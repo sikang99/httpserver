@@ -38,22 +38,19 @@ make m:
 git-hub gh:
 	ssh -T git@github.com
 
-git-update gu:
+
+git-pull gd:
+	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
+
+git-push gu:
 	git init
 	git add README.md Makefile $(PROGRAM).go
-	git commit -m "add Makefile"
+	git commit -m "modify Makefile"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 git-status gs:
 	git status
 	git log --oneline -5
-
-git-origin go:
-	git init
-	git add README.md Makefile $(PROGRAM).go
-	git commit -m "add Makefile"
-	git remote add origin https://sikang99@github.com/sikang99/$(PROGRAM)
-	git push -u origin master
 
 # ---------------------------------------------------------------------------
 usage:
