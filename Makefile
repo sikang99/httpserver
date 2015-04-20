@@ -1,4 +1,4 @@
-# Makefile for
+# Makefile for somthing
 all: usage
 
 PROGRAM=httpserver
@@ -55,7 +55,7 @@ git-status gs:
 # ---------------------------------------------------------------------------
 usage:
 	@echo ""
-	@echo "Makefile for '$(PROGRAM)', by Stoney Kang, 2015/04/12"
+	@echo "Makefile for '$(PROGRAM)', by Stoney Kang, 2015/04/18"
 	@echo ""
 	@echo "usage: make [edit|readme|build|run|test|rebuild|clean|git]"
 	@echo "	edit    : edit source"
@@ -63,5 +63,6 @@ usage:
 	@echo "	run     : execute $(PROGRAM)"
 	@echo "	test    : test $(PROGRAM) options"
 	@echo "	install : install $(PROGRAM) to $(GOPATH)/bin"
-	@echo "	git     : upload $(PROGRAM) to github.com"
+	@echo "	git-push : upload $(PROGRAM) to github.com"
+	@echo "	git-pull : fetch $(PROGRAM) from github.com"
 	@echo ""
