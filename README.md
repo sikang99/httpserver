@@ -28,9 +28,8 @@ To serve a different directory use the `-root` flag:
 
 ## Credits
 
-Inspired by
-[nodeapps/http-server](https://github.com/nodeapps/http-server).
+- Forked from [chrismytton/httpserver](https://github.com/chrismytton/httpserver).
+- Inspired by [nodeapps/http-server](https://github.com/nodeapps/http-server).
 
 ## MIT License
 
-Copyright (c) Chris Mytton
