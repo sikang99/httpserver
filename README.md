@@ -1,10 +1,10 @@
 # Static http server
 
-Ridiculously simple http server for static files.
+Ridiculously simple http/https server for static files.
 
 ## Install
 
-    $ go get github.com/hecticjeff/httpserver
+    $ go get github.com/sikang99/httpserver
 
 ## Usage
 
@@ -22,8 +22,8 @@ To serve a different directory use the `-root` flag:
 
 ## Options
 
-`-port` Defines the TCP port to listen on. (Defaults to 8080).
-`-root` Defines the directory to serve. (Defaults to the current directory).
+* `-port` Defines the TCP port to listen on. (Defaults to 8080).
+* `-root` Defines the directory to serve. (Defaults to the current directory).
 
 ## References
 
