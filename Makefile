@@ -44,7 +44,7 @@ git-pull gd:
 
 git-push gu:
 	git init
-	git add README.md Makefile $(PROGRAM).go
+	git add README.md Makefile $(PROGRAM).go static/gopher.jpg
 	git commit -m "add FileServer handler"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 

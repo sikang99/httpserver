@@ -21,6 +21,7 @@ func main() {
 	flag.Parse()
 
 	http.HandleFunc("/hello", helloHandler)
+	http.HandleFunc("/media", mediaHandler)
 
 	// CAUTION: don't use /static not /static/
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
