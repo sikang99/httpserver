@@ -52,6 +52,9 @@ git-status gs:
 	git status
 	git log --oneline -5
 
+gencert:
+	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 9999 -nodes
+
 # ---------------------------------------------------------------------------
 usage:
 	@echo ""
@@ -65,4 +68,5 @@ usage:
 	@echo "	install : install $(PROGRAM) to $(GOPATH)/bin"
 	@echo "	git-push : upload $(PROGRAM) to github.com"
 	@echo "	git-pull : fetch $(PROGRAM) from github.com"
+	@echo "	gencert  : make certificates for https"
 	@echo ""
