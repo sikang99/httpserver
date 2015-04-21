@@ -28,6 +28,7 @@ To serve a different directory use the `-root` flag:
 ## References
 
 - [HTTPS and Go](https://www.kaihag.com/https-and-go/)
+- [Static http file server in Go](https://www.chrismytton.uk/2013/07/17/golang-static-http-file-server/)
 - Forked from [chrismytton/httpserver](https://github.com/chrismytton/httpserver).
 - Inspired by [nodeapps/http-server](https://github.com/nodeapps/http-server).
 
