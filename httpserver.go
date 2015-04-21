@@ -13,10 +13,10 @@ var (
 	root  = flag.String("root", ".", "Define the root filesystem path")
 )
 
+var wg sync.WaitGroup
+
 func main() {
 	flag.Parse()
-
-	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go serveHttp()
@@ -28,11 +28,13 @@ func main() {
 }
 
 func serveHttp() {
+	defer wg.Done()
 	log.Println("Starting web server at http://0.0.0.0:" + *port)
 	http.ListenAndServe(":"+*port, fileHandler())
 }
 
 func serveHttps() {
+	defer wg.Done()
 	log.Println("Starting web server at https://0.0.0.0:" + *sport)
 	http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", fileHandler())
 }
