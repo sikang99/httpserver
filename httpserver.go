@@ -21,11 +21,12 @@ func main() {
 	flag.Parse()
 
 	http.HandleFunc("/hello", helloHandler)
-	//http.HandleFunc("/static", fileHandler)
-	http.Handle("/static", http.FileServer(http.Dir("./static/")))
+
+	// CAUTION: don't use /static not /static/
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	//fs := http.FileServer(http.Dir("./static"))
-	//http.Handle("/static", http.StripPrefix("/static", fs))
+	//http.Handle("/static", http.StripPrefix("/static/", fs))
 
 	wg.Add(1)
 	go serveHttp()
@@ -61,4 +62,8 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hi there!")
+}
+
+func mediaHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Media handler required!")
 }
