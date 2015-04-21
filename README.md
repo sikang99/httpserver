@@ -23,14 +23,15 @@ To serve a different directory use the `-root` flag:
 ## Options
 
 `-port` Defines the TCP port to listen on. (Defaults to 8080).
-
 `-root` Defines the directory to serve. (Defaults to the current directory).
 
-## Credits
+## References
 
-- 
+- [HTTPS and Go](https://www.kaihag.com/https-and-go/)
 - Forked from [chrismytton/httpserver](https://github.com/chrismytton/httpserver).
 - Inspired by [nodeapps/http-server](https://github.com/nodeapps/http-server).
 
-## MIT License
+## License
+
+MIT
 

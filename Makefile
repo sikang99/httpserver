@@ -45,7 +45,7 @@ git-pull gd:
 git-push gu:
 	git init
 	git add README.md Makefile $(PROGRAM).go
-	git commit -m "modify Makefile"
+	git commit -m "add HTTPS service"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 git-status gs:
