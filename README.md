@@ -27,6 +27,7 @@ To serve a different directory use the `-root` flag:
 
 ## References
 
+- [sparks/rter](https://github.com/sparks/rter) - rtER: Real-Time Emergency Response
 - [Golang. What to use? http.ServeFile(..) or http.FileServer(..)?](http://stackoverflow.com/questions/28793619/golang-what-to-use-http-servefile-or-http-fileserver)
 - [HTTPS and Go](https://www.kaihag.com/https-and-go/)
 - [Static http file server in Go](https://www.chrismytton.uk/2013/07/17/golang-static-http-file-server/)

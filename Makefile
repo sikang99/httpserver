@@ -46,9 +46,8 @@ git-pull gd:
 
 git-push gu:
 	git init
-	#git add README.md Makefile $(PROGRAM).go static/gopher.jpg
 	git add *
-	git commit -m "add favicon.ico"
+	git commit -m "start to code config"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	chromium-browser https://github.com/sikang99/$(PROGRAM)
 

@@ -18,16 +18,13 @@ var (
 func main() {
 	flag.Parse()
 
+	log.Println("Preparing service ...")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
 	http.HandleFunc("/media", mediaHandler)
 
 	// CAUTION: don't use /static not /static/
-	//http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer("./static")))
-
-	//fs := http.FileServer(http.Dir("./static"))
-	//http.Handle("/static", http.StripPrefix("/static/", fs))
 
 	var wg sync.WaitGroup
 
@@ -59,14 +56,9 @@ func fileServer(path string) http.Handler {
 	return http.FileServer(http.Dir(path))
 }
 
-func fileHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Request " + r.URL.Path)
-	http.ServeFile(w, r, r.URL.Path[1:])
-}
-
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Index " + r.URL.Path)
-	http.ServeFile(w, r, "./index.html")
+	http.ServeFile(w, r, r.URL.Path[1:])
 
 	/*
 		err := renderFile(w, r.URL.Path, "html")
