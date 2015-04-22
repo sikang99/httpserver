@@ -15,11 +15,10 @@ var (
 	version = flag.String("version", "0.1.0", "Version number")
 )
 
-var wg sync.WaitGroup
-
 func main() {
 	flag.Parse()
 
+	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
 	http.HandleFunc("/media", mediaHandler)
 
@@ -29,23 +28,25 @@ func main() {
 	//fs := http.FileServer(http.Dir("./static"))
 	//http.Handle("/static", http.StripPrefix("/static/", fs))
 
-	wg.Add(1)
-	go serveHttp()
+	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go serveHttps()
+	go serveHttp(&wg)
+
+	wg.Add(1)
+	go serveHttps(&wg)
 
 	wg.Wait()
 }
 
-func serveHttp() {
+func serveHttp(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP server at http://127.0.0.1:" + *port)
 	//http.ListenAndServe(":"+*port, fileServer())
 	http.ListenAndServe(":"+*port, nil)
 }
 
-func serveHttps() {
+func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTPS server at https://127.0.0.1:" + *sport)
 	//http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", fileServer())
@@ -53,18 +54,47 @@ func serveHttps() {
 }
 
 func fileServer() http.Handler {
+	log.Println("File server " + *root)
 	return http.FileServer(http.Dir(*root))
 }
 
 func fileHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL.Path)
+	log.Println("Request " + r.URL.Path)
 	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Request " + r.URL.Path)
+	http.ServeFile(w, r, "./index.html")
+
+	/*
+		err := renderFile(w, r.URL.Path, "html")
+		if err != nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusNotFound)
+		}
+	*/
+}
+
+/*
+func renderFile(w http.ResponseWriter, filename, ext string) (err error) {
+	file, err := ioutil.ReadFile(filename)
+	defer file.Close()
+
+	if ext != "" {
+		w.Header().Set("Content-Type", mime.TypeByExtension(ext))
+	}
+
+	return err
+}
+*/
+
 func helloHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Request " + r.URL.Path)
 	fmt.Fprintf(w, "Hi there!")
 }
 
 func mediaHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Request " + r.URL.Path)
 	fmt.Fprintf(w, "Media handler required!")
 }

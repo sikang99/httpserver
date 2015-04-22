@@ -15,10 +15,12 @@ build b:
 	@ls -alF --color=auto
 
 run r:
-	./$(PROGRAM)
+	chromium-browser http://127.0.0.1:8000/hello
+	./$(PROGRAM) -port=8000 -sport=8001
 
 test t:
-	./$(PROGRAM) --port 8090
+	chromium-browser -insecure https://127.0.0.1:8001/static
+	./$(PROGRAM) -port=8000 -sport=8001
 
 rebuild:
 	rm -f ./$(PROGRAM)
