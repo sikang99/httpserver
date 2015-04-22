@@ -1,4 +1,4 @@
-# Makefile for somthing
+# Makefile for http server supporting http, https, http2
 all: usage
 
 PROGRAM=httpserver
