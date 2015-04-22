@@ -23,7 +23,8 @@ func main() {
 	http.HandleFunc("/media", mediaHandler)
 
 	// CAUTION: don't use /static not /static/
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+	//http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+	http.Handle("/static/", http.StripPrefix("/static/", fileServer("./static")))
 
 	//fs := http.FileServer(http.Dir("./static"))
 	//http.Handle("/static", http.StripPrefix("/static/", fs))
@@ -53,9 +54,9 @@ func serveHttps(wg *sync.WaitGroup) {
 	http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", nil)
 }
 
-func fileServer() http.Handler {
-	log.Println("File server " + *root)
-	return http.FileServer(http.Dir(*root))
+func fileServer(path string) http.Handler {
+	log.Println("File server " + path)
+	return http.FileServer(http.Dir(path))
 }
 
 func fileHandler(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +65,7 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Request " + r.URL.Path)
+	log.Println("Index " + r.URL.Path)
 	http.ServeFile(w, r, "./index.html")
 
 	/*
@@ -90,11 +91,11 @@ func renderFile(w http.ResponseWriter, filename, ext string) (err error) {
 */
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Request " + r.URL.Path)
+	log.Println("Hello " + r.URL.Path)
 	fmt.Fprintf(w, "Hi there!")
 }
 
 func mediaHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Request " + r.URL.Path)
+	log.Println("Media " + r.URL.Path)
 	fmt.Fprintf(w, "Media handler required!")
 }

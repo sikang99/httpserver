@@ -50,6 +50,7 @@ git-push gu:
 	git add *
 	git commit -m "add favicon.ico"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
+	chromium-browser https://github.com/sikang99/$(PROGRAM)
 
 git-status gs:
 	git status

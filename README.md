@@ -14,11 +14,11 @@ To serve the current directory on port 8080:
 
 To use a different port specify with the `-port` flag:
 
-    $ httpserver -port 5000
+    $ httpserver -port=5000
 
 To serve a different directory use the `-root` flag:
 
-    $ httpserver -root public
+    $ httpserver -root=./public
 
 ## Options
 
