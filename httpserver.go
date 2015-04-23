@@ -37,6 +37,7 @@ func main() {
 	wg.Wait()
 }
 
+// for http access
 func serveHttp(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP server at http://127.0.0.1:" + *port)
@@ -44,6 +45,7 @@ func serveHttp(wg *sync.WaitGroup) {
 	http.ListenAndServe(":"+*port, nil)
 }
 
+// for https access
 func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTPS server at https://127.0.0.1:" + *sport)
@@ -83,7 +85,8 @@ func renderFile(w http.ResponseWriter, filename, ext string) (err error) {
 */
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Hello " + r.URL.Path)
+	log.Printf("Hello %s\n", r.URL.Path)
+	//log.Printf("Hello %q\n", html.EscapeString(r.URL.Path))
 	fmt.Fprintf(w, "Hi there!")
 }
 

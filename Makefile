@@ -1,4 +1,7 @@
 # Makefile for http server supporting http, https, http2
+
+.PHONY:	edit build run rebuild install clean make
+
 all: usage
 
 PROGRAM=httpserver
