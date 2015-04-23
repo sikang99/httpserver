@@ -1,6 +1,6 @@
 # Static http server
 
-Ridiculously simple http/https server for static files.
+Simple http/https test server for some services and tatic files.
 
 ## Install
 
@@ -27,6 +27,7 @@ To serve a different directory use the `-root` flag:
 
 ## References
 
+- [goware/httpmock](https://github.com/goware/httpmock) - HTTP mocking in Go made easy
 - [Using Object-Oriented Web Servers in Go](http://blog.codeship.com/using-object-oriented-web-servers-go/)
 - [sparks/rter](https://github.com/sparks/rter) - rtER: Real-Time Emergency Response
 - [Golang. What to use? http.ServeFile(..) or http.FileServer(..)?](http://stackoverflow.com/questions/28793619/golang-what-to-use-http-servefile-or-http-fileserver)
