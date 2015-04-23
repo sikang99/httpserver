@@ -18,7 +18,7 @@ var (
 func main() {
 	flag.Parse()
 
-	log.Println("Preparing service ...")
+	log.Println("Preparing http/https service ...")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
 	http.HandleFunc("/media", mediaHandler)
@@ -42,7 +42,7 @@ func serveHttp(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP server at http://127.0.0.1:" + *port)
 	//http.ListenAndServe(":"+*port, fileServer())
-	http.ListenAndServe(":"+*port, nil)
+	log.Fatal(http.ListenAndServe(":"+*port, nil))
 }
 
 // for https access
@@ -50,7 +50,7 @@ func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTPS server at https://127.0.0.1:" + *sport)
 	//http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", fileServer())
-	http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", nil)
+	log.Fatal(http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", nil))
 }
 
 func fileServer(path string) http.Handler {
@@ -87,7 +87,7 @@ func renderFile(w http.ResponseWriter, filename, ext string) (err error) {
 func helloHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Hello %s\n", r.URL.Path)
 	//log.Printf("Hello %q\n", html.EscapeString(r.URL.Path))
-	fmt.Fprintf(w, "Hi there!")
+	fmt.Fprintf(w, "Hi there! from Stoney")
 }
 
 func mediaHandler(w http.ResponseWriter, r *http.Request) {
