@@ -56,20 +56,19 @@ func httpClient(url string) error {
 	log.Printf("http.Get %s\n", url)
 	res, err := http.Get(url)
 	if err != nil {
-		log.Println(err)
-		return err
+		log.Fatal(err)
 	}
 	defer res.Body.Close()
 
-	data, err := ioutil.ReadAll(res.Body)
+	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 
 	println("")
 	fmt.Printf("Header: %s\n", res.Header["Content-Type"])
 	fmt.Printf("Code: %s\n", res.Status)
-	fmt.Printf("Data: %s\n", string(data))
+	fmt.Printf("Body: %s\n", string(body))
 	println("")
 
 	return nil

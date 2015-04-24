@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 )
 
@@ -14,17 +15,17 @@ type Config struct {
 func ShowNetInterfaces() {
 	list, err := net.Interfaces()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	for i, iface := range list {
-		fmt.Printf("%d name=%s %v\n", i, iface.Name, iface)
+		fmt.Printf("%d %s %v\n", i, iface.Name, iface)
 		addrs, err := iface.Addrs()
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		for j, addr := range addrs {
-			fmt.Printf(" %d %v\n", j, addr)
+			fmt.Printf("\t%d %v\n", j, addr)
 		}
 	}
 }

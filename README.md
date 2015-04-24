@@ -27,6 +27,7 @@ To serve a different directory use the `-root` flag:
 
 ## References
 
+- [Basic Encryption in Golang](http://golangcast.tv/articles/basic-encryption-in-golang)
 - [BlueDragonX/go-proxy-example](https://github.com/BlueDragonX/go-proxy-example) - An example TCP proxy in Go
 - [jameycribbs/ivy](https://github.com/jameycribbs/ivy) - A simple, file-based Database Management System (DBMS) for Go
 - [goware/httpmock](https://github.com/goware/httpmock) - HTTP mocking in Go made easy
