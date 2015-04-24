@@ -52,17 +52,17 @@ make m:
 	$(EDITOR) Makefile
 
 # ---------------------------------------------------------------------------
-view v:
+git-view gview gv:
 	LANG=C chromium-browser https://github.com/sikang99/$(PROGRAM)
 
 git-hub gh:
 	ssh -T git@github.com
 
 
-git-pull gd:
+git-pull gpull gd:
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
-git-push gu:
+git-push gpush gu:
 	git init
 	git add *
 	git commit -m "add log and monitor funcs"
@@ -79,15 +79,18 @@ gencert:
 # ---------------------------------------------------------------------------
 usage:
 	@echo ""
-	@echo "Makefile for '$(PROGRAM)', by Stoney Kang, 2015/04/18"
+	@echo "Makefile for '$(PROGRAM)', by Stoney Kang, 2015/04/24"
 	@echo ""
 	@echo "usage: make [edit|readme|build|run|test|rebuild|clean|git]"
-	@echo "	edit    : edit source"
-	@echo "	build   : compile source"
-	@echo "	run     : execute $(PROGRAM)"
-	@echo "	test    : test $(PROGRAM) options"
-	@echo "	install : install $(PROGRAM) to $(GOPATH)/bin"
-	@echo "	git-push : upload $(PROGRAM) to github.com"
-	@echo "	git-pull : fetch $(PROGRAM) from github.com"
+	@echo "	edit(e)    : edit source"
+	@echo "	build(b)   : compile source"
+	@echo "	run(r)     : execute $(PROGRAM)"
+	@echo "	run(rm)    : $(PROGRAM) monitor options"
+	@echo "	run(rc)    : $(PROGRAM) client options"
+	@echo "	run(rs)    : $(PROGRAM) server options"
+	@echo "	install(i) : install $(PROGRAM) to $(GOPATH)/bin"
+	@echo "	git-push(gu) : upload $(PROGRAM) to github.com"
+	@echo "	git-pull(gp) : fetch $(PROGRAM) from github.com"
+	@echo "	git-view(gv) : browse $(PROGRAM) at github.com"
 	@echo "	gencert  : make certificates for https"
 	@echo ""
