@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -68,7 +69,7 @@ func httpClient(url string) error {
 	println("")
 	fmt.Printf("Header: %s\n", res.Header["Content-Type"])
 	fmt.Printf("Code: %s\n", res.Status)
-	fmt.Printf("Body: %s\n", string(body))
+	fmt.Printf("%s\n", string(body))
 	println("")
 
 	return nil
@@ -79,7 +80,7 @@ func httpServer() error {
 	log.Println("Server mode")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
-	http.HandleFunc("/media", mediaHandler)
+	http.HandleFunc("/media/", mediaHandler)
 
 	// CAUTION: don't use /static not /static/
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer("./static")))
@@ -118,7 +119,7 @@ func fileServer(path string) http.Handler {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Index " + r.URL.Path)
+	log.Println("Index " + r.URL.Path[1:])
 	http.ServeFile(w, r, r.URL.Path[1:])
 
 	/*
@@ -143,13 +144,25 @@ func renderFile(w http.ResponseWriter, filename, ext string) (err error) {
 }
 */
 
+func Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
+	w.WriteHeader(status)
+	log.Println(message)
+	fmt.Fprintf(w, message)
+}
+
 func helloHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Hello %s\n", r.URL.Path)
-	//log.Printf("Hello %q\n", html.EscapeString(r.URL.Path))
+	//log.Printf("Hello %s\n", r.URL.Path)
+	log.Printf("Hello %q\n", html.EscapeString(r.URL.Path))
 	fmt.Fprintf(w, "Hi there! from Stoney")
 }
 
 func mediaHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Media " + r.URL.Path)
-	fmt.Fprintf(w, "Media handler required!")
+
+	_, err := os.Stat(r.URL.Path[1:])
+	if err != nil {
+		Responder(w, r, 404, r.URL.Path)
+	} else {
+		Responder(w, r, 200, r.URL.Path)
+	}
 }
