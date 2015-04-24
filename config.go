@@ -6,7 +6,9 @@ import (
 )
 
 type Config struct {
-	Desciption string
+	Port       string `json:"port"`
+	SecurePort string `json:"secure_port"`
+	Desciption string `json:"description"`
 }
 
 func ShowNetInterfaces() {

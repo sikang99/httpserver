@@ -20,9 +20,17 @@ var (
 	version = flag.String("version", "0.1.1", "Version number")
 )
 
+func init() {
+	log.SetOutput(os.Stdout)
+	//log.SetPrefix("TRACE: ")
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	flag.Parse()
+}
+
 // client and server in go style
 func main() {
-	flag.Parse()
+	//flag.Parse()
 
 	if *fTest == true {
 		httpTester()
@@ -44,7 +52,7 @@ func httpTester() error {
 
 // http client
 func httpClient(url string) error {
-	log.Printf("Client mode with %s\n", url)
+	log.Printf("http.Get %s\n", url)
 	res, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
@@ -57,9 +65,11 @@ func httpClient(url string) error {
 		log.Println(err)
 	}
 
+	println("")
 	fmt.Printf("Header: %s\n", res.Header["Content-Type"])
 	fmt.Printf("Code: %s\n", res.Status)
 	fmt.Printf("Data: %s\n", string(data))
+	println("")
 
 	return nil
 }
@@ -91,7 +101,6 @@ func httpServer() error {
 func serveHttp(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP server at http://127.0.0.1:" + *port)
-	//http.ListenAndServe(":"+*port, fileServer())
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
 }
 
@@ -99,7 +108,6 @@ func serveHttp(wg *sync.WaitGroup) {
 func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTPS server at https://127.0.0.1:" + *sport)
-	//http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", fileServer())
 	log.Fatal(http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", nil))
 }
 

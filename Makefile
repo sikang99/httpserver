@@ -19,15 +19,17 @@ build b:
 	@ls -alF --color=auto
 
 run r:
-	chromium-browser http://127.0.0.1:8000/hello
+	@chromium-browser http://127.0.0.1:8000/hello
 	./$(PROGRAM) -port=8000 -sport=8001
 
 test t:
-	chromium-browser -insecure https://127.0.0.1:8001/static
+	@chromium-browser -insecure https://127.0.0.1:8001/static
 	./$(PROGRAM) -port=8000 -sport=8001
 
 rclient rc:
-	./$(PROGRAM) -port=8000 -sport=8001
+	./$(PROGRAM) -url http://localhost:8000/hello -port=8000 -sport=8001
+	./$(PROGRAM) -url http://localhost:8000/index
+	./$(PROGRAM) -url http://localhost:8000/media
 
 rserver rs:
 	./$(PROGRAM) -d -port=8000 -sport=8001
