@@ -9,36 +9,40 @@ import (
 )
 
 var (
+	fUrl    = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	fDaemon = flag.Bool("d", false, "Daemon server mode")
-	port    = flag.String("port", "8000", "Define TCP port for http")
-	sport   = flag.String("sport", "8001", "Define TCP port for https")
+	port    = flag.String("port", "8000", "Define TCP port to be used for http")
+	sport   = flag.String("sport", "8001", "Define TCP port to be used for https")
 	root    = flag.String("root", ".", "Define the root filesystem path")
-	version = flag.String("version", "0.1.0", "Version number")
+	version = flag.String("version", "0.1.1", "Version number")
 )
 
 // client and server in go style
 func main() {
 	flag.Parse()
 
+	// determine the role of client and server
 	if *fDaemon == true {
 		httpServer()
 	} else {
-		httpClient()
+		httpClient(*fUrl)
 	}
 }
 
-func httpClient() {
-	log.Println("Client mode")
-	res, err := http.Get("http://localhost:" + *port + "/hello")
+// http client
+func httpClient(url string) {
+	log.Printf("Client mode with %s\n", url)
+	res, err := http.Get(url)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(res.Body)
+	fmt.Println(res.Status)
 
-	ShowNetInterfaces()
+	//ShowNetInterfaces()
 }
 
+// http server
 func httpServer() {
 	log.Println("Server mode")
 	http.HandleFunc("/", indexHandler)
