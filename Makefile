@@ -34,8 +34,8 @@ rclient rc:
 rserver rs:
 	./$(PROGRAM) -d -port=8000 -sport=8001
 
-rtest rt:
-	./$(PROGRAM) -t
+rtest rm:
+	./$(PROGRAM) -m
 
 rebuild:
 	rm -f ./$(PROGRAM)
@@ -65,7 +65,7 @@ git-pull gd:
 git-push gu:
 	git init
 	git add *
-	git commit -m "add config.go"
+	git commit -m "add log and monitor funcs"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	#chromium-browser https://github.com/sikang99/$(PROGRAM)
 

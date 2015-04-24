@@ -12,7 +12,7 @@ import (
 
 var (
 	fDaemon = flag.Bool("d", false, "Daemon server mode")
-	fTest   = flag.Bool("t", false, "Test mode")
+	fMon    = flag.Bool("m", false, "Monitor mode, especillay for web")
 	fUrl    = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	port    = flag.String("port", "8000", "Define TCP port to be used for http")
 	sport   = flag.String("sport", "8001", "Define TCP port to be used for https")
@@ -32,8 +32,8 @@ func init() {
 func main() {
 	//flag.Parse()
 
-	if *fTest == true {
-		httpTester()
+	if *fMon == true {
+		httpMonitor()
 		os.Exit(0)
 	}
 
@@ -45,7 +45,8 @@ func main() {
 	}
 }
 
-func httpTester() error {
+// http monitor
+func httpMonitor() error {
 	ShowNetInterfaces()
 	return nil
 }
