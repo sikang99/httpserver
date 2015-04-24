@@ -3,14 +3,17 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 )
 
 var (
-	fUrl    = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	fDaemon = flag.Bool("d", false, "Daemon server mode")
+	fTest   = flag.Bool("t", false, "Test mode")
+	fUrl    = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	port    = flag.String("port", "8000", "Define TCP port to be used for http")
 	sport   = flag.String("sport", "8001", "Define TCP port to be used for https")
 	root    = flag.String("root", ".", "Define the root filesystem path")
@@ -21,6 +24,11 @@ var (
 func main() {
 	flag.Parse()
 
+	if *fTest == true {
+		httpTester()
+		os.Exit(0)
+	}
+
 	// determine the role of client and server
 	if *fDaemon == true {
 		httpServer()
@@ -29,21 +37,35 @@ func main() {
 	}
 }
 
+func httpTester() error {
+	ShowNetInterfaces()
+	return nil
+}
+
 // http client
-func httpClient(url string) {
+func httpClient(url string) error {
 	log.Printf("Client mode with %s\n", url)
 	res, err := http.Get(url)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return err
+	}
+	defer res.Body.Close()
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Println(err)
 	}
 
-	fmt.Println(res.Status)
+	fmt.Printf("Header: %s\n", res.Header["Content-Type"])
+	fmt.Printf("Code: %s\n", res.Status)
+	fmt.Printf("Data: %s\n", string(data))
 
-	//ShowNetInterfaces()
+	return nil
 }
 
 // http server
-func httpServer() {
+func httpServer() error {
 	log.Println("Server mode")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
@@ -61,6 +83,8 @@ func httpServer() {
 	go serveHttps(&wg)
 
 	wg.Wait()
+
+	return nil
 }
 
 // for http access

@@ -32,6 +32,8 @@ rclient rc:
 rserver rs:
 	./$(PROGRAM) -d -port=8000 -sport=8001
 
+rtest rt:
+	./$(PROGRAM) -t
 
 rebuild:
 	rm -f ./$(PROGRAM)
