@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	fDaemon = flag.Bool("d", false, "Daemon mode")
-	port    = flag.String("port", "8000", "Define what TCP port to bind to")
-	sport   = flag.String("sport", "8001", "Define what TCP port to bind to")
+	fDaemon = flag.Bool("d", false, "Daemon server mode")
+	port    = flag.String("port", "8000", "Define TCP port for http")
+	sport   = flag.String("sport", "8001", "Define TCP port for https")
 	root    = flag.String("root", ".", "Define the root filesystem path")
 	version = flag.String("version", "0.1.0", "Version number")
 )
@@ -29,6 +29,14 @@ func main() {
 
 func httpClient() {
 	log.Println("Client mode")
+	res, err := http.Get("http://localhost:" + *port + "/hello")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(res.Body)
+
+	ShowNetInterfaces()
 }
 
 func httpServer() {

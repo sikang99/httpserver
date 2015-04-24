@@ -14,7 +14,8 @@ readme md:
 	$(EDITOR) README.md
 
 build b:
-	go build $(PROGRAM).go
+	#go build $(PROGRAM).go
+	go build 
 	@ls -alF --color=auto
 
 run r:
@@ -24,6 +25,13 @@ run r:
 test t:
 	chromium-browser -insecure https://127.0.0.1:8001/static
 	./$(PROGRAM) -port=8000 -sport=8001
+
+rclient rc:
+	./$(PROGRAM) -port=8000 -sport=8001
+
+rserver rs:
+	./$(PROGRAM) -d -port=8000 -sport=8001
+
 
 rebuild:
 	rm -f ./$(PROGRAM)
@@ -50,7 +58,7 @@ git-pull gd:
 git-push gu:
 	git init
 	git add *
-	git commit -m "start to code config"
+	git commit -m "add config.go"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	chromium-browser https://github.com/sikang99/$(PROGRAM)
 
