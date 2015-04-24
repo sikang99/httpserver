@@ -9,16 +9,30 @@ import (
 )
 
 var (
+	fDaemon = flag.Bool("d", false, "Daemon mode")
 	port    = flag.String("port", "8000", "Define what TCP port to bind to")
 	sport   = flag.String("sport", "8001", "Define what TCP port to bind to")
 	root    = flag.String("root", ".", "Define the root filesystem path")
 	version = flag.String("version", "0.1.0", "Version number")
 )
 
+// client and server in go style
 func main() {
 	flag.Parse()
 
-	log.Println("Preparing http/https service ...")
+	if *fDaemon == true {
+		httpServer()
+	} else {
+		httpClient()
+	}
+}
+
+func httpClient() {
+	log.Println("Client mode")
+}
+
+func httpServer() {
+	log.Println("Server mode")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
 	http.HandleFunc("/media", mediaHandler)
@@ -53,6 +67,7 @@ func serveHttps(wg *sync.WaitGroup) {
 	log.Fatal(http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", nil))
 }
 
+// static file server
 func fileServer(path string) http.Handler {
 	log.Println("File server " + path)
 	return http.FileServer(http.Dir(path))

@@ -1,4 +1,4 @@
-# Static http server
+# Static http/https server
 
 Simple http/https test server for some services and tatic files.
 
@@ -27,6 +27,7 @@ To serve a different directory use the `-root` flag:
 
 ## References
 
+- [BlueDragonX/go-proxy-example](https://github.com/BlueDragonX/go-proxy-example) - An example TCP proxy in Go
 - [jameycribbs/ivy](https://github.com/jameycribbs/ivy) - A simple, file-based Database Management System (DBMS) for Go
 - [goware/httpmock](https://github.com/goware/httpmock) - HTTP mocking in Go made easy
 - [Using Object-Oriented Web Servers in Go](http://blog.codeship.com/using-object-oriented-web-servers-go/)
