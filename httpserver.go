@@ -69,6 +69,8 @@ func httpClient(url string) error {
 		log.Fatal(err)
 	}
 
+	printHttpHeader(res.Header)
+
 	println("")
 	fmt.Printf("Header: %s\n", res.Header["Content-Type"])
 	fmt.Printf("Code: %s\n", res.Status)
@@ -76,6 +78,12 @@ func httpClient(url string) error {
 	println("")
 
 	return nil
+}
+
+func printHttpHeader(h http.Header) {
+	for k, v := range h {
+		log.Println("key:", k, "value:", v)
+	}
 }
 
 // http server
