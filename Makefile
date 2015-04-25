@@ -10,6 +10,9 @@ EDITOR=vim
 edit e:
 	$(EDITOR) $(PROGRAM).go
 
+ew:
+	$(EDITOR) wrapper.go
+
 readme md:
 	$(EDITOR) README.md
 
@@ -65,7 +68,7 @@ git-pull gpull gd:
 git-push gpush gu:
 	git init
 	git add *
-	git commit -m "add log and monitor funcs"
+	git commit -m "add wrapper functions, not yet used"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	#chromium-browser https://github.com/sikang99/$(PROGRAM)
 
