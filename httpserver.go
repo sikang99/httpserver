@@ -153,3 +153,12 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 		Responder(w, r, 200, r.URL.Path)
 	}
 }
+
+// wrapper function for http.HandlerFunc
+func logging(fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Before")
+		fn(w, r)
+		log.Println("After")
+	}
+}
