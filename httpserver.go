@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"html"
@@ -12,6 +13,8 @@ import (
 )
 
 var (
+	NotSupportError = errors.New("Not supported protocol")
+
 	fDaemon = flag.Bool("d", false, "Daemon server mode")
 	fMon    = flag.Bool("m", false, "Monitor mode, especillay for web")
 	fUrl    = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
@@ -121,30 +124,14 @@ func fileServer(path string) http.Handler {
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Index " + r.URL.Path[1:])
 	http.ServeFile(w, r, r.URL.Path[1:])
-
-	/*
-		err := renderFile(w, r.URL.Path, "html")
-		if err != nil {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusNotFound)
-		}
-	*/
 }
-
-/*
-func renderFile(w http.ResponseWriter, filename, ext string) (err error) {
-	file, err := ioutil.ReadFile(filename)
-	defer file.Close()
-
-	if ext != "" {
-		w.Header().Set("Content-Type", mime.TypeByExtension(ext))
-	}
-
-	return err
-}
-*/
 
 func Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
+	/*
+		w.Header().Set("Content-Type", mime.TypeByExtension(ext))
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+	*/
 	w.WriteHeader(status)
 	log.Println(message)
 	fmt.Fprintf(w, message)
