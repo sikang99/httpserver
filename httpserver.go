@@ -96,7 +96,8 @@ func httpServer() error {
 	// CAUTION: don't use /static not /static/
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer("./static")))
 
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
+	wg := sync.WaitGroup{}
 
 	wg.Add(1)
 	go serveHttp(&wg)
