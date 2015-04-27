@@ -27,6 +27,7 @@ To serve a different directory use the `-root` flag:
 
 ## References
 
+- [Urban4M/go-workgroup](https://github.com/Urban4M/go-workgroup) - go-workgroup - wraps sync.WaitGroup
 - [Gorilla Websockets, golang simple websockets example](http://41j.com/blog/2014/12/gorilla-websockets-golang-simple-websockets-example/)
 - [The http.HandlerFunc wrapper technique in #golang](https://medium.com/@matryer/the-http-handlerfunc-wrapper-technique-in-golang-c60bf76e6124)
 - [Basic Encryption in Golang](http://golangcast.tv/articles/basic-encryption-in-golang)
