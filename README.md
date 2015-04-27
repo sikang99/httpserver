@@ -27,6 +27,8 @@ To serve a different directory use the `-root` flag:
 
 ## References
 
+
+- [Serving server generated PNGs over HTTP in golang](http://41j.com/blog/2015/03/serving-server-generated-pngs-over-http-in-golang/)
 - [Urban4M/go-workgroup](https://github.com/Urban4M/go-workgroup) - go-workgroup - wraps sync.WaitGroup
 - [Gorilla Websockets, golang simple websockets example](http://41j.com/blog/2014/12/gorilla-websockets-golang-simple-websockets-example/)
 - [The http.HandlerFunc wrapper technique in #golang](https://medium.com/@matryer/the-http-handlerfunc-wrapper-technique-in-golang-c60bf76e6124)
@@ -41,6 +43,7 @@ To serve a different directory use the `-root` flag:
 - [Static http file server in Go](https://www.chrismytton.uk/2013/07/17/golang-static-http-file-server/)
 - Forked from [chrismytton/httpserver](https://github.com/chrismytton/httpserver).
 - Inspired by [nodeapps/http-server](https://github.com/nodeapps/http-server).
+
 
 ## License
 
