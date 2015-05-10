@@ -51,7 +51,7 @@ func main() {
 
 // http monitor
 func httpMonitor() error {
-	ShowNetInterfaces()
+	//ShowNetInterfaces()
 	return nil
 }
 
