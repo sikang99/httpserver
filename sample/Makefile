@@ -2,7 +2,8 @@
 
 #PROGRAM=tls-client
 #PROGRAM=tls-simple
-PROGRAM=tls-example
+#PROGRAM=tls-example
+PROGRAM=file-upload
 
 all: usage
 

@@ -71,7 +71,7 @@ git-hub gh:
 git-pull gpull gd:
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
-git-push gpush gu:
+git-push gpush gp:
 	git init
 	git add * .gitignore
 	git commit -m "add samples for tls coding"

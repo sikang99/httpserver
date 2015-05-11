@@ -38,7 +38,7 @@ func init() {
 	flag.Parse()
 }
 
-// client and server in go style
+// a single program including client and server in go style
 func main() {
 	//flag.Parse()
 
@@ -63,19 +63,19 @@ func httpMonitor() error {
 
 // http client
 func httpClient(url string) error {
-	log.Printf("http.Get %s\n", url)
+	log.Printf("http.Client %s\n", url)
 
 	// simple tls setting
-	tr := &http.Transport{
+	tp := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{Transport: tp}
 
-	err := httpClientRequest(client, url)
+	err := httpClientGet(client, url)
 	return err
 }
 
-func httpClientRequest(client *http.Client, url string) error {
+func httpClientGet(client *http.Client, url string) error {
 	res, err := client.Get(url)
 	if err != nil {
 		log.Fatal(err)
@@ -94,6 +94,18 @@ func httpClientRequest(client *http.Client, url string) error {
 	fmt.Printf("Code: %s\n", res.Status)
 	fmt.Printf("%s\n", string(body))
 	println("")
+
+	return err
+}
+
+func httpClientPost(client *http.Client, url string) error {
+	res, err := client.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	// Content-Type: video/mjpeg
 
 	return err
 }

@@ -25,6 +25,18 @@ To serve a different directory use the `-root` flag:
 * `-port` Defines the TCP port to listen on. (Defaults to 8080).
 * `-root` Defines the directory to serve. (Defaults to the current directory).
 
+
+## Design
+
+Internal service structure
+
+	http  --> server(8001)     + --> file server
+	https --> server(8001) --> + --> streaming server
+	http2 --> server(8002)     + --> monitor server
+
+
+
+
 ## References
 
 - [aljemala/tls-client](https://gist.github.com/michaljemala/d6f4e01c4834bf47a9c4) - SSL Client Authentication Golang sample
