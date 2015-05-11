@@ -23,11 +23,11 @@ build b:
 
 run r:
 	@chromium-browser http://127.0.0.1:8000/hello
-	./$(PROGRAM) -port=8000 -sport=8001
+	./$(PROGRAM) -d -port=8000 -sport=8001
 
 test t:
 	@chromium-browser -insecure https://127.0.0.1:8001/static
-	./$(PROGRAM) -port=8000 -sport=8001
+	./$(PROGRAM) -d -port=8000 -sport=8001
 
 rclient rc:
 	./$(PROGRAM) -url http://localhost:8000/hello -port=8000 -sport=8001
@@ -47,6 +47,9 @@ rebuild:
 
 install i:
 	go install
+
+kill k:
+	killall httpserver
 
 clean:
 	rm -f ./$(PROGRAM)
@@ -68,7 +71,7 @@ git-pull gpull gd:
 git-push gpush gu:
 	git init
 	git add *
-	git commit -m "add wrapper functions, not yet used"
+	git commit -m "add -d daemon option to work as a server"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	#chromium-browser https://github.com/sikang99/$(PROGRAM)
 
