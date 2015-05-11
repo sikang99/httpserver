@@ -27,7 +27,7 @@ To serve a different directory use the `-root` flag:
 
 ## References
 
-
+- [aljemala/tls-client](https://gist.github.com/michaljemala/d6f4e01c4834bf47a9c4) - SSL Client Authentication Golang sample
 - [Serving server generated PNGs over HTTP in golang](http://41j.com/blog/2015/03/serving-server-generated-pngs-over-http-in-golang/)
 - [Urban4M/go-workgroup](https://github.com/Urban4M/go-workgroup) - go-workgroup - wraps sync.WaitGroup
 - [Gorilla Websockets, golang simple websockets example](http://41j.com/blog/2014/12/gorilla-websockets-golang-simple-websockets-example/)

@@ -32,9 +32,9 @@ test t:
 	./$(PROGRAM) -d -port=8000 -ports=8001 -port2=8002
 
 rclient rc:
-	./$(PROGRAM) -url http://localhost:8000/hello -port=8000 -sport=8001
-	./$(PROGRAM) -url http://localhost:8000/index
-	./$(PROGRAM) -url http://localhost:8000/media
+	./$(PROGRAM) -url http://localhost:8000/hello
+	./$(PROGRAM) -url https://localhost:8001/media
+	./$(PROGRAM) -url https://localhost:8002/index.html
 
 rserver rs:
 	./$(PROGRAM) -d -port=8000 -sport=8001
@@ -73,7 +73,7 @@ git-pull gpull gd:
 git-push gpush gu:
 	git init
 	git add *
-	git commit -m "add http2 port"
+	git commit -m "add samples for tls coding"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	#chromium-browser https://github.com/sikang99/$(PROGRAM)
 

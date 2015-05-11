@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"sync"
 
+	//"./base"
 	"github.com/bradfitz/http2"
 )
 
@@ -55,14 +57,22 @@ func main() {
 
 // http monitor
 func httpMonitor() error {
-	//ShowNetInterfaces()
+	//base.ShowNetInterfaces()
 	return nil
 }
 
 // http client
 func httpClient(url string) error {
 	log.Printf("http.Get %s\n", url)
-	res, err := http.Get(url)
+
+	// simple tls
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
+	res, err := client.Get(url)
+	//res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -124,23 +134,22 @@ func serveHttp(wg *sync.WaitGroup) {
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
 }
 
-// for https access
+// for https tls access
 func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTPS server at https://127.0.0.1:" + *ports)
-	log.Fatal(http.ListenAndServeTLS(":"+*ports, "cert.pem", "key.pem", nil))
+	log.Fatal(http.ListenAndServeTLS(":"+*ports, "sec/cert.pem", "sec/key.pem", nil))
 }
 
-// for http2 access
+// for http2 tls access
 func serveHttp2(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP2 server at https://127.0.0.1:" + *port2)
 
 	var srv http.Server
 	srv.Addr = ":" + *port2
-
 	http2.ConfigureServer(&srv, &http2.Server{})
-	log.Fatal(srv.ListenAndServeTLS("server.crt", "server.key"))
+	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
 }
 
 // static file server
@@ -154,17 +163,6 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
-func Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
-	/*
-		w.Header().Set("Content-Type", mime.TypeByExtension(ext))
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusNotFound)
-	*/
-	w.WriteHeader(status)
-	log.Println(message)
-	fmt.Fprintf(w, message)
-}
-
 func helloHandler(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("Hello %s\n", r.URL.Path)
 	log.Printf("Hello %q\n", html.EscapeString(r.URL.Path))
@@ -176,8 +174,19 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := os.Stat(r.URL.Path[1:])
 	if err != nil {
-		Responder(w, r, 404, r.URL.Path)
+		Responder(w, r, 404, r.URL.Path+" is Not Found")
 	} else {
 		Responder(w, r, 200, r.URL.Path)
 	}
+}
+
+func Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
+	/*
+		w.Header().Set("Content-Type", mime.TypeByExtension(ext))
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+	*/
+	w.WriteHeader(status)
+	log.Println(message)
+	fmt.Fprintf(w, message)
 }
