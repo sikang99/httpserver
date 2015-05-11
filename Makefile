@@ -8,17 +8,17 @@ PROGRAM=httpserver
 EDITOR=vim
 
 edit e:
-	$(EDITOR) $(PROGRAM).go
+	$(EDITOR) server/$(PROGRAM).go
 
 ew:
-	$(EDITOR) wrapper.go
+	$(EDITOR) base/wrapper.go
 
 readme md:
 	$(EDITOR) README.md
 
 build b:
 	#go build $(PROGRAM).go
-	go build 
+	go build -o $(PROGRAM) server/$(PROGRAM).go
 	@ls -alF --color=auto
 
 # testing http
@@ -40,7 +40,7 @@ rclient rc:
 rserver rs:
 	./$(PROGRAM) -d -port=8000 -sport=8001
 
-rtest rm:
+rmonitor rm:
 	./$(PROGRAM) -m
 
 rebuild:

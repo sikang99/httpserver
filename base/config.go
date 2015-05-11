@@ -9,6 +9,8 @@ import (
 type Config struct {
 	Port       string `json:"port"`
 	SecurePort string `json:"secure_port"`
+	Http2Port  string `json:"http2_port"`
+	LogFile    string `json:"log_file"`
 	Desciption string `json:"description"`
 }
 
