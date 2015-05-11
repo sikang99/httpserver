@@ -33,7 +33,8 @@ test t:
 
 rclient rc:
 	./$(PROGRAM) -url http://localhost:8000/hello
-	./$(PROGRAM) -url https://localhost:8001/media
+	./$(PROGRAM) -url https://localhost:8001/media/gopher.jpg
+	./$(PROGRAM) -url https://localhost:8001/static/image/gopher.jpg
 	./$(PROGRAM) -url https://localhost:8002/index.html
 	#./$(PROGRAM) -url https://localhost:8002/README.md
 

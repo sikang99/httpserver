@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"../base"
@@ -87,12 +88,17 @@ func httpClientGet(client *http.Client, url string) error {
 		log.Fatal(err)
 	}
 
-	printHttpHeader(res.Header)
+	//printHttpHeader(res.Header)
+	ct := res.Header["Content-Type"][0]
 
 	println("")
-	fmt.Printf("Header: %s\n", res.Header["Content-Type"])
-	fmt.Printf("Code: %s\n", res.Status)
-	fmt.Printf("%s\n", string(body))
+	fmt.Printf("Response Code: %s\n", res.Status)
+	fmt.Printf("Content-Type: %s\n", res.Header["Content-Type"])
+	if strings.Contains(ct, "text") == true {
+		fmt.Printf("%s\n", string(body))
+	} else {
+		fmt.Printf("[binary data]\n")
+	}
 	println("")
 
 	return err
