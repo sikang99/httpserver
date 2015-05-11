@@ -35,6 +35,7 @@ rclient rc:
 	./$(PROGRAM) -url http://localhost:8000/hello
 	./$(PROGRAM) -url https://localhost:8001/media
 	./$(PROGRAM) -url https://localhost:8002/index.html
+	#./$(PROGRAM) -url https://localhost:8002/README.md
 
 rserver rs:
 	./$(PROGRAM) -d -port=8000 -sport=8001
@@ -72,7 +73,7 @@ git-pull gpull gd:
 
 git-push gpush gu:
 	git init
-	git add *
+	git add * .gitignore
 	git commit -m "add samples for tls coding"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	#chromium-browser https://github.com/sikang99/$(PROGRAM)

@@ -1,7 +1,8 @@
 .PHONY:	all tls-client make usage
 
 #PROGRAM=tls-client
-PROGRAM=tls-simple
+#PROGRAM=tls-simple
+PROGRAM=tls-example
 
 all: usage
 

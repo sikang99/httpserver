@@ -65,14 +65,18 @@ func httpMonitor() error {
 func httpClient(url string) error {
 	log.Printf("http.Get %s\n", url)
 
-	// simple tls
+	// simple tls setting
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 
+	err := httpClientRequest(client, url)
+	return err
+}
+
+func httpClientRequest(client *http.Client, url string) error {
 	res, err := client.Get(url)
-	//res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,7 +95,7 @@ func httpClient(url string) error {
 	fmt.Printf("%s\n", string(body))
 	println("")
 
-	return nil
+	return err
 }
 
 func printHttpHeader(h http.Header) {
@@ -107,7 +111,7 @@ func httpServer() error {
 	http.HandleFunc("/hello", helloHandler)
 	http.HandleFunc("/media/", mediaHandler)
 
-	// CAUTION: don't use /static not /static/
+	// CAUTION: don't use /static not /static/ as the prefix
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer("./static")))
 
 	//var wg sync.WaitGroup
@@ -130,21 +134,21 @@ func httpServer() error {
 // for http access
 func serveHttp(wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println("Starting HTTP server at http://127.0.0.1:" + *port)
+	log.Println("Starting HTTP server at http://localhost:" + *port)
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
 }
 
 // for https tls access
 func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println("Starting HTTPS server at https://127.0.0.1:" + *ports)
+	log.Println("Starting HTTPS server at https://localhost:" + *ports)
 	log.Fatal(http.ListenAndServeTLS(":"+*ports, "sec/cert.pem", "sec/key.pem", nil))
 }
 
 // for http2 tls access
 func serveHttp2(wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println("Starting HTTP2 server at https://127.0.0.1:" + *port2)
+	log.Println("Starting HTTP2 server at https://localhost:" + *port2)
 
 	var srv http.Server
 	srv.Addr = ":" + *port2

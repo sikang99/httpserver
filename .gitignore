@@ -1,0 +1,8 @@
+# executables
+httpserver
+sample/tls-client
+sample/tls-simple
+
+# large video files
+*.mp4
+*.avi
