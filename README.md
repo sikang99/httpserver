@@ -39,13 +39,24 @@ Internal service structure
 
 ## References
 
+
+### Streaming
+
+- [mattn/go-mjpeg](https://github.com/mattn/go-mjpeg) - 
+- [saljam/mjpeg](https://github.com/saljam/mjpeg) - MJPEG streaming for Go
+- [saljam/webcam](https://github.com/saljam/webcam) - WebRTC based one-way camera streaming
+- [hlubek/webcamproxy](https://github.com/hlubek/webcamproxy) - Proxy for a webcam stream over websockets in Go (golang)
+- [BlueDragonX/go-proxy-example](https://github.com/BlueDragonX/go-proxy-example) - An example TCP proxy in Go
+
+
+### HTTP
+
 - [aljemala/tls-client](https://gist.github.com/michaljemala/d6f4e01c4834bf47a9c4) - SSL Client Authentication Golang sample
 - [Serving server generated PNGs over HTTP in golang](http://41j.com/blog/2015/03/serving-server-generated-pngs-over-http-in-golang/)
 - [Urban4M/go-workgroup](https://github.com/Urban4M/go-workgroup) - go-workgroup - wraps sync.WaitGroup
 - [Gorilla Websockets, golang simple websockets example](http://41j.com/blog/2014/12/gorilla-websockets-golang-simple-websockets-example/)
 - [The http.HandlerFunc wrapper technique in #golang](https://medium.com/@matryer/the-http-handlerfunc-wrapper-technique-in-golang-c60bf76e6124)
 - [Basic Encryption in Golang](http://golangcast.tv/articles/basic-encryption-in-golang)
-- [BlueDragonX/go-proxy-example](https://github.com/BlueDragonX/go-proxy-example) - An example TCP proxy in Go
 - [jameycribbs/ivy](https://github.com/jameycribbs/ivy) - A simple, file-based Database Management System (DBMS) for Go
 - [goware/httpmock](https://github.com/goware/httpmock) - HTTP mocking in Go made easy
 - [Using Object-Oriented Web Servers in Go](http://blog.codeship.com/using-object-oriented-web-servers-go/)

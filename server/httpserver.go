@@ -118,7 +118,7 @@ func httpClientPost(client *http.Client, url string) error {
 
 func printHttpHeader(h http.Header) {
 	for k, v := range h {
-		log.Println("key:", k, "value:", v)
+		fmt.Println("key:", k, "value:", v)
 	}
 }
 
