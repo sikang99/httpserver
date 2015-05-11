@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/bradfitz/http2"
 )
 
 var (
@@ -19,7 +21,8 @@ var (
 	fMon    = flag.Bool("m", false, "Monitor mode, especillay for web")
 	fUrl    = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	port    = flag.String("port", "8000", "Define TCP port to be used for http")
-	sport   = flag.String("sport", "8001", "Define TCP port to be used for https")
+	ports   = flag.String("ports", "8001", "Define TCP port to be used for https")
+	port2   = flag.String("port2", "8002", "Define TCP port to be used for http2")
 	root    = flag.String("root", ".", "Define the root filesystem path")
 	version = flag.String("version", "0.1.1", "Version number")
 )
@@ -29,6 +32,7 @@ func init() {
 	//log.SetPrefix("TRACE: ")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
+	// parse command options
 	flag.Parse()
 }
 
@@ -105,6 +109,9 @@ func httpServer() error {
 	wg.Add(1)
 	go serveHttps(&wg)
 
+	wg.Add(1)
+	go serveHttp2(&wg)
+
 	wg.Wait()
 
 	return nil
@@ -120,8 +127,20 @@ func serveHttp(wg *sync.WaitGroup) {
 // for https access
 func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println("Starting HTTPS server at https://127.0.0.1:" + *sport)
-	log.Fatal(http.ListenAndServeTLS(":"+*sport, "cert.pem", "key.pem", nil))
+	log.Println("Starting HTTPS server at https://127.0.0.1:" + *ports)
+	log.Fatal(http.ListenAndServeTLS(":"+*ports, "cert.pem", "key.pem", nil))
+}
+
+// for http2 access
+func serveHttp2(wg *sync.WaitGroup) {
+	defer wg.Done()
+	log.Println("Starting HTTP2 server at https://127.0.0.1:" + *port2)
+
+	var srv http.Server
+	srv.Addr = ":" + *port2
+
+	http2.ConfigureServer(&srv, &http2.Server{})
+	log.Fatal(srv.ListenAndServeTLS("server.crt", "server.key"))
 }
 
 // static file server

@@ -21,13 +21,15 @@ build b:
 	go build 
 	@ls -alF --color=auto
 
+# testing http
 run r:
 	@chromium-browser http://127.0.0.1:8000/hello
-	./$(PROGRAM) -d -port=8000 -sport=8001
+	./$(PROGRAM) -d -port=8000 -ports=8001
 
+# testing http2
 test t:
-	@chromium-browser -insecure https://127.0.0.1:8001/static
-	./$(PROGRAM) -d -port=8000 -sport=8001
+	chromium-browser --allow-running-insecure-content https://127.0.0.1:8002/static
+	./$(PROGRAM) -d -port=8000 -ports=8001 -port2=8002
 
 rclient rc:
 	./$(PROGRAM) -url http://localhost:8000/hello -port=8000 -sport=8001
@@ -71,7 +73,7 @@ git-pull gpull gd:
 git-push gpush gu:
 	git init
 	git add *
-	git commit -m "add -d daemon option to work as a server"
+	git commit -m "add http2 port"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 	#chromium-browser https://github.com/sikang99/$(PROGRAM)
 
