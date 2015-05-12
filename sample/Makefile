@@ -29,12 +29,15 @@ video:
 video-save:
 	curl http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi > axis.mjpeg
 
-
 clean:
 	rm -f $(PROGRAM)
 
 clobber:
 	rm -f tls-simple tls-client tls-simple file-upload mjpeg-view
+
+
+git:
+	cd .. && make gp
 
 readme md:
 	vi README.md
