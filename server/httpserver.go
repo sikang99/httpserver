@@ -89,7 +89,7 @@ func httpClientGet(client *http.Client, url string) error {
 	}
 
 	//printHttpHeader(res.Header)
-	ct := res.Header["Content-Type"][0]
+	ct := res.Header.Get("Content-Type")
 
 	println("")
 	fmt.Printf("Response Code: %s\n", res.Status)

@@ -3,7 +3,8 @@
 #PROGRAM=tls-client
 #PROGRAM=tls-simple
 #PROGRAM=tls-example
-PROGRAM=file-upload
+#PROGRAM=file-upload
+PROGRAM=mjpeg-view
 
 all: usage
 
@@ -16,16 +17,33 @@ build b:
 run r:
 	./$(PROGRAM)
 
+image:
+	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi
+
+image-save:
+	curl http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi > axis.jpeg
+
+video:
+	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi
+
+video-save:
+	curl http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi > axis.mjpeg
+
+
 clean:
 	rm -f $(PROGRAM)
 
 clobber:
-	rm -f tls-simple tls-client
+	rm -f tls-simple tls-client tls-simple file-upload mjpeg-view
+
+readme md:
+	vi README.md
 
 make m:
 	vi Makefile
 
 usage:
 	@echo ""
-	@echo "make [tls-client]"
+	@echo "Makefile for $(PROGRAM)"
+	@echo "usage: make [edit|build|run]"
 	@echo ""
