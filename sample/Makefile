@@ -19,7 +19,7 @@ build b:
 	go build -o $(PROGRAM) $(PROGRAM).go
 
 run r:
-	./$(PROGRAM)
+	./$(PROGRAM) -port=8081
 
 image:
 	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi

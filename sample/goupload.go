@@ -7,15 +7,20 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
-var port = flag.String("port", "8080", "server port")
-var dir = flag.String("dir", "./static/", "directory to handle files")
+var (
+	port    = flag.String("port", "8080", "server port")
+	dir     = flag.String("dir", "./static/", "directory to handle files")
+	version = flag.String("version", "0.0.9", "program version")
+)
 
 func init() {
 	log.SetOutput(os.Stdout)
@@ -23,6 +28,69 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	flag.Parse()
+}
+
+var index_tmpl = `
+<html lang="en">
+<title>{{ .Title }}</title>
+<body>
+<form action="http://localhost:{{ .Port }}/receive" method="post" enctype="multipart/form-data">
+<label for="file">Filename:</label>
+<input type="file" name="file" id="file">
+delete:<input type="checkbox" name="delete" value="remove">
+<input type="submit" name="submit" value="Submit">
+</form>
+</body>
+</html>
+`
+var static_tmpl = `
+<html>
+<title>Change to static</title>
+<head>
+<script>
+window.location = "http://localhost:{{ .Port }}/{{ .Dir }}";
+</script>
+</head>
+<body>
+</body>
+</html>
+`
+
+type Context struct {
+	Title string
+	Port  string
+	Dir   string
+}
+
+func sendPage(w http.ResponseWriter, page string) {
+	ctx := Context{
+		Title: "Go file upload and delete",
+		Port:  *port,
+		Dir:   *dir,
+	}
+
+	t := template.New("upload")
+	t, err := t.Parse(page)
+	if err != nil {
+		log.Print("template parsing error: ", err)
+	}
+
+	t.Execute(w, ctx)
+	return
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%v\n", r.URL)
+
+	if strings.Contains(r.URL.Path, "favicon.ico") {
+		w.Header().Add("Content-Type:", "image/icon")
+		body, _ := ioutil.ReadFile("static/favicon.ico")
+		fmt.Fprint(w, string(body))
+		return
+	}
+
+	sendPage(w, index_tmpl)
+	return
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -67,17 +135,21 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("File '%s' deleted successfully.\n", header.Filename)
 	}
 
-	//fmt.Printf("check at http://localhost:%s/static\n", *port)
-	w.Header().Add("Content-Type:", "text/html")
-	body, _ := ioutil.ReadFile("static/gostatic.html")
-	fmt.Fprint(w, string(body))
+	/*
+		//fmt.Printf("check at http://localhost:%s/static\n", *port)
+		w.Header().Add("Content-Type:", "text/html")
+		body, _ := ioutil.ReadFile("static/gostatic.html")
+		fmt.Fprint(w, string(body))
+	*/
+	sendPage(w, static_tmpl)
 }
 
 func main() {
 	// to serve goupload.html file in the browser
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/receive", uploadHandler)
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
-	fmt.Printf("visit with http://localhost:%s/static\n", *port)
+	fmt.Printf("visit with http://localhost:%s\n", *port)
 	http.ListenAndServe(":"+*port, nil)
 }
