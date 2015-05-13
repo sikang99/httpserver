@@ -4,12 +4,16 @@
 #PROGRAM=tls-simple
 #PROGRAM=tls-example
 #PROGRAM=file-upload
-PROGRAM=mjpeg-view
+#PROGRAM=mjpeg-view
+PROGRAM=goupload
 
 all: usage
 
 edit e:
 	vi $(PROGRAM).go
+
+html h:
+	vi $(PROGRAM).html
 
 build b:
 	go build -o $(PROGRAM) $(PROGRAM).go
@@ -33,10 +37,10 @@ clean:
 	rm -f $(PROGRAM)
 
 clobber:
-	rm -f tls-simple tls-client tls-simple file-upload mjpeg-view
-
+	rm -f tls-simple tls-client tls-simple file-upload mjpeg-view goupload
 
 git:
+	make clobber
 	cd .. && make gp
 
 readme md:
@@ -48,5 +52,5 @@ make m:
 usage:
 	@echo ""
 	@echo "Makefile for $(PROGRAM)"
-	@echo "usage: make [edit|build|run]"
+	@echo "usage: make [edit|html|build|runi|git]"
 	@echo ""
