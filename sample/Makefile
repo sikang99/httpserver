@@ -13,7 +13,7 @@ edit e:
 	vi $(PROGRAM).go
 
 html h:
-	vi $(PROGRAM).html
+	vi static/$(PROGRAM).html
 
 build b:
 	go build -o $(PROGRAM) $(PROGRAM).go
@@ -25,13 +25,13 @@ image:
 	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi
 
 image-save:
-	curl http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi > axis.jpeg
+	curl http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi > static/axis.jpeg
 
 video:
 	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi
 
 video-save:
-	curl http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi > axis.mjpeg
+	curl http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi > static/axis.mjpeg
 
 clean:
 	rm -f $(PROGRAM)

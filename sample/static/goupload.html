@@ -1,12 +1,26 @@
 <html>
-<title>Go upload</title>
+<title>Go file upload and delete</title>
+<head>
+<script>
+function onSummit() {
+	window.location = "http://localhost:8080/static";
+}
+</script>
+</head>
 <body>
 
 <form action="http://localhost:8080/receive" method="post" enctype="multipart/form-data">
-<label for="file">Filename:</label>
-<input type="file" name="file" id="file">
-<input type="submit" name="submit" value="Submit">
+<div class="row">
+	<div>
+	<label for="file">Filename:</label>
+	<input type="file" name="file" id="file">
+	delete:<input type="checkbox" name="delete" value="remove">
+	<input type="submit" name="submit" value="Submit">
+	</div>
+	<div>
+	<label>About Me<textarea type="text" name="aboutMe" class="aboutMe"></textarea></label>
+	</div>
+	</div>
 </form>
-
 </body>
 </html>

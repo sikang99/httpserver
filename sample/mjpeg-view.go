@@ -1,4 +1,5 @@
 /*
+	http://wiki.suikawiki.org/n/multipart%2Fx-mixed-replace
 	https://gist.githubusercontent.com/gregworley/1294450/raw/9ba9fd49ed800b76c8674ecb0117b8479380aad1/gistfile1.go
 
 	X11 viewer for a MJPEG stream, such as the one obtained from the
