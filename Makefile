@@ -13,36 +13,47 @@ edit e:
 ew:
 	$(EDITOR) base/wrapper.go
 
-readme md:
-	$(EDITOR) README.md
-
 build b:
 	#go build $(PROGRAM).go
 	go build -o $(PROGRAM) server/$(PROGRAM).go
 	@ls -alF --color=auto
 
-# testing http
 run r:
-	@chromium-browser http://127.0.0.1:8000/hello
-	./$(PROGRAM) -d -port=8000 -ports=8001
+	@echo ""
+	@echo "make (run) [rh|rh2|rc|rc2|rs|rm]"
+	@echo "    rh  : run server and access to it with http"
+	@echo "    rh2 : run server and access to it with http2"
+	@echo "    rs  : run server"
+	@echo "    rc  : run client for http"
+	@echo "    rc2 : run client for http2"
+	@echo "    rm  : run monitor"
+	@echo ""
 
-# testing http2
-test t:
-	chromium-browser --allow-running-insecure-content https://127.0.0.1:8002/static
-	./$(PROGRAM) -d -port=8000 -ports=8001 -port2=8002
+rh:
+	@chromium-browser http://localhost:8080/hello
+	./$(PROGRAM) -d -port=8080 -ports=8081 -port2=8082
 
-rclient rc:
-	./$(PROGRAM) -url http://localhost:8000/hello
-	./$(PROGRAM) -url https://localhost:8001/media/gopher.jpeg
-	./$(PROGRAM) -url https://localhost:8001/static/image/gopher.jpg
-	./$(PROGRAM) -url https://localhost:8002/index.html
-	#./$(PROGRAM) -url https://localhost:8002/README.md
+rh2:
+	@chromium-browser --allow-running-insecure-content https://localhost:8082/static
+	./$(PROGRAM) -d -port=8080 -ports=8081 -port2=8082
 
-rserver rs:
-	./$(PROGRAM) -d -port=8000 -sport=8001
+rc:
+	./$(PROGRAM) -url http://localhost:8080/hello
+	./$(PROGRAM) -url http://localhost:8080/media/gopher.jpeg
+	./$(PROGRAM) -url http://localhost:8080/static/image/gopher.jpg
+	./$(PROGRAM) -url http://localhost:8080/index.html
 
-rmonitor rm:
-	./$(PROGRAM) -m
+rc2:
+	./$(PROGRAM) -url https://localhost:8082/hello
+	./$(PROGRAM) -url https://localhost:8082/media/gopher.jpeg
+	./$(PROGRAM) -url https://localhost:8082/static/image/gopher.jpg
+	./$(PROGRAM) -url https://localhost:8082/index.html
+
+rm:
+	./$(PROGRAM) -m -port=8080 -ports=8081 -port2=8082
+
+rs:
+	./$(PROGRAM) -d -port=8080 -ports=8081 -port2=8082
 
 rebuild:
 	rm -f ./$(PROGRAM)
@@ -58,28 +69,31 @@ kill k:
 clean:
 	rm -f ./$(PROGRAM)
 
-make m:
-	$(EDITOR) Makefile
-
 # ---------------------------------------------------------------------------
-git-view gview gv:
+git g:
+	@echo ""
+	@echo "make (git) [gv|gh|gd|gp|gs]"
+	@echo "    gv  : git view"
+	@echo "    gp  : git push"
+	@echo "    gs  : git status"
+	@echo ""
+
+gv:
 	LANG=C chromium-browser https://github.com/sikang99/$(PROGRAM)
 
-git-hub gh:
+gh:
 	ssh -T git@github.com
 
-
-git-pull gpull gd:
+gd:
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
-git-push gpush gp:
+gp:
 	git init
 	git add * .gitignore
 	git commit -m "add samples for tls coding"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
-	#chromium-browser https://github.com/sikang99/$(PROGRAM)
 
-git-status gs:
+gs:
 	git status
 	git log --oneline -5
 
@@ -87,20 +101,21 @@ gencert:
 	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 9999 -nodes
 
 # ---------------------------------------------------------------------------
+readme md:
+	$(EDITOR) README.md
+
+make m:
+	$(EDITOR) Makefile
+
 usage:
 	@echo ""
-	@echo "Makefile for '$(PROGRAM)', by Stoney Kang, 2015/04/24"
+	@echo "Makefile for '$(PROGRAM)', by Stoney Kang, 2015/05/15"
 	@echo ""
 	@echo "usage: make [edit|readme|build|run|test|rebuild|clean|git]"
-	@echo "	edit(e)    : edit source"
-	@echo "	build(b)   : compile source"
-	@echo "	run(r)     : execute $(PROGRAM)"
-	@echo "	run(rm)    : $(PROGRAM) monitor options"
-	@echo "	run(rc)    : $(PROGRAM) client options"
-	@echo "	run(rs)    : $(PROGRAM) server options"
-	@echo "	install(i) : install $(PROGRAM) to $(GOPATH)/bin"
-	@echo "	git-push(gu) : upload $(PROGRAM) to github.com"
-	@echo "	git-pull(gp) : fetch $(PROGRAM) from github.com"
-	@echo "	git-view(gv) : browse $(PROGRAM) at github.com"
-	@echo "	gencert  : make certificates for https"
+	@echo "	   edit(e)    : edit source"
+	@echo "	   build(b)   : compile source"
+	@echo "	   run(r)     : execute $(PROGRAM)"
+	@echo "	   install(i) : install $(PROGRAM) to $(GOPATH)/bin"
+	@echo "	   git(g)     : git $(PROGRAM) to github.com"
+	@echo "	   gencert  : make certificates for https"
 	@echo ""

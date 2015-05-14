@@ -5,7 +5,8 @@
 #PROGRAM=tls-example
 #PROGRAM=file-upload
 #PROGRAM=mjpeg-view
-PROGRAM=goupload
+#PROGRAM=goupload
+PROGRAM=websocket-chat
 
 all: usage
 
@@ -19,13 +20,15 @@ build b:
 	go build -o $(PROGRAM) $(PROGRAM).go
 
 run r:
-	./$(PROGRAM) -port=8081
+	#./$(PROGRAM) -port=8081
+	./$(PROGRAM)
 
 image:
 	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi
 
 image-save:
 	curl http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi > static/axis.jpeg
+	shotwell static/axis.jpeg
 
 video:
 	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi

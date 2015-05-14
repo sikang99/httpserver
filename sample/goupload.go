@@ -1,6 +1,7 @@
 /*
 	https://www.socketloop.com/tutorials/golang-upload-file
 	http://stackoverflow.com/questions/28940005/golang-get-multipart-form-data
+	http://blog.zmxv.com/2011/09/go-template-examples.html
 */
 package main
 
@@ -17,9 +18,10 @@ import (
 )
 
 var (
+	host    = flag.String("host", "localhost", "server address")
 	port    = flag.String("port", "8080", "server port")
 	dir     = flag.String("dir", "./static/", "directory to handle files")
-	version = flag.String("version", "0.0.9", "program version")
+	version = flag.String("version", "0.1.0", "program version")
 )
 
 func init() {
@@ -34,7 +36,7 @@ var index_tmpl = `
 <html lang="en">
 <title>{{ .Title }}</title>
 <body>
-<form action="http://localhost:{{ .Port }}/receive" method="post" enctype="multipart/form-data">
+<form action="http://{{ .Host }}:{{ .Port }}/receive" method="post" enctype="multipart/form-data">
 <label for="file">Filename:</label>
 <input type="file" name="file" id="file">
 delete:<input type="checkbox" name="delete" value="remove">
@@ -48,7 +50,7 @@ var static_tmpl = `
 <title>Change to static</title>
 <head>
 <script>
-window.location = "http://localhost:{{ .Port }}/{{ .Dir }}";
+window.location = "http://{{ .Host }}:{{ .Port }}/{{ .Dir }}";
 </script>
 </head>
 <body>
@@ -58,32 +60,33 @@ window.location = "http://localhost:{{ .Port }}/{{ .Dir }}";
 
 type Context struct {
 	Title string
+	Host  string
 	Port  string
 	Dir   string
 }
 
-func sendPage(w http.ResponseWriter, page string) {
+func sendPage(w http.ResponseWriter, page string) error {
 	ctx := Context{
 		Title: "Go file upload and delete",
+		Host:  *host,
 		Port:  *port,
 		Dir:   *dir,
 	}
 
-	t := template.New("upload")
-	t, err := t.Parse(page)
+	t, err := template.New("upload").Parse(page)
 	if err != nil {
 		log.Print("template parsing error: ", err)
+		return err
 	}
 
-	t.Execute(w, ctx)
-	return
+	return t.Execute(w, ctx)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%v\n", r.URL)
 
 	if strings.Contains(r.URL.Path, "favicon.ico") {
-		w.Header().Add("Content-Type:", "image/icon")
+		w.Header().Set("Content-Type", "image/icon")
 		body, _ := ioutil.ReadFile("static/favicon.ico")
 		fmt.Fprint(w, string(body))
 		return
@@ -125,7 +128,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("File '%s' uploaded successfully.\n", header.Filename)
 
-	// remove the file
+	// remove the file if checked
 	if r.FormValue("delete") != "" {
 		err = os.Remove(*dir + header.Filename)
 		if err != nil {
@@ -135,21 +138,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("File '%s' deleted successfully.\n", header.Filename)
 	}
 
-	/*
-		//fmt.Printf("check at http://localhost:%s/static\n", *port)
-		w.Header().Add("Content-Type:", "text/html")
-		body, _ := ioutil.ReadFile("static/gostatic.html")
-		fmt.Fprint(w, string(body))
-	*/
 	sendPage(w, static_tmpl)
 }
 
 func main() {
-	// to serve goupload.html file in the browser
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/receive", uploadHandler)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
-	fmt.Printf("visit with http://localhost:%s\n", *port)
+	fmt.Printf("visit with http://%s:%s\n", *host, *port)
 	http.ListenAndServe(":"+*port, nil)
 }

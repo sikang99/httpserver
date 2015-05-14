@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,6 +15,18 @@ import (
 	"../base"
 	"github.com/bradfitz/http2"
 )
+
+var index_page = `
+<html>
+<head>
+</head>
+<body>
+Here are some pictures for gophers.
+<img src="./static/image/gopherhelmet.png">Gopher with helmet</img>
+<img src="./static/image/gophergun.jpg">Gopher with a gun</img>
+</body>
+</html>
+`
 
 var (
 	NotSupportError = errors.New("Not supported protocol")
@@ -31,7 +42,7 @@ var (
 )
 
 func init() {
-	log.SetOutput(os.Stdout)
+	//log.SetOutput(os.Stdout)
 	//log.SetPrefix("TRACE: ")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -127,7 +138,7 @@ func httpServer() error {
 	log.Println("Server mode")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
-	http.HandleFunc("/media/", mediaHandler)
+	http.HandleFunc("/media", mediaHandler)
 
 	// CAUTION: don't use /static not /static/ as the prefix
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer("./static")))
@@ -136,12 +147,15 @@ func httpServer() error {
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
+	// HTTP server
 	go serveHttp(&wg)
 
 	wg.Add(1)
+	// HTTPS server
 	go serveHttps(&wg)
 
 	wg.Add(1)
+	// HTTP2 server
 	go serveHttp2(&wg)
 
 	wg.Wait()
@@ -176,18 +190,18 @@ func serveHttp2(wg *sync.WaitGroup) {
 
 // static file server
 func fileServer(path string) http.Handler {
-	log.Println("File server " + path)
+	log.Println("File server for " + path)
 	return http.FileServer(http.Dir(path))
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Index " + r.URL.Path[1:])
+	log.Println("Index " + r.URL.Path)
 	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
-	//log.Printf("Hello %s\n", r.URL.Path)
-	log.Printf("Hello %q\n", html.EscapeString(r.URL.Path))
+	log.Printf("Hello %s\n", r.URL.Path)
+	//log.Printf("Hello %q\n", html.EscapeString(r.URL.Path))
 	fmt.Fprintf(w, "Hi there! from Stoney")
 }
 
