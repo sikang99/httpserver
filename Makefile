@@ -14,7 +14,6 @@ ew:
 	$(EDITOR) base/wrapper.go
 
 build b:
-	#go build $(PROGRAM).go
 	go build -o $(PROGRAM) server/$(PROGRAM).go
 	@ls -alF --color=auto
 
@@ -55,6 +54,9 @@ rm:
 rs:
 	./$(PROGRAM) -d -port=8080 -ports=8081 -port2=8082
 
+rt:
+	curl -I http://localhost:8080/stream
+
 rebuild:
 	rm -f ./$(PROGRAM)
 	go build $(PROGRAM).go
@@ -90,7 +92,7 @@ gd:
 gp:
 	git init
 	git add * .gitignore
-	git commit -m "add samples for tls coding"
+	git commit -m "add mjpeg viewing"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
@@ -112,10 +114,10 @@ usage:
 	@echo "Makefile for '$(PROGRAM)', by Stoney Kang, 2015/05/15"
 	@echo ""
 	@echo "usage: make [edit|readme|build|run|test|rebuild|clean|git]"
-	@echo "	   edit(e)    : edit source"
-	@echo "	   build(b)   : compile source"
-	@echo "	   run(r)     : execute $(PROGRAM)"
-	@echo "	   install(i) : install $(PROGRAM) to $(GOPATH)/bin"
-	@echo "	   git(g)     : git $(PROGRAM) to github.com"
-	@echo "	   gencert  : make certificates for https"
+	@echo "    edit(e)    : edit source"
+	@echo "    build(b)   : compile source"
+	@echo "    run(r)     : execute $(PROGRAM)"
+	@echo "    install(i) : install $(PROGRAM) to $(GOPATH)/bin"
+	@echo "    git(g)     : git $(PROGRAM) to github.com"
+	@echo "    gencert    : make certificates for https"
 	@echo ""

@@ -6,7 +6,8 @@
 #PROGRAM=file-upload
 #PROGRAM=mjpeg-view
 #PROGRAM=goupload
-PROGRAM=websocket-chat
+#PROGRAM=websocket-chat
+PROGRAM=url-parse
 
 all: usage
 
@@ -40,7 +41,7 @@ clean:
 	rm -f $(PROGRAM)
 
 clobber:
-	rm -f tls-simple tls-client tls-simple file-upload mjpeg-view goupload
+	rm -f tls-simple tls-client tls-simple file-upload mjpeg-view goupload websocket-chat url-parse
 
 git:
 	make clobber

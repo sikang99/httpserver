@@ -39,6 +39,9 @@ Internal service structure
 
 ## References
 
+### V4L2
+
+- [v4l2grab - Grabbing JPEGs from V4L2 devices](http://www.twam.info/linux/v4l2grab-grabbing-jpegs-from-v4l2-devices)
 
 ### Streaming
 
