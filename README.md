@@ -51,9 +51,10 @@ Internal service structure
 - [hlubek/webcamproxy](https://github.com/hlubek/webcamproxy) - Proxy for a webcam stream over websockets in Go (golang)
 - [BlueDragonX/go-proxy-example](https://github.com/BlueDragonX/go-proxy-example) - An example TCP proxy in Go
 
-### Multipart
+### MIME/Multipart
 
-- [https://github.com/technoweenie/multipartstreamer](https://github.com/technoweenie/multipartstreamer) - Encode large files in MIME multipart format without reading the entire content into memory
+- [technoweenie/multipartstreamer](https://github.com/technoweenie/multipartstreamer) - Encode large files in MIME multipart format without reading the entire content into memory
+- [tdewolff/minify](https://github.com/tdewolff/minify) - Go minifiers for web formats
 
 
 ### HTTP

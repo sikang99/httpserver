@@ -8,13 +8,13 @@ PROGRAM=httpserver
 EDITOR=vim
 
 edit e:
-	$(EDITOR) server/$(PROGRAM).go
+	$(EDITOR) src/server/$(PROGRAM).go
 
 ew:
-	$(EDITOR) base/wrapper.go
+	$(EDITOR) src/base/wrapper.go
 
 build b:
-	go build -o $(PROGRAM) server/$(PROGRAM).go
+	go build -o $(PROGRAM) src/server/$(PROGRAM).go
 	@ls -alF --color=auto
 
 run r:
@@ -92,7 +92,7 @@ gd:
 gp:
 	git init
 	git add * .gitignore
-	git commit -m "add mjpeg viewing"
+	git commit -m "define mjpeg struct"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

@@ -6,6 +6,7 @@ sample/tls-simple
 # large video files
 *.mp4
 *.avi
+*.jpg
 *.jpeg
 *.mjpeg
 *.mjpg
