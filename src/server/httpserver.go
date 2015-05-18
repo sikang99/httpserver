@@ -5,9 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"io/ioutil"
 	"log"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,7 +19,9 @@ import (
 	"text/template"
 	"time"
 
-	"../base"
+	//"../base"
+	"stoney/httpserver/src/base"
+
 	"github.com/bradfitz/http2"
 )
 
@@ -74,15 +79,13 @@ type Config struct {
 var (
 	NotSupportError = errors.New("Not supported protocol")
 
-	dflag  = flag.Bool("d", false, "Daemon server mode")
-	mflag  = flag.Bool("m", false, "Monitor mode, especillay for web")
+	fmode  = flag.String("m", "player", "Working mode of program")
 	fhost  = flag.String("host", "localhost", "server host address")
 	fport  = flag.String("port", "8000", "Define TCP port to be used for http")
 	fports = flag.String("ports", "8001", "Define TCP port to be used for https")
 	fport2 = flag.String("port2", "8002", "Define TCP port to be used for http2")
 	furl   = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
-	fmode  = flag.String("mode", "server", "Define the root filesystem path")
 	vflag  = flag.Bool("version", false, "0.2.0")
 )
 
@@ -106,16 +109,23 @@ func main() {
 	}
 	fmt.Printf("%s %s\n", url.Scheme, url.Host)
 
-	if *mflag == true {
-		httpMonitor()
-		os.Exit(0)
-	}
+	// determine the working type of the program
+	fmt.Printf("Working mode : %s\n", *fmode)
 
-	// determine the role of client and server
-	if *dflag == true {
+	switch *fmode {
+	case "reader":
+		streamReader(*furl)
+	case "player":
+		httpPlayer(*furl)
+	case "caster":
+		httpCaster(*furl)
+	case "monitor":
+		httpMonitor()
+	case "server":
 		httpServer()
-	} else {
-		httpClient(*furl)
+	default:
+		fmt.Println("Unknown mode")
+		os.Exit(0)
 	}
 }
 
@@ -125,9 +135,9 @@ func httpMonitor() error {
 	return nil
 }
 
-// http client
-func httpClient(url string) error {
-	log.Printf("http.Client %s\n", url)
+// http player client
+func httpPlayer(url string) error {
+	log.Printf("httpPlayer %s\n", url)
 
 	// simple tls setting
 	tp := &http.Transport{
@@ -136,6 +146,20 @@ func httpClient(url string) error {
 	client := &http.Client{Transport: tp}
 
 	err := httpClientGet(client, url)
+	return err
+}
+
+// http caster client
+func httpCaster(url string) error {
+	log.Printf("httpCaster %s\n", url)
+
+	// simple tls setting
+	tp := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tp}
+
+	err := httpClientPost(client, url)
 	return err
 }
 
@@ -169,21 +193,64 @@ func httpClientGet(client *http.Client, url string) error {
 
 func httpClientPost(client *http.Client, url string) error {
 	mjpg := base.MjpegNew()
+	header_type := fmt.Sprint("multipart/x-mixed-replace; boundary=--myboundary")
 
-	res, err := client.Post(url, mjpg.HeaderType, io.Reader(mjpg))
+	println("1")
+	res, err := client.Post(url, header_type, io.Reader(mjpg))
+	//res, err := client.Post(url, header_type, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer res.Body.Close()
-
+	println("2")
 	// Content-Type: video/mjpeg
 
+	//sendStreamData(client.Conn)
+
+	//body := new(bytes.Buffer)
+	//writer := multipart.NewWriter(body)
 	return err
 }
 
 func printHttpHeader(h http.Header) {
 	for k, v := range h {
 		fmt.Println("key:", k, "value:", v)
+	}
+}
+
+func streamReader(url string) {
+	res, err := http.Get(url)
+	if err != nil {
+		log.Fatalf("GET of %q: %v", url, err)
+	}
+	log.Printf("Content: %v", res.Header.Get("Content-Type"))
+
+	_, params, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
+	fmt.Printf("%v %v\n", params, res.Header.Get("Content-Type"))
+	if err != nil {
+		log.Fatalf("ParseMediaType: %v", err)
+	}
+
+	boundary := params["boundary"]
+	if !strings.HasPrefix(boundary, "--") {
+		log.Printf("expected boundary to start with --, got %q", boundary)
+	}
+	r := multipart.NewReader(res.Body, boundary)
+	decodeFrames(r)
+
+}
+
+func decodeFrames(r *multipart.Reader) {
+	for {
+		print(".")
+		p, err := r.NextPart()
+		if err != nil {
+			log.Fatalf("NextPart: %v", err)
+		}
+		_, err = jpeg.Decode(p)
+		if err != nil {
+			log.Fatalf("jpeg Decode: %v", err)
+		}
 	}
 }
 
@@ -270,6 +337,7 @@ var conf = Config{
 
 func sendFile(w http.ResponseWriter, file string) error {
 	w.Header().Set("Content-Type", "image/icon")
+	w.Header().Set("Server", "Happy Media Server")
 	body, err := ioutil.ReadFile("static/favicon.ico")
 	if err != nil {
 		log.Println(err)
@@ -320,12 +388,13 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 const boundary = "myboundary"
 const frameheader = "\r\n" +
 	"--" + boundary + "\r\n" +
-	"Content-Type: image/jpeg\r\n" +
+	"Content-Type: video/mjpeg\r\n" +
 	"Content-Length: %d\r\n" +
 	"X-Timestamp: 0.000000\r\n" +
 	"\r\n"
 
-func sendStreamFile(w http.ResponseWriter, file string) error {
+//func sendStreamFile(w http.ResponseWriter, file string) error {
+func sendStreamFile(w io.Writer, file string) error {
 	jpeg, err := ioutil.ReadFile(file)
 	if err != nil {
 		log.Println(err)
@@ -352,19 +421,14 @@ func sendStreamRequest(w http.ResponseWriter) error {
 
 func sendStreamResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
+	w.Header().Set("Server", "Happy Media Server")
 	w.WriteHeader(http.StatusOK)
 
 	return nil
 }
 
-func streamHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Stream " + r.URL.Path)
-
-	err := sendStreamResponse(w)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+func sendStreamData(w io.Writer) error {
+	var err error
 
 	for {
 		err = sendStreamFile(w, "static/image/arducar.jpg")
@@ -380,6 +444,32 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		time.Sleep(1 * time.Second)
+	}
+
+	return err
+}
+
+func streamHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Stream %s for %s\n", r.Method, r.URL.Path)
+
+	switch r.Method {
+	case "POST":
+		log.Println("POST")
+
+	case "GET":
+		err := sendStreamResponse(w)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		err = sendStreamData(w)
+		if err != nil {
+			log.Println(err)
+		}
+
+	default:
+		log.Println("Unknown method")
 	}
 
 	return

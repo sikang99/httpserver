@@ -55,7 +55,7 @@ Internal service structure
 
 - [technoweenie/multipartstreamer](https://github.com/technoweenie/multipartstreamer) - Encode large files in MIME multipart format without reading the entire content into memory
 - [tdewolff/minify](https://github.com/tdewolff/minify) - Go minifiers for web formats
-
+- [Looking for good net/http package tutorials, blog posts, etc (self.golang)](http://www.reddit.com/r/golang/comments/364z8t/looking_for_good_nethttp_package_tutorials_blog/)
 
 ### HTTP
 

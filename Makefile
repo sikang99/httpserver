@@ -13,6 +13,10 @@ edit e:
 ew:
 	$(EDITOR) src/base/wrapper.go
 
+em:
+	$(EDITOR) src/base/mjpeg.go
+
+
 build b:
 	go build -o $(PROGRAM) src/server/$(PROGRAM).go
 	@ls -alF --color=auto
@@ -23,36 +27,43 @@ run r:
 	@echo "    rh  : run server and access to it with http"
 	@echo "    rh2 : run server and access to it with http2"
 	@echo "    rs  : run server"
-	@echo "    rc  : run client for http"
-	@echo "    rc2 : run client for http2"
+	@echo "    rp  : run player for http"
+	@echo "    rp2 : run player for http2"
+	@echo "    rc : run caster for http"
 	@echo "    rm  : run monitor"
 	@echo ""
 
 rh:
 	@chromium-browser http://localhost:8080/hello
-	./$(PROGRAM) -d -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
 rh2:
 	@chromium-browser --allow-running-insecure-content https://localhost:8082/static
-	./$(PROGRAM) -d -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
+
+rp:
+	./$(PROGRAM) -m=player -url http://localhost:8080/hello
+	./$(PROGRAM) -m=player -url http://localhost:8080/media/gopher.jpeg
+	./$(PROGRAM) -m=player -url http://localhost:8080/static/image/gopher.jpg
+	./$(PROGRAM) -m=player -url http://localhost:8080/index.html
+
+rp2:
+	./$(PROGRAM) -m=player -url https://localhost:8082/hello
+	./$(PROGRAM) -m=player -url https://localhost:8082/media/gopher.jpeg
+	./$(PROGRAM) -m=player -url https://localhost:8082/static/image/gopher.jpg
+	./$(PROGRAM) -m=player -url https://localhost:8082/index.html
 
 rc:
-	./$(PROGRAM) -url http://localhost:8080/hello
-	./$(PROGRAM) -url http://localhost:8080/media/gopher.jpeg
-	./$(PROGRAM) -url http://localhost:8080/static/image/gopher.jpg
-	./$(PROGRAM) -url http://localhost:8080/index.html
+	./$(PROGRAM) -m=caster -url http://localhost:8080/stream
 
-rc2:
-	./$(PROGRAM) -url https://localhost:8082/hello
-	./$(PROGRAM) -url https://localhost:8082/media/gopher.jpeg
-	./$(PROGRAM) -url https://localhost:8082/static/image/gopher.jpg
-	./$(PROGRAM) -url https://localhost:8082/index.html
+rr:
+	./$(PROGRAM) -m=reader -url http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi
 
 rm:
-	./$(PROGRAM) -m -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=monitor -port=8080 -ports=8081 -port2=8082
 
 rs:
-	./$(PROGRAM) -d -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
 rt:
 	curl -I http://localhost:8080/stream
