@@ -118,7 +118,9 @@ var conf = ServerConfig{
 	ImageChannel: make(chan []byte, 2),
 }
 
+//---------------------------------------------------------------------------
 // a single program including client and server in go style
+//---------------------------------------------------------------------------
 func main() {
 	//flag.Parse()
 
@@ -149,12 +151,9 @@ func main() {
 	}
 }
 
-// http monitor client
-func ActHttpMonitor() error {
-	base.ShowNetInterfaces()
-	return nil
-}
-
+//---------------------------------------------------------------------------
+// config transport with timeout
+//---------------------------------------------------------------------------
 var timeout = time.Duration(3 * time.Second)
 
 func dialTimeout(network, addr string) (net.Conn, error) {
@@ -171,7 +170,17 @@ func httpClientConfig() *http.Client {
 	return &http.Client{Transport: tp, Timeout: timeout}
 }
 
+//---------------------------------------------------------------------------
+// http monitor client
+//---------------------------------------------------------------------------
+func ActHttpMonitor() error {
+	base.ShowNetInterfaces()
+	return nil
+}
+
+//---------------------------------------------------------------------------
 // http player client
+//---------------------------------------------------------------------------
 func ActHttpPlayer(url string) error {
 	log.Printf("httpPlayer %s\n", url)
 
@@ -179,7 +188,9 @@ func ActHttpPlayer(url string) error {
 	return httpClientGet(client, url)
 }
 
+//---------------------------------------------------------------------------
 // http caster client
+//---------------------------------------------------------------------------
 func ActHttpCaster(url string) error {
 	log.Printf("httpCaster %s\n", url)
 
@@ -522,6 +533,7 @@ func sendStreamOK(w http.ResponseWriter) error {
 // for Player
 func sendStreamResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
+	//w.Header().Set("Content-Type", "multipart/mixed; boundary=--"+boundary)
 	w.Header().Set("Server", "Happy Media Server")
 	w.WriteHeader(http.StatusOK)
 
@@ -584,7 +596,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		log.Println("Unknown method")
+		log.Println("Unknown method: ", r.Method)
 	}
 
 	return
