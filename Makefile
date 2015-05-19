@@ -54,7 +54,7 @@ rp2:
 	./$(PROGRAM) -m=player -url https://localhost:8082/index.html
 
 rc:
-	./$(PROGRAM) -m=caster -url http://localhost:8080/stream
+	./$(PROGRAM) -m=caster -url https://localhost:8082/stream
 
 rr:
 	./$(PROGRAM) -m=reader -url http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi

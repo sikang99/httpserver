@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"flag"
@@ -11,9 +12,12 @@ import (
 	"log"
 	"mime"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -68,12 +72,13 @@ var mjpeg_tmpl = `<!DOCTYPE html>
 </html>
 `
 
-type Config struct {
-	Title string
-	Image string
-	Host  string
-	Port  string
-	Mode  string
+type ServerConfig struct {
+	Title        string
+	Image        string
+	Host         string
+	Port         string
+	Mode         string
+	ImageChannel chan []byte
 }
 
 var (
@@ -98,6 +103,20 @@ func init() {
 	flag.Parse()
 }
 
+func NewServerConfig() *ServerConfig {
+	return &ServerConfig{
+		ImageChannel: make(chan []byte, 2)}
+}
+
+var conf = ServerConfig{
+	Title:        "Simple MJPEG Canvas Player",
+	Image:        "static/image/gophergun.jpg",
+	Host:         *fhost,
+	Port:         *fport,
+	Mode:         *fmode,
+	ImageChannel: make(chan []byte, 2),
+}
+
 // a single program including client and server in go style
 func main() {
 	//flag.Parse()
@@ -114,55 +133,62 @@ func main() {
 
 	switch *fmode {
 	case "reader":
-		streamReader(*furl)
+		ActHttpReader(*furl)
 	case "player":
-		httpPlayer(*furl)
+		ActHttpPlayer(*furl)
 	case "caster":
-		httpCaster(*furl)
+		ActHttpCaster(*furl)
 	case "monitor":
-		httpMonitor()
+		ActHttpMonitor()
 	case "server":
-		httpServer()
+		ActHttpServer()
 	default:
 		fmt.Println("Unknown mode")
 		os.Exit(0)
 	}
 }
 
-// http monitor
-func httpMonitor() error {
+// http monitor client
+func ActHttpMonitor() error {
 	base.ShowNetInterfaces()
 	return nil
 }
 
-// http player client
-func httpPlayer(url string) error {
-	log.Printf("httpPlayer %s\n", url)
+var timeout = time.Duration(3 * time.Second)
 
-	// simple tls setting
+func dialTimeout(network, addr string) (net.Conn, error) {
+	return net.DialTimeout(network, addr, timeout)
+}
+
+func httpClientConfig() *http.Client {
+	// simple timeout and tls setting
 	tp := &http.Transport{
+		Dial:            dialTimeout,
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Transport: tp}
 
-	err := httpClientGet(client, url)
-	return err
+	return &http.Client{Transport: tp, Timeout: timeout}
+}
+
+// http player client
+func ActHttpPlayer(url string) error {
+	log.Printf("httpPlayer %s\n", url)
+
+	client := httpClientConfig()
+	return httpClientGet(client, url)
 }
 
 // http caster client
-func httpCaster(url string) error {
+func ActHttpCaster(url string) error {
 	log.Printf("httpCaster %s\n", url)
 
-	// simple tls setting
-	tp := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tp}
-
-	err := httpClientPost(client, url)
-	return err
+	client := httpClientConfig()
+	return httpClientPost(client, url)
 }
 
+//---------------------------------------------------------------------------
+// http GET to server
+//---------------------------------------------------------------------------
 func httpClientGet(client *http.Client, url string) error {
 	res, err := client.Get(url)
 	if err != nil {
@@ -175,78 +201,100 @@ func httpClientGet(client *http.Client, url string) error {
 		log.Fatal(err)
 	}
 
-	//printHttpHeader(res.Header)
+	printHttpResponse(res, body)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// http POST to server
+//---------------------------------------------------------------------------
+func httpClientPost(client *http.Client, url string) error {
+	b := new(bytes.Buffer)
+	w := multipart.NewWriter(b)
+
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Type", "multipart/x-mixed-replace")
+	p, err := w.CreatePart(h)
+
+	req, err := http.NewRequest("POST", url, b)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "multipart/x-mixed-replace; boundary=--myboundary")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("22")
+	fmt.Printf("req = %v\nres = %v\n", req, res)
+	sendStreamData(p)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// print response headers and body (text case) for debugging
+//---------------------------------------------------------------------------
+func printHttpResponse(res *http.Response, body []byte) {
+	h := res.Header
+	for k, v := range h {
+		fmt.Println("key:", k, "value:", v)
+	}
+
 	ct := res.Header.Get("Content-Type")
 
 	println("")
-	fmt.Printf("Response Code: %s\n", res.Status)
-	fmt.Printf("Content-Type: %s\n", res.Header["Content-Type"])
 	if strings.Contains(ct, "text") == true {
 		fmt.Printf("%s\n", string(body))
 	} else {
 		fmt.Printf("[binary data]\n")
 	}
 	println("")
-
-	return err
 }
 
-func httpClientPost(client *http.Client, url string) error {
-	mjpg := base.MjpegNew()
-	header_type := fmt.Sprint("multipart/x-mixed-replace; boundary=--myboundary")
-
-	println("1")
-	res, err := client.Post(url, header_type, io.Reader(mjpg))
-	//res, err := client.Post(url, header_type, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	println("2")
-	// Content-Type: video/mjpeg
-
-	//sendStreamData(client.Conn)
-
-	//body := new(bytes.Buffer)
-	//writer := multipart.NewWriter(body)
-	return err
-}
-
-func printHttpHeader(h http.Header) {
-	for k, v := range h {
-		fmt.Println("key:", k, "value:", v)
-	}
-}
-
-func streamReader(url string) {
+//---------------------------------------------------------------------------
+//	multipart reader entry
+//---------------------------------------------------------------------------
+func ActHttpReader(url string) {
+	//client := httpClientConfig()
+	//res, err := client.Get(url)
 	res, err := http.Get(url)
 	if err != nil {
 		log.Fatalf("GET of %q: %v", url, err)
 	}
-	log.Printf("Content: %v", res.Header.Get("Content-Type"))
+	log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
-	_, params, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	fmt.Printf("%v %v\n", params, res.Header.Get("Content-Type"))
+	mt, params, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
+	//fmt.Printf("%v %v\n", params, res.Header.Get("Content-Type"))
 	if err != nil {
-		log.Fatalf("ParseMediaType: %v", err)
+		log.Fatalf("ParseMediaType: %s %v", mt, err)
 	}
 
 	boundary := params["boundary"]
 	if !strings.HasPrefix(boundary, "--") {
 		log.Printf("expected boundary to start with --, got %q", boundary)
 	}
-	r := multipart.NewReader(res.Body, boundary)
-	decodeFrames(r)
 
+	r := multipart.NewReader(res.Body, boundary)
+
+	//recvMultipartDecodeJpeg(r)
+	recvMultipartToBuffer(r)
 }
 
-func decodeFrames(r *multipart.Reader) {
+//---------------------------------------------------------------------------
+//	receive multipart data and decode jpeg
+//---------------------------------------------------------------------------
+func recvMultipartDecodeJpeg(r *multipart.Reader) {
 	for {
 		print(".")
 		p, err := r.NextPart()
 		if err != nil {
 			log.Fatalf("NextPart: %v", err)
 		}
+
 		_, err = jpeg.Decode(p)
 		if err != nil {
 			log.Fatalf("jpeg Decode: %v", err)
@@ -254,8 +302,57 @@ func decodeFrames(r *multipart.Reader) {
 	}
 }
 
-// http server
-func httpServer() error {
+//---------------------------------------------------------------------------
+//	receive multipart data into buffer
+//---------------------------------------------------------------------------
+func recvMultipartToBuffer(r *multipart.Reader) {
+	for {
+		p, err := r.NextPart()
+		if err != nil {
+			log.Fatalf("NextPart: %v", err)
+		}
+
+		sl := p.Header.Get("Content-Length")
+		nl, err := strconv.Atoi(sl)
+		if err != nil {
+			log.Fatalf("%s %s %d\n", p.Header, sl, nl)
+		}
+
+		data := make([]byte, nl)
+
+		// implement like ReadFull() in jpeg.Decode()
+		var tn int
+		for tn < nl {
+			n, err := p.Read(data[tn:])
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			tn += n
+		}
+
+		fmt.Printf("%s %d/%d [%02x %02x - %02x %02x]\n", p.Header.Get("Content-Type"), tn, nl, data[0], data[1], data[nl-2], data[nl-1])
+		//conf.ImageChannel <- data[:n]
+
+	}
+}
+
+//---------------------------------------------------------------------------
+// receive byte data
+//---------------------------------------------------------------------------
+func recvStreamData(r io.Reader) {
+	b := make([]byte, 1024*1204*1204)
+	n, err := r.Read(b)
+	if err != nil {
+		log.Fatal(err)
+	}
+	println(n)
+}
+
+//---------------------------------------------------------------------------
+// http server entry
+//---------------------------------------------------------------------------
+func ActHttpServer() error {
 	log.Println("Server mode")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)
@@ -327,14 +424,6 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	sendPage(w, index_tmpl)
 }
 
-var conf = Config{
-	Title: "Simple MJPEG Canvas Player",
-	Image: "static/image/gophergun.jpg",
-	Host:  *fhost,
-	Port:  *fport,
-	Mode:  *fmode,
-}
-
 func sendFile(w http.ResponseWriter, file string) error {
 	w.Header().Set("Content-Type", "image/icon")
 	w.Header().Set("Server", "Happy Media Server")
@@ -393,7 +482,6 @@ const frameheader = "\r\n" +
 	"X-Timestamp: 0.000000\r\n" +
 	"\r\n"
 
-//func sendStreamFile(w http.ResponseWriter, file string) error {
 func sendStreamFile(w io.Writer, file string) error {
 	jpeg, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -427,6 +515,13 @@ func sendStreamResponse(w http.ResponseWriter) error {
 	return nil
 }
 
+func sendStreamOK(w http.ResponseWriter) error {
+	w.Header().Set("Server", "Happy Media Server")
+	w.WriteHeader(http.StatusOK)
+
+	return nil
+}
+
 func sendStreamData(w io.Writer) error {
 	var err error
 
@@ -443,7 +538,7 @@ func sendStreamData(w io.Writer) error {
 			log.Println(err)
 			break
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 
 	return err
@@ -454,7 +549,15 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "POST":
-		log.Println("POST")
+		err := sendStreamOK(w)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		println("21")
+		//recvStreamData(w)
+		//mr := multipart.NewReader(r.Body, boundary)
+		//recvMultipartData(mr)
 
 	case "GET":
 		err := sendStreamResponse(w)
