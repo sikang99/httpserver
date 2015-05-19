@@ -59,6 +59,9 @@ rc:
 rr:
 	./$(PROGRAM) -m=reader -url http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi
 
+rra:
+	./$(PROGRAM) -m=reader -url http://localhost:8050/agilecam\?action=stream\&channel=100\&source=1
+
 rm:
 	./$(PROGRAM) -m=monitor -port=8080 -ports=8081 -port2=8082
 

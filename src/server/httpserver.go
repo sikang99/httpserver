@@ -1,3 +1,6 @@
+// ---------------------------------------------------------------------------------
+// one program including agents such as caster, server, player, monitor
+// ---------------------------------------------------------------------------------
 package main
 
 import (
@@ -72,16 +75,7 @@ var mjpeg_tmpl = `<!DOCTYPE html>
 </html>
 `
 
-type ServerConfig struct {
-	Title        string
-	Image        string
-	Host         string
-	Port         string
-	Mode         string
-	ImageChannel chan []byte
-	Player       io.Writer
-}
-
+//---------------------------------------------------------------------------
 var (
 	NotSupportError = errors.New("Not supported protocol")
 
@@ -102,6 +96,16 @@ func init() {
 
 	// parse command options
 	flag.Parse()
+}
+
+type ServerConfig struct {
+	Title        string
+	Image        string
+	Host         string
+	Port         string
+	Mode         string
+	ImageChannel chan []byte
+	Player       io.Writer
 }
 
 func NewServerConfig() *ServerConfig {
@@ -224,10 +228,7 @@ func httpClientGet(client *http.Client, url string) error {
 func httpClientPost(client *http.Client, url string) error {
 	b := new(bytes.Buffer)
 	w := multipart.NewWriter(b)
-
-	h := make(textproto.MIMEHeader)
-	h.Set("Content-Type", "multipart/x-mixed-replace")
-	p, err := w.CreatePart(h)
+	w.SetBoundary("myboundary")
 
 	req, err := http.NewRequest("POST", url, b)
 	if err != nil {
@@ -239,10 +240,20 @@ func httpClientPost(client *http.Client, url string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(res.Status)
 
-	fmt.Println("22")
-	fmt.Printf("req = %v\nres = %v\n", req, res)
-	sendStreamData(p)
+	fdata, err := ioutil.ReadFile("static/image/gopher.jpg")
+	fsize := len(fdata)
+
+	part, _ := w.CreatePart(textproto.MIMEHeader{
+		"Content-Type":   {"image/jpeg"},
+		"Content-Length": {strconv.Itoa(fsize)},
+	})
+
+	b.Write(fdata)
+	b.WriteTo(part)
+
+	time.Sleep(time.Second)
 
 	return err
 }
@@ -280,7 +291,7 @@ func ActHttpReader(url string) {
 	log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
 	mt, params, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	//fmt.Printf("%v %v\n", params, res.Header.Get("Content-Type"))
+	fmt.Printf("%v %v\n", params, res.Header.Get("Content-Type"))
 	if err != nil {
 		log.Fatalf("ParseMediaType: %s %v", mt, err)
 	}
@@ -294,24 +305,6 @@ func ActHttpReader(url string) {
 
 	//recvMultipartDecodeJpeg(r)
 	recvMultipartToBuffer(r)
-}
-
-//---------------------------------------------------------------------------
-//	receive multipart data and decode jpeg
-//---------------------------------------------------------------------------
-func recvMultipartDecodeJpeg(r *multipart.Reader) {
-	for {
-		print(".")
-		p, err := r.NextPart()
-		if err != nil {
-			log.Fatalf("NextPart: %v", err)
-		}
-
-		_, err = jpeg.Decode(p)
-		if err != nil {
-			log.Fatalf("jpeg Decode: %v", err)
-		}
-	}
 }
 
 //---------------------------------------------------------------------------
@@ -329,7 +322,7 @@ func recvMultipartToBuffer(r *multipart.Reader) {
 		if err != nil {
 			log.Fatalf("%s %s %d\n", p.Header, sl, nl)
 		}
-
+		//println(nl)
 		data := make([]byte, nl)
 
 		// implement like ReadFull() in jpeg.Decode()
@@ -345,7 +338,24 @@ func recvMultipartToBuffer(r *multipart.Reader) {
 
 		fmt.Printf("%s %d/%d [%02x %02x - %02x %02x]\n", p.Header.Get("Content-Type"), tn, nl, data[0], data[1], data[nl-2], data[nl-1])
 		//conf.ImageChannel <- data[:n]
+	}
+}
 
+//---------------------------------------------------------------------------
+//	receive multipart data and decode jpeg
+//---------------------------------------------------------------------------
+func recvMultipartDecodeJpeg(r *multipart.Reader) {
+	for {
+		print(".")
+		p, err := r.NextPart()
+		if err != nil {
+			log.Fatalf("NextPart: %v", err)
+		}
+
+		_, err = jpeg.Decode(p)
+		if err != nil {
+			log.Fatalf("jpeg Decode: %v", err)
+		}
 	}
 }
 
@@ -394,21 +404,27 @@ func ActHttpServer() error {
 	return nil
 }
 
+//---------------------------------------------------------------------------
 // for http access
+//---------------------------------------------------------------------------
 func serveHttp(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP server at http://" + *fhost + ":" + *fport)
 	log.Fatal(http.ListenAndServe(":"+*fport, nil))
 }
 
+//---------------------------------------------------------------------------
 // for https tls access
+//---------------------------------------------------------------------------
 func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTPS server at https://" + *fhost + ":" + *fports)
 	log.Fatal(http.ListenAndServeTLS(":"+*fports, "sec/cert.pem", "sec/key.pem", nil))
 }
 
+//---------------------------------------------------------------------------
 // for http2 tls access
+//---------------------------------------------------------------------------
 func serveHttp2(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP2 server at https://" + *fhost + ":" + *fport2)
@@ -419,12 +435,17 @@ func serveHttp2(wg *sync.WaitGroup) {
 	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
 }
 
-// static file server
+//---------------------------------------------------------------------------
+// static file server handler
+//---------------------------------------------------------------------------
 func fileServer(path string) http.Handler {
 	log.Println("File server for " + path)
 	return http.FileServer(http.Dir(path))
 }
 
+//---------------------------------------------------------------------------
+// index file handler
+//---------------------------------------------------------------------------
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Index " + r.URL.Path)
 
@@ -436,29 +457,9 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	sendPage(w, index_tmpl)
 }
 
-func sendFile(w http.ResponseWriter, file string) error {
-	w.Header().Set("Content-Type", "image/icon")
-	w.Header().Set("Server", "Happy Media Server")
-	body, err := ioutil.ReadFile("static/favicon.ico")
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	fmt.Fprint(w, string(body))
-
-	return nil
-}
-
-func sendPage(w http.ResponseWriter, page string) error {
-	t, err := template.New("mjpeg").Parse(page)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	return t.Execute(w, conf)
-}
-
+//---------------------------------------------------------------------------
+// hello file handler
+//---------------------------------------------------------------------------
 func helloHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Hello %s\n", r.URL.Path)
 
@@ -475,6 +476,9 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//---------------------------------------------------------------------------
+// media file handler
+//---------------------------------------------------------------------------
 func mediaHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Media " + r.URL.Path)
 
@@ -486,6 +490,36 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//---------------------------------------------------------------------------
+// send a file
+//---------------------------------------------------------------------------
+func sendFile(w http.ResponseWriter, file string) error {
+	w.Header().Set("Content-Type", "image/icon")
+	w.Header().Set("Server", "Happy Media Server")
+	body, err := ioutil.ReadFile("static/favicon.ico")
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	fmt.Fprint(w, string(body))
+
+	return nil
+}
+
+//---------------------------------------------------------------------------
+// send a page
+//---------------------------------------------------------------------------
+func sendPage(w http.ResponseWriter, page string) error {
+	t, err := template.New("mjpeg").Parse(page)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return t.Execute(w, conf)
+}
+
+//---------------------------------------------------------------------------
 const boundary = "myboundary"
 const frameheader = "\r\n" +
 	"--" + boundary + "\r\n" +
@@ -494,7 +528,12 @@ const frameheader = "\r\n" +
 	"X-Timestamp: 0.000000\r\n" +
 	"\r\n"
 
+//---------------------------------------------------------------------------
+// send an jpeg file in multipart format with boundary
+//---------------------------------------------------------------------------
 func sendStreamFile(w io.Writer, file string) error {
+	var err error
+
 	jpeg, err := ioutil.ReadFile(file)
 	if err != nil {
 		log.Println(err)
@@ -516,7 +555,7 @@ func sendStreamFile(w io.Writer, file string) error {
 }
 
 //---------------------------------------------------------------------------
-// send response for /stream
+// send response for /stream with multipart format
 //---------------------------------------------------------------------------
 func sendStreamRequest(w http.ResponseWriter) error {
 	return nil
@@ -541,7 +580,7 @@ func sendStreamResponse(w http.ResponseWriter) error {
 }
 
 //---------------------------------------------------------------------------
-// send jpeg files in multipart with boundary
+// send jpeg files in multipart format
 //---------------------------------------------------------------------------
 func sendStreamData(w io.Writer) error {
 	var err error
@@ -559,7 +598,7 @@ func sendStreamData(w io.Writer) error {
 			log.Println(err)
 			break
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 	return err
@@ -579,9 +618,19 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		println("21")
-		//recvStreamData(w)
-		//mr := multipart.NewReader(r.Body, boundary)
-		//recvMultipartData(mr)
+		mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		fmt.Printf("%v %v\n", r.Header.Get("Content-Type"), params)
+		if err != nil {
+			log.Fatalf("ParseMediaType: %s %v", mt, err)
+		}
+
+		boundary := params["boundary"]
+		if !strings.HasPrefix(boundary, "--") {
+			log.Printf("expected boundary to start with --, got %q", boundary)
+		}
+
+		mr := multipart.NewReader(r.Body, boundary)
+		recvMultipartToBuffer(mr)
 
 	case "GET": // for Player
 		err := sendStreamResponse(w)
@@ -615,3 +664,5 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 	log.Println(message)
 	fmt.Fprintf(w, message)
 }
+
+// ---------------------------------------------------------------------------------

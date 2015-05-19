@@ -4,11 +4,12 @@
 #PROGRAM=tls-simple
 #PROGRAM=tls-example
 #PROGRAM=file-upload
-#PROGRAM=mjpeg-view
 #PROGRAM=goupload
+#PROGRAM=mjpeg-view
 #PROGRAM=websocket-chat
 #PROGRAM=url-parse
-PROGRAM=mjpeg-proxy
+#PROGRAM=mjpeg-proxy
+PROGRAM=mixed-write
 
 all: usage
 
@@ -22,8 +23,8 @@ build b:
 	go build -o $(PROGRAM) $(PROGRAM).go
 
 run r:
-	#./$(PROGRAM) -port=8081
 	./$(PROGRAM)
+	#./$(PROGRAM) -port=8081
 
 image:
 	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi
