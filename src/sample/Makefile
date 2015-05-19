@@ -7,7 +7,8 @@
 #PROGRAM=mjpeg-view
 #PROGRAM=goupload
 #PROGRAM=websocket-chat
-PROGRAM=url-parse
+#PROGRAM=url-parse
+PROGRAM=mjpeg-proxy
 
 all: usage
 

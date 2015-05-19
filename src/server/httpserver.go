@@ -79,6 +79,7 @@ type ServerConfig struct {
 	Port         string
 	Mode         string
 	ImageChannel chan []byte
+	Player       io.Writer
 }
 
 var (
@@ -503,10 +504,22 @@ func sendStreamFile(w io.Writer, file string) error {
 	return err
 }
 
+//---------------------------------------------------------------------------
+// send response for /stream
+//---------------------------------------------------------------------------
 func sendStreamRequest(w http.ResponseWriter) error {
 	return nil
 }
 
+// for Caster
+func sendStreamOK(w http.ResponseWriter) error {
+	w.Header().Set("Server", "Happy Media Server")
+	w.WriteHeader(http.StatusOK)
+
+	return nil
+}
+
+// for Player
 func sendStreamResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
 	w.Header().Set("Server", "Happy Media Server")
@@ -515,13 +528,9 @@ func sendStreamResponse(w http.ResponseWriter) error {
 	return nil
 }
 
-func sendStreamOK(w http.ResponseWriter) error {
-	w.Header().Set("Server", "Happy Media Server")
-	w.WriteHeader(http.StatusOK)
-
-	return nil
-}
-
+//---------------------------------------------------------------------------
+// send jpeg files in multipart with boundary
+//---------------------------------------------------------------------------
 func sendStreamData(w io.Writer) error {
 	var err error
 
@@ -544,11 +553,14 @@ func sendStreamData(w io.Writer) error {
 	return err
 }
 
+//---------------------------------------------------------------------------
+// handle /stream access
+//---------------------------------------------------------------------------
 func streamHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Stream %s for %s\n", r.Method, r.URL.Path)
 
 	switch r.Method {
-	case "POST":
+	case "POST": // for Caster
 		err := sendStreamOK(w)
 		if err != nil {
 			log.Println(err)
@@ -559,7 +571,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		//mr := multipart.NewReader(r.Body, boundary)
 		//recvMultipartData(mr)
 
-	case "GET":
+	case "GET": // for Player
 		err := sendStreamResponse(w)
 		if err != nil {
 			log.Println(err)
@@ -578,6 +590,9 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+//---------------------------------------------------------------------------
+// respond message
+//---------------------------------------------------------------------------
 func Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
 	/*
 		w.Header().Set("Content-Type", mime.TypeByExtension(ext))

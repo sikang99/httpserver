@@ -45,6 +45,8 @@ Internal service structure
 
 ### Streaming
 
+- [putsi/paparazzogo](https://github.com/putsi/paparazzogo) - HTTP.Handler for Go. Caching proxy that delivers MJPEG-stream in JPG-images.
+- [marpie/go-mjpeg](https://github.com/marpie/go-mjpeg) - Motion JPEG Implementation in Go
 - [mattn/go-mjpeg](https://github.com/mattn/go-mjpeg) - 
 - [saljam/mjpeg](https://github.com/saljam/mjpeg) - MJPEG streaming for Go
 - [saljam/webcam](https://github.com/saljam/webcam) - WebRTC based one-way camera streaming
@@ -60,6 +62,7 @@ Internal service structure
 
 ### HTTP
 
+- [pikanezi/http](https://github.com/pikanezi/http) - Override of net/http golang library to use Request and ResponseWritter in a more efficient way
 - [aljemala/tls-client](https://gist.github.com/michaljemala/d6f4e01c4834bf47a9c4) - SSL Client Authentication Golang sample
 - [Serving server generated PNGs over HTTP in golang](http://41j.com/blog/2015/03/serving-server-generated-pngs-over-http-in-golang/)
 - [Urban4M/go-workgroup](https://github.com/Urban4M/go-workgroup) - go-workgroup - wraps sync.WaitGroup
