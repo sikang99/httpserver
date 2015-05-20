@@ -33,6 +33,7 @@ import (
 	"github.com/bradfitz/http2"
 )
 
+//---------------------------------------------------------------------------
 var index_tmpl = `<!DOCTYPE html>
 <html>
 <head>
@@ -57,7 +58,7 @@ var hello_tmpl = `<!DOCTYPE html>
   function init() {
     var viewer = new MJPEGCANVAS.Viewer({
       divID : 'mjpeg',
-      host : 'https://localhost',
+      host : '{{ .Addr }}',
       port : {{ .Port }},
       width : 1024,
       height : 768,
@@ -102,6 +103,7 @@ func init() {
 type ServerConfig struct {
 	Title        string
 	Image        string
+	Addr         string
 	Host         string
 	Port         string
 	Mode         string
@@ -117,6 +119,7 @@ func NewServerConfig() *ServerConfig {
 var conf = ServerConfig{
 	Title:        "Simple MJPEG Proxy Server",
 	Image:        "static/image/gophergun.jpg",
+	Addr:         "http://localhost",
 	Host:         *fhost,
 	Port:         *fport,
 	Mode:         *fmode,
@@ -496,6 +499,10 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 	host := strings.Split(r.Host, ":")
 	conf.Port = host[1]
 
+	if r.TLS != nil {
+		conf.Addr = "https://localhost"
+	}
+
 	_, err := os.Stat(hello_page)
 	if err != nil {
 		sendPage(w, hello_tmpl)
@@ -580,6 +587,7 @@ func sendStreamTest(w io.Writer, loop bool) error {
 func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 	var err error
 
+	// direct pattern matching
 	files, err := filepath.Glob(dir + "*" + ext)
 	if err != nil {
 		log.Println(err)
@@ -601,6 +609,7 @@ func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 	}
 
 	/*
+		// read dir and compare extension
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			log.Println(err)

@@ -115,7 +115,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "multipart handling & server config"
+	git commit -m "support TLS connection from player"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
