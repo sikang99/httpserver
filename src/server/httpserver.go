@@ -46,7 +46,7 @@ var index_tmpl = `<!DOCTYPE html>
 </html>
 `
 
-var mjpeg_tmpl = `<!DOCTYPE html>
+var hello_tmpl = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
@@ -448,7 +448,7 @@ func fileServer(path string) http.Handler {
 // index file handler
 //---------------------------------------------------------------------------
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Index " + r.URL.Path)
+	log.Printf("Index %s\n", r.URL.Path)
 
 	if strings.Contains(r.URL.Path, "favicon.ico") {
 		http.ServeFile(w, r, "static/favicon.ico")
@@ -459,21 +459,20 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //---------------------------------------------------------------------------
-// hello file handler
+// hello file handler (default: hello.html)
 //---------------------------------------------------------------------------
 func helloHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Hello %s\n", r.URL.Path)
 
-	mjpeg_page := "static/mjpeg_canvas.html"
+	hello_page := "static/hello.html"
 
-	_, err := os.Stat(mjpeg_page)
+	_, err := os.Stat(hello_page)
 	if err != nil {
-		sendPage(w, mjpeg_tmpl)
-		log.Printf("Hello %s\n", "mjpeg_tmpl")
+		sendPage(w, hello_tmpl)
+		log.Printf("Hello %s\n", "hello_tmpl")
 	} else {
-		http.ServeFile(w, r, mjpeg_page)
-		log.Printf("Hello %s\n", mjpeg_page)
-
+		http.ServeFile(w, r, hello_page)
+		log.Printf("Hello %s\n", hello_page)
 	}
 }
 
@@ -518,6 +517,39 @@ func sendPage(w http.ResponseWriter, page string) error {
 	}
 
 	return t.Execute(w, conf)
+}
+
+//---------------------------------------------------------------------------
+// 51 send files with the given format(extension) in the directory
+//---------------------------------------------------------------------------
+func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
+	var err error
+
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	for {
+		for _, f := range files {
+			fpath := dir + f.Name()
+			if filepath.Ext(fpath) == ext {
+				//fmt.Println(fpath)
+				err = sendStreamFile(w, fpath)
+				if err != nil {
+					return err
+				}
+				time.Sleep(time.Second)
+			}
+		}
+
+		if !loop {
+			break
+		}
+	}
+
+	return err
 }
 
 //---------------------------------------------------------------------------
@@ -675,9 +707,10 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		err = sendStreamData(w)
+		err = sendStreamDir(w, "./static/image/", ".jpg", true)
 		if err != nil {
 			log.Println(err)
+			break
 		}
 
 	default:

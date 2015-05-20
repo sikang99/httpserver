@@ -1,15 +1,19 @@
 .PHONY:	all tls-client make usage
 
-#PROGRAM=tls-client
-#PROGRAM=tls-simple
-#PROGRAM=tls-example
-#PROGRAM=file-upload
-#PROGRAM=goupload
-#PROGRAM=mjpeg-view
-#PROGRAM=websocket-chat
-#PROGRAM=url-parse
-#PROGRAM=mjpeg-proxy
-PROGRAM=mixed-write
+PROGRAMS= \
+	tls-client \
+	tls-simple \
+	tls-example \
+	file-upload \
+	mjpeg-view \
+	mjpeg-proxy \
+	websocket-chat \
+	url-parse \
+	mixed-write \
+	goupload \
+
+
+PROGRAM=goupload
 
 all: usage
 
@@ -43,7 +47,7 @@ clean:
 	rm -f $(PROGRAM)
 
 clobber:
-	rm -f tls-simple tls-client tls-simple file-upload mjpeg-view goupload websocket-chat url-parse
+	rm -f $(PROGRAMS)
 
 git:
 	make clobber
