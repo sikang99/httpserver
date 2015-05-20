@@ -111,7 +111,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "define mjpeg struct"
+	git commit -m "multipart handling"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

@@ -115,7 +115,7 @@ func NewServerConfig() *ServerConfig {
 }
 
 var conf = ServerConfig{
-	Title:        "Simple MJPEG Canvas Player",
+	Title:        "Simple MJPEG Proxy Server",
 	Image:        "static/image/gophergun.jpg",
 	Host:         *fhost,
 	Port:         *fport,
@@ -139,6 +139,7 @@ func main() {
 	// determine the working type of the program
 	fmt.Printf("Working mode : %s\n", *fmode)
 
+	// let's do working mode
 	switch *fmode {
 	case "reader":
 		ActHttpReader(*furl)
@@ -280,12 +281,19 @@ func printHttpResponse(res *http.Response, body []byte) {
 }
 
 //---------------------------------------------------------------------------
-//	multipart reader entry
+//	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
 func ActHttpReader(url string) {
-	//client := httpClientConfig()
-	//res, err := client.Get(url)
-	res, err := http.Get(url)
+	var err error
+	var res *http.Response
+
+	// WHY: different behavior?
+	if strings.Contains(url, "axis") {
+		res, err = http.Get(url)
+	} else {
+		client := httpClientConfig()
+		res, err = client.Get(url)
+	}
 	if err != nil {
 		log.Fatalf("GET of %q: %v", url, err)
 	}
@@ -378,7 +386,7 @@ func recvStreamData(r io.Reader) {
 func ActHttpServer() error {
 	log.Println("Server mode")
 	http.HandleFunc("/", indexHandler)
-	http.HandleFunc("/hello", helloHandler)
+	http.HandleFunc("/hello", helloHandler)   // view
 	http.HandleFunc("/media", mediaHandler)   // on-demand
 	http.HandleFunc("/stream", streamHandler) // live
 
@@ -411,7 +419,14 @@ func ActHttpServer() error {
 func serveHttp(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP server at http://" + *fhost + ":" + *fport)
-	log.Fatal(http.ListenAndServe(":"+*fport, nil))
+
+	srv := &http.Server{
+		Addr:         ":" + *fport,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+
+	log.Fatal(srv.ListenAndServe())
 }
 
 //---------------------------------------------------------------------------
@@ -420,7 +435,14 @@ func serveHttp(wg *sync.WaitGroup) {
 func serveHttps(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTPS server at https://" + *fhost + ":" + *fports)
-	log.Fatal(http.ListenAndServeTLS(":"+*fports, "sec/cert.pem", "sec/key.pem", nil))
+
+	srv := &http.Server{
+		Addr:         ":" + *fports,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+
+	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
 }
 
 //---------------------------------------------------------------------------
@@ -430,9 +452,13 @@ func serveHttp2(wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Println("Starting HTTP2 server at https://" + *fhost + ":" + *fport2)
 
-	var srv http.Server
-	srv.Addr = ":" + *fport2
-	http2.ConfigureServer(&srv, &http2.Server{})
+	srv := &http.Server{
+		Addr:         ":" + *fport2,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+
+	http2.ConfigureServer(srv, &http2.Server{})
 	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
 }
 
@@ -520,6 +546,31 @@ func sendPage(w http.ResponseWriter, page string) error {
 }
 
 //---------------------------------------------------------------------------
+// send some jpeg files in multipart format
+//---------------------------------------------------------------------------
+func sendStreamTest(w io.Writer, loop bool) error {
+	var err error
+
+	files := []string{"static/image/arducar.jpg", "static/image/gopher.jpg"}
+
+	for {
+		for i := range files {
+			err = sendStreamFile(w, files[i])
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
+		if !loop {
+			break
+		}
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
 // 51 send files with the given format(extension) in the directory
 //---------------------------------------------------------------------------
 func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
@@ -568,6 +619,7 @@ func sendStreamFile(w io.Writer, file string) error {
 	}
 	fsize := len(fdata)
 
+	// check the extension at first and its content
 	ctype := mime.TypeByExtension(filepath.Ext(file))
 	if ctype == "" {
 		ctype = http.DetectContentType(fdata)
@@ -648,32 +700,7 @@ func sendStreamResponse(w http.ResponseWriter) error {
 }
 
 //---------------------------------------------------------------------------
-// send jpeg files in multipart format
-//---------------------------------------------------------------------------
-func sendStreamData(w io.Writer) error {
-	var err error
-
-	for {
-		err = sendStreamFile(w, "static/image/arducar.jpg")
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		time.Sleep(1 * time.Second)
-
-		err = sendStreamFile(w, "static/image/gopher.jpg")
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// handle /stream access
+// 21 handle /stream access
 //---------------------------------------------------------------------------
 func streamHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Stream %s for %s\n", r.Method, r.URL.Path)
@@ -685,7 +712,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			break
 		}
-		println("21")
+
 		mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		fmt.Printf("%v %v\n", r.Header.Get("Content-Type"), params)
 		if err != nil {
@@ -721,7 +748,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //---------------------------------------------------------------------------
-// respond message
+// respond message simply
 //---------------------------------------------------------------------------
 func Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
 	/*
@@ -734,4 +761,4 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 	fmt.Fprintf(w, message)
 }
 
-// ---------------------------------------------------------------------------------
+// ------------------------------E-----N-----D--------------------------------------

@@ -4,16 +4,17 @@ PROGRAMS= \
 	tls-client \
 	tls-simple \
 	tls-example \
-	file-upload \
 	mjpeg-view \
+	mjpeg-stream \
 	mjpeg-proxy \
 	websocket-chat \
+	file-upload \
+	goupload \
 	url-parse \
 	mixed-write \
-	goupload \
 
 
-PROGRAM=goupload
+PROGRAM=mixed-write
 
 all: usage
 
@@ -29,6 +30,9 @@ build b:
 run r:
 	./$(PROGRAM)
 	#./$(PROGRAM) -port=8081
+
+kill k:
+	killall $(PROGRAM)
 
 image:
 	curl -I http://imoment:imoment@192.168.0.91/axis-cgi/jpg/image.cgi
@@ -50,7 +54,6 @@ clobber:
 	rm -f $(PROGRAMS)
 
 git:
-	make clobber
 	cd .. && make gp
 
 readme md:
@@ -61,6 +64,6 @@ make m:
 
 usage:
 	@echo ""
-	@echo "Makefile for $(PROGRAM)"
-	@echo "usage: make [edit|html|build|runi|git]"
+	@echo "Makefile for '$(PROGRAM)'"
+	@echo "usage: make [edit|html|build|run|kill|git]"
 	@echo ""
