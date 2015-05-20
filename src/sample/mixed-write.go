@@ -1,12 +1,19 @@
+/*
+	multipart stream generator
+*/
 package main
 
 import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"log"
+	"mime"
 	"mime/multipart"
+	"net/http"
 	"net/textproto"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -34,23 +41,37 @@ func oldmain() {
 
 func main() {
 	files := []string{"static/01.txt", "static/02.txt", "static/03.txt"}
-	files = append(files, "static/04.txt")
+	files = append(files, "static/ubuntu.jpg")
+	files = append(files, "static/video.mjpg")
+	files = append(files, "static/favicon.ico")
+	files = append(files, "static/tiger.svg")
 
-	mr := multipart.NewWriter(os.Stdout)
-	mr.SetBoundary("myboundary")
+	mw := multipart.NewWriter(os.Stdout)
+	mw.SetBoundary("myboundary")
 
 	b := new(bytes.Buffer)
 
 	for i := range files {
-		fdata, _ := ioutil.ReadFile(files[i])
+		fdata, err := ioutil.ReadFile(files[i])
+		if err != nil {
+			log.Println(err)
+		}
 		fsize := len(fdata)
 
-		part, _ := mr.CreatePart(textproto.MIMEHeader{
-			"Content-Type":   {"text/plain"},
+		ctype := mime.TypeByExtension(filepath.Ext(files[i]))
+		if ctype == "" {
+			ctype = http.DetectContentType(fdata)
+		}
+
+		part, err := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type":   {ctype},
 			"Content-Length": {strconv.Itoa(fsize)},
 		})
+		if err != nil {
+			log.Println(err)
+		}
 
-		b.Write(fdata)
-		b.WriteTo(part)
+		//b.Write(fdata)  // prepare data in the buffer
+		b.WriteTo(part) // output the part in multipart format
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -520,6 +521,44 @@ func sendPage(w http.ResponseWriter, page string) error {
 }
 
 //---------------------------------------------------------------------------
+// send any file in multipart format with boundary (standard style)
+//---------------------------------------------------------------------------
+func sendStreamFile(w io.Writer, file string) error {
+	mw := multipart.NewWriter(w)
+	mw.SetBoundary("myboundary")
+
+	buf := new(bytes.Buffer)
+
+	fdata, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	fsize := len(fdata)
+
+	ctype := mime.TypeByExtension(filepath.Ext(file))
+	if ctype == "" {
+		ctype = http.DetectContentType(fdata)
+	}
+
+	part, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":   {ctype},
+		"Content-Length": {strconv.Itoa(fsize)},
+	})
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	buf.Write(fdata)  // prepare data in the buffer
+	buf.WriteTo(part) // output the part with buffer in multipart format
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send an jpeg file in multipart format with boundary (brute force style)
+//---------------------------------------------------------------------------
 const boundary = "myboundary"
 const frameheader = "\r\n" +
 	"--" + boundary + "\r\n" +
@@ -528,10 +567,7 @@ const frameheader = "\r\n" +
 	"X-Timestamp: 0.000000\r\n" +
 	"\r\n"
 
-//---------------------------------------------------------------------------
-// send an jpeg file in multipart format with boundary
-//---------------------------------------------------------------------------
-func sendStreamFile(w io.Writer, file string) error {
+func sendStreamJpeg(w io.Writer, file string) error {
 	var err error
 
 	jpeg, err := ioutil.ReadFile(file)
