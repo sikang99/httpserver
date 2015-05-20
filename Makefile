@@ -37,8 +37,12 @@ rh:
 	@chromium-browser http://localhost:8080/hello
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
+rhs:
+	@chromium-browser --allow-running-insecure-content https://localhost:8081/hello
+	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
+
 rh2:
-	@chromium-browser --allow-running-insecure-content https://localhost:8082/static
+	@chromium-browser --allow-running-insecure-content https://localhost:8082/hello
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
 rp:

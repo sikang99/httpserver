@@ -51,14 +51,14 @@ var hello_tmpl = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8" />
 <script type="text/javascript" src="static/eventemitter2.min.js"></script>
-<script type="text/javascript" src="static/mjpegcanvas.min.js"></script>
+<script type="text/javascript" src="static/mjpegcanvas.min.bak.js"></script>
   
 <script type="text/javascript" type="text/javascript">
   function init() {
     var viewer = new MJPEGCANVAS.Viewer({
       divID : 'mjpeg',
-      host : 'localhost',
-      port : 8080,
+      host : 'https://localhost',
+      port : {{ .Port }},
       width : 1024,
       height : 768,
       topic : 'agilecam'
@@ -82,9 +82,9 @@ var (
 
 	fmode  = flag.String("m", "player", "Working mode of program")
 	fhost  = flag.String("host", "localhost", "server host address")
-	fport  = flag.String("port", "8000", "Define TCP port to be used for http")
-	fports = flag.String("ports", "8001", "Define TCP port to be used for https")
-	fport2 = flag.String("port2", "8002", "Define TCP port to be used for http2")
+	fport  = flag.String("port", "8000", "TCP port to be used for http")
+	fports = flag.String("ports", "8001", "TCP port to be used for https")
+	fport2 = flag.String("port2", "8002", "TCP port to be used for http2")
 	furl   = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
 	vflag  = flag.Bool("version", false, "0.2.0")
@@ -134,7 +134,7 @@ func main() {
 		log.Println(err)
 		return
 	}
-	fmt.Printf("%s %s\n", url.Scheme, url.Host)
+	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
 
 	// determine the working type of the program
 	fmt.Printf("Working mode : %s\n", *fmode)
@@ -384,7 +384,8 @@ func recvStreamData(r io.Reader) {
 // http server entry
 //---------------------------------------------------------------------------
 func ActHttpServer() error {
-	log.Println("Server mode")
+	log.Println("Happy Media Server mode")
+
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)   // view
 	http.HandleFunc("/media", mediaHandler)   // on-demand
@@ -421,9 +422,9 @@ func serveHttp(wg *sync.WaitGroup) {
 	log.Println("Starting HTTP server at http://" + *fhost + ":" + *fport)
 
 	srv := &http.Server{
-		Addr:         ":" + *fport,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr: ":" + *fport,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
 	}
 
 	log.Fatal(srv.ListenAndServe())
@@ -437,9 +438,9 @@ func serveHttps(wg *sync.WaitGroup) {
 	log.Println("Starting HTTPS server at https://" + *fhost + ":" + *fports)
 
 	srv := &http.Server{
-		Addr:         ":" + *fports,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr: ":" + *fports,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
 	}
 
 	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
@@ -453,9 +454,9 @@ func serveHttp2(wg *sync.WaitGroup) {
 	log.Println("Starting HTTP2 server at https://" + *fhost + ":" + *fport2)
 
 	srv := &http.Server{
-		Addr:         ":" + *fport2,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr: ":" + *fport2,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
 	}
 
 	http2.ConfigureServer(srv, &http2.Server{})
@@ -474,7 +475,7 @@ func fileServer(path string) http.Handler {
 // index file handler
 //---------------------------------------------------------------------------
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Index %s\n", r.URL.Path)
+	log.Printf("Index %s to %s\n", r.URL.Path, r.Host)
 
 	if strings.Contains(r.URL.Path, "favicon.ico") {
 		http.ServeFile(w, r, "static/favicon.ico")
@@ -488,17 +489,20 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 // hello file handler (default: hello.html)
 //---------------------------------------------------------------------------
 func helloHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Hello %s\n", r.URL.Path)
+	log.Printf("Hello %s to %s\n", r.URL.Path, r.Host)
 
 	hello_page := "static/hello.html"
+
+	host := strings.Split(r.Host, ":")
+	conf.Port = host[1]
 
 	_, err := os.Stat(hello_page)
 	if err != nil {
 		sendPage(w, hello_tmpl)
-		log.Printf("Hello %s\n", "hello_tmpl")
+		log.Printf("Hello serve %s\n", "hello_tmpl")
 	} else {
 		http.ServeFile(w, r, hello_page)
-		log.Printf("Hello %s\n", hello_page)
+		log.Printf("Hello serve %s\n", hello_page)
 	}
 }
 
@@ -506,7 +510,7 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 // media file handler
 //---------------------------------------------------------------------------
 func mediaHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Media " + r.URL.Path)
+	log.Println("Media %s to %s\n", r.URL.Path, r.Host)
 
 	_, err := os.Stat(r.URL.Path[1:])
 	if err != nil {
@@ -576,23 +580,19 @@ func sendStreamTest(w io.Writer, loop bool) error {
 func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 	var err error
 
-	files, err := ioutil.ReadDir(dir)
+	files, err := filepath.Glob(dir + "*" + ext)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
 	for {
-		for _, f := range files {
-			fpath := dir + f.Name()
-			if filepath.Ext(fpath) == ext {
-				//fmt.Println(fpath)
-				err = sendStreamFile(w, fpath)
-				if err != nil {
-					return err
-				}
-				time.Sleep(time.Second)
+		for i := range files {
+			err = sendStreamFile(w, files[i])
+			if err != nil {
+				return err
 			}
+			time.Sleep(time.Second)
 		}
 
 		if !loop {
@@ -600,6 +600,31 @@ func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 		}
 	}
 
+	/*
+		files, err := ioutil.ReadDir(dir)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		for {
+			for _, f := range files {
+				fpath := dir + f.Name()
+				if filepath.Ext(fpath) == ext {
+					//fmt.Println(fpath)
+					err = sendStreamFile(w, fpath)
+					if err != nil {
+						return err
+					}
+					time.Sleep(time.Second)
+				}
+			}
+
+			if !loop {
+				break
+			}
+		}
+	*/
 	return err
 }
 
@@ -702,16 +727,17 @@ func sendStreamResponse(w http.ResponseWriter) error {
 // 21 handle /stream access
 //---------------------------------------------------------------------------
 func streamHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Stream %s for %s\n", r.Method, r.URL.Path)
+	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
 	switch r.Method {
 	case "POST": // for Caster
-		err := sendStreamOK(w)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-
+		/*
+			err := sendStreamOK(w)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+		*/
 		mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		fmt.Printf("%v %v\n", r.Header.Get("Content-Type"), params)
 		if err != nil {
