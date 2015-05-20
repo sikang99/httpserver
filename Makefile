@@ -111,7 +111,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "multipart handling"
+	git commit -m "multipart handling & server config"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

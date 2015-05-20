@@ -692,7 +692,6 @@ func sendStreamOK(w http.ResponseWriter) error {
 // for Player
 func sendStreamResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
-	//w.Header().Set("Content-Type", "multipart/mixed; boundary=--"+boundary)
 	w.Header().Set("Server", "Happy Media Server")
 	w.WriteHeader(http.StatusOK)
 
