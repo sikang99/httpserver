@@ -137,6 +137,7 @@ func main() {
 		log.Println(err)
 		return
 	}
+	fmt.Printf("Happy Media System, v.0.1.1\n")
 	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
 
 	// determine the working type of the program
@@ -154,6 +155,10 @@ func main() {
 		ActHttpMonitor()
 	case "server":
 		ActHttpServer()
+	case "sender":
+		ActTcpSender()
+	case "receiver":
+		ActTcpReceiver()
 	default:
 		fmt.Println("Unknown mode")
 		os.Exit(0)
@@ -228,14 +233,22 @@ func httpClientGet(client *http.Client, url string) error {
 }
 
 //---------------------------------------------------------------------------
-// http POST to server
+// 21 http POST to server
+// http://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
 //---------------------------------------------------------------------------
 func httpClientPost(client *http.Client, url string) error {
-	b := new(bytes.Buffer)
-	w := multipart.NewWriter(b)
-	w.SetBoundary("myboundary")
+	// send multipart data
+	outer := new(bytes.Buffer)
 
-	req, err := http.NewRequest("POST", url, b)
+	mw := multipart.NewWriter(outer)
+	mw.SetBoundary("myboundary")
+	b := new(bytes.Buffer)
+
+	fdata, err := ioutil.ReadFile("static/image/gopher.jpg")
+	fsize := len(fdata)
+
+	// prepare a connection
+	req, err := http.NewRequest("POST", url, outer)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -247,18 +260,15 @@ func httpClientPost(client *http.Client, url string) error {
 	}
 	fmt.Println(res.Status)
 
-	fdata, err := ioutil.ReadFile("static/image/gopher.jpg")
-	fsize := len(fdata)
+	for i := 0; i < 2; i++ {
+		part, _ := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type":   {"image/jpeg"},
+			"Content-Length": {strconv.Itoa(fsize)},
+		})
 
-	part, _ := w.CreatePart(textproto.MIMEHeader{
-		"Content-Type":   {"image/jpeg"},
-		"Content-Length": {strconv.Itoa(fsize)},
-	})
-
-	b.Write(fdata)
-	b.WriteTo(part)
-
-	time.Sleep(time.Second)
+		//b.Write(fdata)
+		b.WriteTo(part)
+	}
 
 	return err
 }
@@ -593,6 +603,10 @@ func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 		log.Println(err)
 		return err
 	}
+	if files == nil {
+		log.Println("no matched file")
+		return err
+	}
 
 	for {
 		for i := range files {
@@ -733,20 +747,19 @@ func sendStreamResponse(w http.ResponseWriter) error {
 }
 
 //---------------------------------------------------------------------------
-// 21 handle /stream access
+// 22 handle /stream access
 //---------------------------------------------------------------------------
 func streamHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
 	switch r.Method {
 	case "POST": // for Caster
-		/*
-			err := sendStreamOK(w)
-			if err != nil {
-				log.Println(err)
-				break
-			}
-		*/
+		err := sendStreamOK(w)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
 		mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		fmt.Printf("%v %v\n", r.Header.Get("Content-Type"), params)
 		if err != nil {
@@ -759,6 +772,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		mr := multipart.NewReader(r.Body, boundary)
+		time.Sleep(30 * time.Second)
 		recvMultipartToBuffer(mr)
 
 	case "GET": // for Player
@@ -793,6 +807,91 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 	w.WriteHeader(status)
 	log.Println(message)
 	fmt.Fprintf(w, message)
+}
+
+//---------------------------------------------------------------------------
+// TCP data sender for debugging
+//---------------------------------------------------------------------------
+func ActTcpSender() {
+}
+
+func ActTcpReceiver() {
+	l, err := net.Listen("tcp", ":"+*fport)
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	defer l.Close()
+
+	log.Println("Listening on :8080")
+	for {
+		// Listen for an incoming connection.
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting: ", err.Error())
+			os.Exit(1)
+		}
+
+		go handleRequest(conn)
+	}
+}
+
+func handleRequest(conn net.Conn) error {
+	var err error
+
+	log.Printf("in %s\n", conn.RemoteAddr())
+	defer conn.Close()
+
+	for {
+		err = recvTcpData(conn)
+		if err != nil {
+			break
+		}
+		err = sendTcpOk(conn)
+		if err != nil {
+			break
+		}
+	}
+
+	log.Printf("out %s\n", conn.RemoteAddr())
+	return err
+}
+
+func recvTcpData(conn net.Conn) error {
+	var err error
+
+	buf := make([]byte, 10*1024*1024) // 10MByte
+
+	n, err := conn.Read(buf)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	fmt.Println(string(buf[:n]))
+
+	return err
+}
+
+func sendTcpOk(conn net.Conn) error {
+	var err error
+	var smsg bytes.Buffer
+
+	smsg.WriteString("HTTP/1.1 200 Ok\r\n")
+	smsg.WriteString("Server: Happy Dump Server\r\n")
+	smsg.WriteString("\r\n")
+
+	fmt.Printf("BUFF [%d]\n%s", smsg.Len(), smsg.String())
+
+	n, err := smsg.WriteTo(conn)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	fmt.Printf("SEND [%d]\n", n)
+
+	return err
 }
 
 // ------------------------------E-----N-----D--------------------------------------

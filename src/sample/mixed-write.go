@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -40,11 +41,23 @@ func oldmain() {
 }
 
 func main() {
-	files := []string{"static/01.txt", "static/02.txt", "static/03.txt"}
-	files = append(files, "static/ubuntu.jpg")
-	files = append(files, "static/video.mjpg")
-	files = append(files, "static/favicon.ico")
-	files = append(files, "static/tiger.svg")
+	/*
+		files := []string{"static/01.txt", "static/02.txt", "static/03.txt"}
+		files = append(files, "static/ubuntu.jpg")
+		files = append(files, "static/video.mjpg")
+		files = append(files, "static/favicon.ico")
+		files = append(files, "static/tiger.svg")
+	*/
+
+	files, err := filepath.Glob("static/*")
+	if err != nil {
+		log.Println(err)
+	}
+	if files == nil {
+		log.Println("no matched files")
+		return
+	}
+	fmt.Println(files)
 
 	mw := multipart.NewWriter(os.Stdout)
 	mw.SetBoundary("myboundary")
@@ -52,6 +65,8 @@ func main() {
 	b := new(bytes.Buffer)
 
 	for i := range files {
+		fmt.Println(files[i], len(files[i]))
+
 		fdata, err := ioutil.ReadFile(files[i])
 		if err != nil {
 			log.Println(err)

@@ -58,7 +58,7 @@ rp2:
 	./$(PROGRAM) -m=player -url https://localhost:8082/index.html
 
 rc:
-	./$(PROGRAM) -m=caster -url https://localhost:8082/stream
+	./$(PROGRAM) -m=caster -url http://localhost:8080/stream
 
 rr:
 	./$(PROGRAM) -m=reader -url http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi
@@ -71,6 +71,12 @@ rm:
 
 rs:
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
+
+rd:
+	./$(PROGRAM) -m=dumper -port=8080 -ports=8081 -port2=8082
+
+rdt:
+	echo -n "test out the server" | nc localhost 8080
 
 rt:
 	curl -I http://localhost:8080/stream
@@ -115,7 +121,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "support TLS connection from player"
+	git commit -m "write TCP sender/receiver for debugging"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
