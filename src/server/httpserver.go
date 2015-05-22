@@ -953,7 +953,7 @@ func summitTcpRequest(conn net.Conn) (map[string]string, error) {
 	_, err = readTcpMessage(conn)
 
 	// send multipart stream, ex) jpg files
-	err = sendTcpMultipartFiles(conn, "static/image/*.jpg")
+	err = sendTcpMultipartFiles(conn, "static/image/*")
 
 	return nil, err
 }
@@ -1116,7 +1116,13 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 			log.Println(err)
 			return err
 		}
-		err = sendTcpPart(conn, fdata)
+
+		ctype := mime.TypeByExtension(files[i])
+		if ctype == "" {
+			ctype = http.DetectContentType(fdata)
+		}
+
+		err = sendTcpPart(conn, fdata, ctype)
 		if err != nil {
 			return err
 		}
@@ -1130,15 +1136,13 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 //---------------------------------------------------------------------------
 // send a part
 //---------------------------------------------------------------------------
-func sendTcpPart(conn net.Conn, data []byte) error {
+func sendTcpPart(conn net.Conn, data []byte, ctype string) error {
 	var err error
 
 	req := fmt.Sprintf("--%s\r\n", "myboundary")
-	req += fmt.Sprintf("Content-Type: %s\r\n", "image/jpeg")
+	req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
 	req += fmt.Sprintf("Content-Length: %d\r\n", len(data))
 	req += "\r\n"
-
-	fmt.Printf("SEND [%d,%d]\n%s", len(req), len(data), req)
 
 	_, err = conn.Write([]byte(req))
 	if err != nil {
@@ -1152,6 +1156,7 @@ func sendTcpPart(conn net.Conn, data []byte) error {
 		return err
 	}
 
+	fmt.Printf("SEND [%d,%d]\n%s", len(req), len(data), req)
 	return err
 }
 

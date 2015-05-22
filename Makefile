@@ -124,7 +124,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "handle websocket"
+	git commit -m "implement tcp sender/receiver"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
