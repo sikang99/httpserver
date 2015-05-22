@@ -72,8 +72,11 @@ rm:
 rs:
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
-rd:
-	./$(PROGRAM) -m=dumper -port=8080 -ports=8081 -port2=8082
+rts:
+	./$(PROGRAM) -m=sender -port=8080 -ports=8081 -port2=8082
+
+rtr:
+	./$(PROGRAM) -m=receiver -port=8080 -ports=8081 -port2=8082
 
 rdt:
 	echo -n "test out the server" | nc localhost 8080

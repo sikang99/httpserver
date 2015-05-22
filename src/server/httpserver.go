@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"errors"
@@ -141,7 +142,7 @@ func main() {
 	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
 
 	// determine the working type of the program
-	fmt.Printf("Working mode : %s\n", *fmode)
+	fmt.Printf("Working mode: %s\n", *fmode)
 
 	// let's do working mode
 	switch *fmode {
@@ -156,7 +157,7 @@ func main() {
 	case "server":
 		ActHttpServer()
 	case "sender":
-		ActTcpSender()
+		ActTcpSender(*fhost, *fport)
 	case "receiver":
 		ActTcpReceiver()
 	default:
@@ -235,6 +236,7 @@ func httpClientGet(client *http.Client, url string) error {
 //---------------------------------------------------------------------------
 // 21 http POST to server
 // http://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
+// http://www.tagwith.com/question_781711_golang-adding-multiple-files-to-a-http-multipart-request
 //---------------------------------------------------------------------------
 func httpClientPost(client *http.Client, url string) error {
 	// send multipart data
@@ -246,6 +248,16 @@ func httpClientPost(client *http.Client, url string) error {
 
 	fdata, err := ioutil.ReadFile("static/image/gopher.jpg")
 	fsize := len(fdata)
+
+	for i := 0; i < 3; i++ {
+		part, _ := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type":   {"image/jpeg"},
+			"Content-Length": {strconv.Itoa(fsize)},
+		})
+
+		b.Write(fdata)
+		b.WriteTo(part)
+	}
 
 	// prepare a connection
 	req, err := http.NewRequest("POST", url, outer)
@@ -259,16 +271,6 @@ func httpClientPost(client *http.Client, url string) error {
 		return err
 	}
 	fmt.Println(res.Status)
-
-	for i := 0; i < 2; i++ {
-		part, _ := mw.CreatePart(textproto.MIMEHeader{
-			"Content-Type":   {"image/jpeg"},
-			"Content-Length": {strconv.Itoa(fsize)},
-		})
-
-		//b.Write(fdata)
-		b.WriteTo(part)
-	}
 
 	return err
 }
@@ -754,12 +756,13 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "POST": // for Caster
-		err := sendStreamOK(w)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-
+		/*
+			err := sendStreamOK(w)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+		*/
 		mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		fmt.Printf("%v %v\n", r.Header.Get("Content-Type"), params)
 		if err != nil {
@@ -772,7 +775,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		mr := multipart.NewReader(r.Body, boundary)
-		time.Sleep(30 * time.Second)
+
 		recvMultipartToBuffer(mr)
 
 	case "GET": // for Player
@@ -811,10 +814,52 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 
 //---------------------------------------------------------------------------
 // TCP data sender for debugging
+// http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
+// https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
 //---------------------------------------------------------------------------
-func ActTcpSender() {
+func ActTcpSender(hname, hport string) {
+	/*
+		addr, _ := net.ResolveTCPAddr("tcp", hname+":"+hport)
+		conn, err := net.DialTCP("tcp", nil, addr)
+		if err != nil {
+			log.Println(err)
+			os.Exit(1)
+		}
+		defer conn.Close()
+
+		err = conn.SetNoDelay(true)
+		if err != nil {
+			log.Println(err)
+		}
+
+		log.Printf("Connecting to %s\n", addr)
+	*/
+
+	conn, err := net.Dial("tcp", hname+":"+hport)
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	defer conn.Close()
+
+	readTcpMessage(conn)
 }
 
+//---------------------------------------------------------------------------
+// 31 read Message from TCP socket
+//---------------------------------------------------------------------------
+func readTcpMessage(conn net.Conn) error {
+	var err error
+
+	rmsg, err := bufio.NewReader(conn).ReadString('\n')
+	fmt.Println(rmsg)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// TCP data receiver for debugging
+//---------------------------------------------------------------------------
 func ActTcpReceiver() {
 	l, err := net.Listen("tcp", ":"+*fport)
 	if err != nil {
@@ -823,20 +868,20 @@ func ActTcpReceiver() {
 	}
 	defer l.Close()
 
-	log.Println("Listening on :8080")
+	log.Printf("Listening on :%s\n", *fport)
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
+			log.Println(err)
 			os.Exit(1)
 		}
 
-		go handleRequest(conn)
+		go handleTcpRequest(conn)
 	}
 }
 
-func handleRequest(conn net.Conn) error {
+func handleTcpRequest(conn net.Conn) error {
 	var err error
 
 	log.Printf("in %s\n", conn.RemoteAddr())
