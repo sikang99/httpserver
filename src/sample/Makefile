@@ -12,9 +12,10 @@ PROGRAMS= \
 	goupload \
 	url-parse \
 	mixed-write \
+	camrecord \
 
 
-PROGRAM=mixed-write
+PROGRAM=camrecord
 
 all: usage
 

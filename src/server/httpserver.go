@@ -138,7 +138,7 @@ func main() {
 		log.Println(err)
 		return
 	}
-	fmt.Printf("Happy Media System, v.0.1.1\n")
+	fmt.Printf("Happy Media System, v.0.3.3\n")
 	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
 
 	// determine the working type of the program
@@ -189,7 +189,10 @@ func httpClientConfig() *http.Client {
 // http monitor client
 //---------------------------------------------------------------------------
 func ActHttpMonitor() error {
+	log.Printf("Happy Media Monitor\n")
+
 	base.ShowNetInterfaces()
+
 	return nil
 }
 
@@ -197,7 +200,7 @@ func ActHttpMonitor() error {
 // http player client
 //---------------------------------------------------------------------------
 func ActHttpPlayer(url string) error {
-	log.Printf("httpPlayer %s\n", url)
+	log.Printf("Happy Media Player for %s\n", url)
 
 	client := httpClientConfig()
 	return httpClientGet(client, url)
@@ -207,7 +210,7 @@ func ActHttpPlayer(url string) error {
 // http caster client
 //---------------------------------------------------------------------------
 func ActHttpCaster(url string) error {
-	log.Printf("httpCaster %s\n", url)
+	log.Printf("Happy Media Caster for %s\n", url)
 
 	client := httpClientConfig()
 	return httpClientPost(client, url)
@@ -299,6 +302,8 @@ func printHttpResponse(res *http.Response, body []byte) {
 //	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
 func ActHttpReader(url string) {
+	log.Printf("Happy Media Reader for %s\n", url)
+
 	var err error
 	var res *http.Response
 
@@ -399,7 +404,7 @@ func recvStreamData(r io.Reader) {
 // http server entry
 //---------------------------------------------------------------------------
 func ActHttpServer() error {
-	log.Println("Happy Media Server mode")
+	log.Println("Happy Media Server")
 
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)   // view
@@ -423,6 +428,14 @@ func ActHttpServer() error {
 	wg.Add(1)
 	// HTTP2 server
 	go serveHttp2(&wg)
+
+	wg.Add(1)
+	// WS server
+	go serveWs(&wg)
+
+	wg.Add(1)
+	// WSS server
+	go serveWss(&wg)
 
 	wg.Wait()
 
@@ -476,6 +489,20 @@ func serveHttp2(wg *sync.WaitGroup) {
 
 	http2.ConfigureServer(srv, &http2.Server{})
 	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
+}
+
+//---------------------------------------------------------------------------
+// for ws access
+//---------------------------------------------------------------------------
+func serveWs(wg *sync.WaitGroup) {
+
+}
+
+//---------------------------------------------------------------------------
+// for wss access
+//---------------------------------------------------------------------------
+func serveWss(wg *sync.WaitGroup) {
+
 }
 
 //---------------------------------------------------------------------------
@@ -818,49 +845,163 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 // https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
 //---------------------------------------------------------------------------
 func ActTcpSender(hname, hport string) {
-	/*
-		addr, _ := net.ResolveTCPAddr("tcp", hname+":"+hport)
-		conn, err := net.DialTCP("tcp", nil, addr)
-		if err != nil {
-			log.Println(err)
-			os.Exit(1)
-		}
-		defer conn.Close()
+	log.Printf("Happy Media TCP Sender\n")
 
-		err = conn.SetNoDelay(true)
-		if err != nil {
-			log.Println(err)
-		}
-
-		log.Printf("Connecting to %s\n", addr)
-	*/
-
-	conn, err := net.Dial("tcp", hname+":"+hport)
+	addr, _ := net.ResolveTCPAddr("tcp", hname+":"+hport)
+	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
 	defer conn.Close()
 
-	readTcpMessage(conn)
+	err = conn.SetNoDelay(true)
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Printf("Connecting to %s\n", addr)
+
+	/*
+		conn, err := net.Dial("tcp", hname+":"+hport)
+		if err != nil {
+			log.Println(err)
+			os.Exit(1)
+		}
+		defer conn.Close()
+	*/
+
+	reader := bufio.NewReader(conn)
+	headers, _ := sendTcpRequest(conn, reader)
+	fmt.Println(headers)
+
 }
 
 //---------------------------------------------------------------------------
-// 31 read Message from TCP socket
+// 31 send TCP request
 //---------------------------------------------------------------------------
-func readTcpMessage(conn net.Conn) error {
+func sendTcpRequest(conn net.Conn, reader *bufio.Reader) (map[string]string, string) {
 	var err error
 
-	rmsg, err := bufio.NewReader(conn).ReadString('\n')
-	fmt.Println(rmsg)
+	req := "POST /stream HTTP/1.1\r\n"
+	req += "Content-Type: multipart/x-mixed-replace; boundary=myboundary\r\n"
+	req += "Client: Happy TCP Client\r\n"
+	req += "\r\n"
 
-	return err
+	fmt.Printf("SEND [%d]\n%s", len(req), req)
+
+	_, err = conn.Write([]byte(req))
+	if err != nil {
+		log.Println(err)
+		return nil, ""
+	}
+
+	headers := readTcpHeader(reader)
+
+	contentLength := 0
+	value, ok := headers["CONTENT-LENGTH"]
+	if ok {
+		contentLength, _ = strconv.Atoi(value)
+	}
+
+	if contentLength > 0 {
+		return headers, readTcpBody(reader, contentLength)
+	}
+
+	return headers, ""
+}
+
+func sendTcpResponse(conn net.Conn) (map[string]string, string) {
+	var err error
+
+	res := "HTTP/1.1 200 Ok\r\n"
+	res += "Client: Happy TCP Server\r\n"
+	res += "\r\n"
+
+	fmt.Printf("SEND [%d]\n%s", len(res), res)
+
+	_, err = conn.Write([]byte(res))
+	if err != nil {
+		log.Println(err)
+		return nil, ""
+	}
+
+	return nil, ""
+}
+
+//---------------------------------------------------------------------------
+// 32 read header + (body) from TCP socket
+//---------------------------------------------------------------------------
+func readTcpHeader(reader *bufio.Reader) map[string]string {
+	result := make(map[string]string)
+
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			panic(err)
+		}
+		if string(line) == "" {
+			break
+		}
+
+		fmt.Println(string(line))
+
+		keyvalue := strings.SplitN(string(line), ":", 2)
+		if len(keyvalue) > 1 {
+			result[strings.ToUpper(keyvalue[0])] = strings.TrimSpace(keyvalue[1])
+		}
+	}
+
+	fmt.Println()
+
+	return result
+
+}
+
+func readTcpBody(reader *bufio.Reader, contentLength int) (result string) {
+	if contentLength < 0 {
+		buf := make([]byte, 512)
+		for {
+			read, _ := reader.Read(buf)
+			if read == 0 {
+				return
+			} else {
+				result += string(buf)
+			}
+
+		}
+	} else {
+		buf := make([]byte, contentLength)
+		start := 0
+
+		for start < contentLength {
+			readed, _ := reader.Read(buf[start:])
+			result += string(buf)
+
+			start += readed
+		}
+	}
+
+	return result
+}
+
+//---------------------------------------------------------------------------
+// send multipart frame
+//---------------------------------------------------------------------------
+func sendTcpMultipart() {
+
+}
+
+func sendTcpPart() {
+
 }
 
 //---------------------------------------------------------------------------
 // TCP data receiver for debugging
 //---------------------------------------------------------------------------
 func ActTcpReceiver() {
+	log.Printf("Happy Media TCP Receiver\n")
+
 	l, err := net.Listen("tcp", ":"+*fport)
 	if err != nil {
 		log.Println(err)
@@ -923,7 +1064,7 @@ func sendTcpOk(conn net.Conn) error {
 	var smsg bytes.Buffer
 
 	smsg.WriteString("HTTP/1.1 200 Ok\r\n")
-	smsg.WriteString("Server: Happy Dump Server\r\n")
+	smsg.WriteString("Server: Happy TCP Server\r\n")
 	smsg.WriteString("\r\n")
 
 	fmt.Printf("BUFF [%d]\n%s", smsg.Len(), smsg.String())
