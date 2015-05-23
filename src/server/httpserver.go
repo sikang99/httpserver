@@ -28,12 +28,10 @@ import (
 	"text/template"
 	"time"
 
-	"golang.org/x/net/websocket"
-
-	//"../base"
 	"stoney/httpserver/src/base"
 
 	"github.com/bradfitz/http2"
+	"golang.org/x/net/websocket"
 )
 
 //---------------------------------------------------------------------------
@@ -91,7 +89,7 @@ var (
 	fport2 = flag.String("port2", "8002", "TCP port to be used for http2")
 	furl   = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
-	vflag  = flag.Bool("version", false, "0.2.0")
+	vflag  = flag.Bool("version", false, "0.3.1")
 )
 
 func init() {
@@ -109,6 +107,8 @@ type ServerConfig struct {
 	Addr         string
 	Host         string
 	Port         string
+	PortS        string
+	Port2        string
 	Mode         string
 	ImageChannel chan []byte
 	Player       io.Writer
@@ -120,11 +120,13 @@ func NewServerConfig() *ServerConfig {
 }
 
 var conf = ServerConfig{
-	Title:        "Simple MJPEG Proxy Server",
-	Image:        "static/image/gophergun.jpg",
+	Title:        "Happy Media System",
+	Image:        "static/image/*.jpg",
 	Addr:         "http://localhost",
 	Host:         *fhost,
 	Port:         *fport,
+	PortS:        *fports,
+	Port2:        *fport2,
 	Mode:         *fmode,
 	ImageChannel: make(chan []byte, 2),
 }
@@ -161,7 +163,11 @@ func main() {
 	case "sender":
 		ActTcpSender(*fhost, *fport)
 	case "receiver":
-		ActTcpReceiver()
+		ActTcpReceiver(*fport)
+	case "shooter":
+		ActWsShooter(*fhost, *fport)
+	case "catcher":
+		ActWsCatcher(*fport)
 	default:
 		fmt.Println("Unknown mode")
 		os.Exit(0)
@@ -882,13 +888,14 @@ func ActTcpSender(hname, hport string) {
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		log.Println(err)
-		os.Exit(1)
+		return
 	}
 	defer conn.Close()
 
 	err = conn.SetNoDelay(true)
 	if err != nil {
 		log.Println(err)
+		return
 	}
 
 	log.Printf("Connecting to %s\n", addr)
@@ -898,25 +905,25 @@ func ActTcpSender(hname, hport string) {
 		log.Println(err)
 		return
 	}
-
 	fmt.Println(headers)
 
+	return
 }
 
 //---------------------------------------------------------------------------
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
-func ActTcpReceiver() {
+func ActTcpReceiver(hport string) {
 	log.Printf("Happy Media TCP Receiver\n")
 
-	l, err := net.Listen("tcp", ":"+*fport)
+	l, err := net.Listen("tcp", ":"+hport)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
 	defer l.Close()
 
-	log.Printf("Listening on :%s\n", *fport)
+	log.Printf("Listening on :%s\n", hport)
 
 	for {
 		// Listen for an incoming connection.
@@ -939,7 +946,7 @@ func summitTcpRequest(conn net.Conn) (map[string]string, error) {
 	// send POST request
 	req := "POST /stream HTTP/1.1\r\n"
 	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", "myboundary")
-	req += "User-Agent: Happy TCP Client\r\n"
+	req += "User-Agent: Happy Media TCP Client\r\n"
 	req += "\r\n"
 
 	fmt.Printf("SEND [%d]\n%s", len(req), req)
@@ -953,7 +960,7 @@ func summitTcpRequest(conn net.Conn) (map[string]string, error) {
 	_, err = readTcpMessage(conn)
 
 	// send multipart stream, ex) jpg files
-	err = sendTcpMultipartFiles(conn, "static/image/*")
+	err = sendTcpMultipartFiles(conn, "static/image/*.jpg")
 
 	return nil, err
 }
@@ -965,16 +972,19 @@ func handleTcpRequest(conn net.Conn) error {
 	var err error
 
 	log.Printf("in %s\n", conn.RemoteAddr())
+	defer log.Printf("out %s\n", conn.RemoteAddr())
 	defer conn.Close()
 
 	// recv POST request
 	_, err = readTcpMessage(conn)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
 	err = sendTcpResponse(conn)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
@@ -983,11 +993,10 @@ func handleTcpRequest(conn net.Conn) error {
 		_, err = readTcpMessage(conn)
 		if err != nil {
 			log.Println(err)
-			break
+			return err
 		}
 	}
 
-	log.Printf("out %s\n", conn.RemoteAddr())
 	return err
 }
 
@@ -998,7 +1007,7 @@ func sendTcpResponse(conn net.Conn) error {
 	var err error
 
 	res := "HTTP/1.1 200 Ok\r\n"
-	res += "Server: Happy TCP Server\r\n"
+	res += "Server: Happy Media TCP Server\r\n"
 	res += "\r\n"
 
 	fmt.Printf("SEND [%d]\n%s", len(res), res)
@@ -1013,26 +1022,27 @@ func sendTcpResponse(conn net.Conn) error {
 }
 
 //---------------------------------------------------------------------------
-// 41 read a message in http style
+// read a message in http header style
 //---------------------------------------------------------------------------
 func readTcpMessage(conn net.Conn) (map[string]string, error) {
 	var err error
 
 	reader := bufio.NewReader(conn)
+
 	headers, err := readTcpHeader(reader)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 
-	contentLength := 0
+	clen := 0
 	value, ok := headers["CONTENT-LENGTH"]
 	if ok {
-		contentLength, _ = strconv.Atoi(value)
+		clen, _ = strconv.Atoi(value)
 	}
 
-	if contentLength > 0 {
-		_, err = readTcpBody(reader, contentLength)
+	if clen > 0 {
+		_, err = readTcpBody(reader, clen)
 		if err != nil {
 			log.Println(err)
 			return nil, err
@@ -1075,13 +1085,13 @@ func readTcpHeader(reader *bufio.Reader) (map[string]string, error) {
 //---------------------------------------------------------------------------
 // read body of message
 //---------------------------------------------------------------------------
-func readTcpBody(reader *bufio.Reader, contentLength int) ([]byte, error) {
+func readTcpBody(reader *bufio.Reader, clen int) ([]byte, error) {
 	var err error
 
-	buf := make([]byte, contentLength)
+	buf := make([]byte, clen)
 
 	tn := 0
-	for tn < contentLength {
+	for tn < clen {
 		n, err := reader.Read(buf[tn:])
 		if err != nil {
 			log.Println(err)
@@ -1090,12 +1100,12 @@ func readTcpBody(reader *bufio.Reader, contentLength int) ([]byte, error) {
 		tn += n
 	}
 
-	fmt.Printf("[DATA] (%d/%d)\n\n", tn, contentLength)
+	fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
 	return buf, err
 }
 
 //---------------------------------------------------------------------------
-// send multipart frame
+// send files in the multipart
 //---------------------------------------------------------------------------
 func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 	var err error
@@ -1106,7 +1116,7 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 		return err
 	}
 	if files == nil {
-		log.Printf("no file for %s\n", pattern)
+		log.Printf("no file for '%s'\n", pattern)
 		return err
 	}
 
@@ -1117,6 +1127,11 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 			return err
 		}
 
+		if len(fdata) == 0 {
+			fmt.Printf(">> ignore '%s'\n", files[i])
+			continue
+		}
+
 		ctype := mime.TypeByExtension(files[i])
 		if ctype == "" {
 			ctype = http.DetectContentType(fdata)
@@ -1124,9 +1139,10 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 
 		err = sendTcpPart(conn, fdata, ctype)
 		if err != nil {
+			log.Println(err)
 			return err
 		}
-		//break
+
 		time.Sleep(time.Second)
 	}
 
@@ -1139,10 +1155,14 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 func sendTcpPart(conn net.Conn, data []byte, ctype string) error {
 	var err error
 
+	clen := len(data)
+
 	req := fmt.Sprintf("--%s\r\n", "myboundary")
 	req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
-	req += fmt.Sprintf("Content-Length: %d\r\n", len(data))
+	req += fmt.Sprintf("Content-Length: %d\r\n", clen)
 	req += "\r\n"
+
+	defer fmt.Printf("SEND [%d,%d]\n%s", len(req), clen, req)
 
 	_, err = conn.Write([]byte(req))
 	if err != nil {
@@ -1150,14 +1170,92 @@ func sendTcpPart(conn net.Conn, data []byte, ctype string) error {
 		return err
 	}
 
-	_, err = conn.Write(data)
-	if err != nil {
-		log.Println(err)
-		return err
+	if clen > 0 {
+		_, err = conn.Write(data)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
 	}
 
-	fmt.Printf("SEND [%d,%d]\n%s", len(req), len(data), req)
 	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket sender for debugging
+//---------------------------------------------------------------------------
+func ActWsShooter(hname, hport string) {
+	log.Printf("Happy Media WS Shooter\n")
+
+	origin := fmt.Sprintf("http://%s/", hname)
+	url := fmt.Sprintf("ws://%s:%s/stream", hname, hport)
+
+	ws, err := websocket.Dial(url, "", origin)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	smsg := []byte("POST /stream HTTP/1.1\r\n\r\n")
+
+	n, err := ws.Write(smsg)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Printf("Send(%d): %s", n, smsg)
+
+	rmsg := make([]byte, 512)
+
+	n, err = ws.Read(rmsg)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Printf("Recv(%d): %s", n, rmsg[:n])
+}
+
+//---------------------------------------------------------------------------
+// WebSocket receiver for debugging
+//---------------------------------------------------------------------------
+func ActWsCatcher(hport string) {
+	log.Printf("Happy Media WS Catcher\n")
+
+	http.Handle("/stream", websocket.Handler(WsStreamHandler))
+	log.Fatal(http.ListenAndServe(":"+hport, nil))
+}
+
+//---------------------------------------------------------------------------
+// WebSocket stream handler
+//---------------------------------------------------------------------------
+func WsStreamHandler(ws *websocket.Conn) {
+	log.Printf("in %s\n", ws.RemoteAddr())
+	defer log.Printf("out %s\n", ws.RemoteAddr())
+
+	rmsg := make([]byte, 512)
+
+	n, err := ws.Read(rmsg)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Printf("Recv(%d): %s", n, rmsg[:n])
+
+	smsg := []byte("HTTP/1.1 200 Ok\r\n\r\n")
+
+	n, err = ws.Write(smsg)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Printf("Send(%d): %s", n, smsg)
+}
+
+//---------------------------------------------------------------------------
+// WebSocket send part
+//---------------------------------------------------------------------------
+func WsSendPart() {
+
 }
 
 // ------------------------------E-----N-----D--------------------------------------

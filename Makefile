@@ -72,11 +72,19 @@ rm:
 rs:
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
+# TCP
 rts:
 	./$(PROGRAM) -m=sender -port=8080 -ports=8081 -port2=8082
 
 rtr:
 	./$(PROGRAM) -m=receiver -port=8080 -ports=8081 -port2=8082
+
+# WebSocket
+rws:
+	./$(PROGRAM) -m=shooter -port=8080 -ports=8081 -port2=8082
+
+rwr:
+	./$(PROGRAM) -m=catcher -port=8080 -ports=8081 -port2=8082
 
 rdt:
 	echo -n "test out the server" | nc localhost 8080
@@ -124,7 +132,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "implement tcp sender/receiver"
+	git commit -m "implement websocket sender/receiver"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
