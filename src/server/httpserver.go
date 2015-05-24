@@ -79,6 +79,15 @@ var hello_tmpl = `<!DOCTYPE html>
 `
 
 //---------------------------------------------------------------------------
+const (
+	Version   = "0.4.2"
+	TCPClient = "Happy Media TCP Server"
+	TCPServer = "Happy Media TCP Server"
+	WSClient  = "Happy Media WS Server"
+	WSServer  = "Happy Media WS Server"
+)
+
+//---------------------------------------------------------------------------
 var (
 	NotSupportError = errors.New("Not supported protocol")
 
@@ -89,7 +98,7 @@ var (
 	fport2 = flag.String("port2", "8002", "TCP port to be used for http2")
 	furl   = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
-	vflag  = flag.Bool("version", false, "0.3.1")
+	vflag  = flag.Bool("version", false, Version)
 )
 
 func init() {
@@ -121,7 +130,7 @@ func NewServerConfig() *ServerConfig {
 
 var conf = ServerConfig{
 	Title:        "Happy Media System",
-	Image:        "static/image/*.jpg",
+	Image:        "static/image/gophergun.jpg",
 	Addr:         "http://localhost",
 	Host:         *fhost,
 	Port:         *fport,
@@ -142,7 +151,7 @@ func main() {
 		log.Println(err)
 		return
 	}
-	fmt.Printf("Happy Media System, v.0.3.3\n")
+	fmt.Printf("Happy Media System, v.%s\n", Version)
 	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
 
 	// determine the working type of the program
@@ -338,26 +347,29 @@ func ActHttpReader(url string) {
 		log.Printf("expected boundary to start with --, got %q", boundary)
 	}
 
-	r := multipart.NewReader(res.Body, boundary)
+	mr := multipart.NewReader(res.Body, boundary)
 
-	//recvMultipartDecodeJpeg(r)
-	recvMultipartToBuffer(r)
+	//recvMultipartDecodeJpeg(mr)
+	recvMultipartToBuffer(mr)
 }
 
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
 //---------------------------------------------------------------------------
-func recvMultipartToBuffer(r *multipart.Reader) {
+func recvMultipartToBuffer(r *multipart.Reader) error {
+	var err error
+
 	for {
 		p, err := r.NextPart()
 		if err != nil {
-			log.Fatalf("NextPart: %v", err)
+			log.Println(err)
+			return err
 		}
 
 		sl := p.Header.Get("Content-Length")
 		nl, err := strconv.Atoi(sl)
 		if err != nil {
-			log.Fatalf("%s %s %d\n", p.Header, sl, nl)
+			log.Printf("%s %s %d\n", p.Header, sl, nl)
 		}
 		//println(nl)
 		data := make([]byte, nl)
@@ -368,7 +380,7 @@ func recvMultipartToBuffer(r *multipart.Reader) {
 			n, err := p.Read(data[tn:])
 			if err != nil {
 				log.Println(err)
-				return
+				return err
 			}
 			tn += n
 		}
@@ -376,6 +388,8 @@ func recvMultipartToBuffer(r *multipart.Reader) {
 		fmt.Printf("%s %d/%d [%02x %02x - %02x %02x]\n", p.Header.Get("Content-Type"), tn, nl, data[0], data[1], data[nl-2], data[nl-1])
 		//conf.ImageChannel <- data[:n]
 	}
+
+	return err
 }
 
 //---------------------------------------------------------------------------
@@ -386,26 +400,14 @@ func recvMultipartDecodeJpeg(r *multipart.Reader) {
 		print(".")
 		p, err := r.NextPart()
 		if err != nil {
-			log.Fatalf("NextPart: %v", err)
+			log.Println(err)
 		}
 
 		_, err = jpeg.Decode(p)
 		if err != nil {
-			log.Fatalf("jpeg Decode: %v", err)
+			log.Println(err)
 		}
 	}
-}
-
-//---------------------------------------------------------------------------
-// receive byte data
-//---------------------------------------------------------------------------
-func recvStreamData(r io.Reader) {
-	b := make([]byte, 1024*1204*1204)
-	n, err := r.Read(b)
-	if err != nil {
-		log.Fatal(err)
-	}
-	println(n)
 }
 
 //---------------------------------------------------------------------------
@@ -1186,6 +1188,7 @@ func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
 
 //==================================================================================
 //	WebSocket(WS, WSS)
+// https://github.com/golang-samples/websocket
 //==================================================================================
 
 //---------------------------------------------------------------------------
@@ -1197,18 +1200,24 @@ func ActWsShooter(hname, hport string) {
 	origin := fmt.Sprintf("http://%s/", hname)
 	url := fmt.Sprintf("ws://%s:%s/stream", hname, hport)
 
+	// connect to the server
 	ws, err := websocket.Dial(url, "", origin)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	WsSummitRequest(ws)
+	err = WsSummitRequest(ws)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	WsSendMultipartFiles(ws, "static/image/*.jpg")
 }
 
 //---------------------------------------------------------------------------
 // WebSocket receiver for debugging
-// https://github.com/golang-samples/websocket
 //---------------------------------------------------------------------------
 func ActWsCatcher(hport string) {
 	log.Printf("Happy Media WS Catcher\n")
@@ -1224,60 +1233,198 @@ func WsStreamHandler(ws *websocket.Conn) {
 	log.Printf("in %s\n", ws.RemoteAddr())
 	defer log.Printf("out %s\n", ws.RemoteAddr())
 
-	WsHandleRequest(ws)
+	err := WsHandleRequest(ws)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	WsRecvMultipart(ws, "myboundary")
 }
 
 //---------------------------------------------------------------------------
 // WebSocket summit requeest in the client
 //---------------------------------------------------------------------------
-func WsSummitRequest(ws *websocket.Conn) {
-	smsg := []byte("POST /stream HTTP/1.1\r\n\r\n")
+func WsSummitRequest(ws *websocket.Conn) error {
+	var err error
 
-	n, err := ws.Write(smsg)
+	// send POST request
+	smsg := "POST /stream HTTP/1.1\r\n"
+	smsg += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", "myboundary")
+	smsg += "User-Agent: Happy Media WS Client\r\n"
+	smsg += "\r\n"
+
+	n, err := ws.Write([]byte(smsg))
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
-	fmt.Printf("Send(%d): %s", n, smsg)
+	fmt.Printf("Send(%d):\n%s", n, smsg)
 
 	rmsg := make([]byte, 512)
 
 	n, err = ws.Read(rmsg)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
-	fmt.Printf("Recv(%d): %s", n, rmsg[:n])
+	fmt.Printf("Recv(%d):\n%s", n, rmsg[:n])
+
+	return err
 }
 
 //---------------------------------------------------------------------------
 // WebSocket handle request in the server
 //---------------------------------------------------------------------------
-func WsHandleRequest(ws *websocket.Conn) {
+func WsHandleRequest(ws *websocket.Conn) error {
+	var err error
+
+	// recv POST request
 	rmsg := make([]byte, 512)
 
 	n, err := ws.Read(rmsg)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
-	fmt.Printf("Recv(%d): %s", n, rmsg[:n])
+	fmt.Printf("Recv(%d):\n%s", n, rmsg[:n])
 
-	smsg := []byte("HTTP/1.1 200 Ok\r\n\r\n")
+	smsg := "HTTP/1.1 200 Ok\r\n"
+	smsg += "Server: Happy Media WS Server\r\n"
+	smsg += "\r\n"
 
-	n, err = ws.Write(smsg)
+	n, err = ws.Write([]byte(smsg))
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
-	fmt.Printf("Send(%d): %s", n, smsg)
+	fmt.Printf("Send(%d):\n%s", n, smsg)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket send multipart
+//---------------------------------------------------------------------------
+func WsSendMultipartFiles(ws *websocket.Conn, pattern string) error {
+	var err error
+
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if files == nil {
+		log.Printf("no file for '%s'\n", pattern)
+		return err
+	}
+
+	//mw := multipart.NewWriter(os.Stdout)	// for debug
+	mw := multipart.NewWriter(ws)
+	mw.SetBoundary("myboundary")
+
+	for i := range files {
+		fmt.Println(files[i])
+		fdata, err := ioutil.ReadFile(files[i])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		if len(fdata) == 0 {
+			fmt.Printf(">> ignore '%s'\n", files[i])
+			continue
+		}
+
+		ctype := mime.TypeByExtension(files[i])
+		if ctype == "" {
+			ctype = http.DetectContentType(fdata)
+		}
+
+		err = WsSendPart(mw, fdata, len(fdata), ctype)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket recv multipart
+//---------------------------------------------------------------------------
+func WsRecvMultipart(ws *websocket.Conn, boundary string) error {
+	var err error
+
+	mr := multipart.NewReader(ws, boundary)
+
+	err = recvMultipartToBuffer(mr)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return err
 }
 
 //---------------------------------------------------------------------------
 // WebSocket send part
 //---------------------------------------------------------------------------
-func WsSendPart(ws *websocket.Conn) {
+func WsSendPart(mw *multipart.Writer, data []byte, dsize int, dtype string) error {
+	var err error
 
+	buf := new(bytes.Buffer)
+
+	part, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":   {dtype},
+		"Content-Length": {strconv.Itoa(dsize)},
+	})
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	buf.Write(data)   // prepare data in the buffer
+	buf.WriteTo(part) // output the part with buffer in multipart format
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket recv part
+//---------------------------------------------------------------------------
+func WsRecvPart(mr *multipart.Reader) error {
+	var err error
+
+	p, err := mr.NextPart()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	sl := p.Header.Get("Content-Length")
+	nl, err := strconv.Atoi(sl)
+	if err != nil {
+		log.Printf("%s %s %d\n", p.Header, sl, nl)
+	}
+
+	data := make([]byte, nl)
+
+	// implement like ReadFull() in jpeg.Decode()
+	var tn int
+	for tn < nl {
+		n, err := p.Read(data[tn:])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		tn += n
+
+	}
+	return err
 }
 
 // ------------------------------E-----N-----D--------------------------------------
