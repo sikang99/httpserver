@@ -900,7 +900,7 @@ func ActTcpSender(hname, hport string) {
 
 	log.Printf("Connecting to %s\n", addr)
 
-	headers, err := summitTcpRequest(conn)
+	headers, err := TcpSummitRequest(conn)
 	if err != nil {
 		log.Println(err)
 		return
@@ -933,14 +933,14 @@ func ActTcpReceiver(hport string) {
 			os.Exit(1)
 		}
 
-		go handleTcpRequest(conn)
+		go TcpHandleRequest(conn)
 	}
 }
 
 //---------------------------------------------------------------------------
 // 31 summit TCP request
 //---------------------------------------------------------------------------
-func summitTcpRequest(conn net.Conn) (map[string]string, error) {
+func TcpSummitRequest(conn net.Conn) (map[string]string, error) {
 	var err error
 
 	// send POST request
@@ -957,10 +957,10 @@ func summitTcpRequest(conn net.Conn) (map[string]string, error) {
 		return nil, err
 	}
 
-	_, err = readTcpMessage(conn)
+	_, err = TcpReadMessage(conn)
 
 	// send multipart stream, ex) jpg files
-	err = sendTcpMultipartFiles(conn, "static/image/*.jpg")
+	err = TcpSendMultipartFiles(conn, "static/image/*.jpg")
 
 	return nil, err
 }
@@ -968,7 +968,7 @@ func summitTcpRequest(conn net.Conn) (map[string]string, error) {
 //---------------------------------------------------------------------------
 // handle request
 //---------------------------------------------------------------------------
-func handleTcpRequest(conn net.Conn) error {
+func TcpHandleRequest(conn net.Conn) error {
 	var err error
 
 	log.Printf("in %s\n", conn.RemoteAddr())
@@ -976,13 +976,13 @@ func handleTcpRequest(conn net.Conn) error {
 	defer conn.Close()
 
 	// recv POST request
-	_, err = readTcpMessage(conn)
+	_, err = TcpReadMessage(conn)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	err = sendTcpResponse(conn)
+	err = TcpSendResponse(conn)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -990,7 +990,7 @@ func handleTcpRequest(conn net.Conn) error {
 
 	//  recv multipart stream
 	for {
-		_, err = readTcpMessage(conn)
+		_, err = TcpReadMessage(conn)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -1003,7 +1003,7 @@ func handleTcpRequest(conn net.Conn) error {
 //---------------------------------------------------------------------------
 // send TCP response
 //---------------------------------------------------------------------------
-func sendTcpResponse(conn net.Conn) error {
+func TcpSendResponse(conn net.Conn) error {
 	var err error
 
 	res := "HTTP/1.1 200 Ok\r\n"
@@ -1024,12 +1024,12 @@ func sendTcpResponse(conn net.Conn) error {
 //---------------------------------------------------------------------------
 // read a message in http header style
 //---------------------------------------------------------------------------
-func readTcpMessage(conn net.Conn) (map[string]string, error) {
+func TcpReadMessage(conn net.Conn) (map[string]string, error) {
 	var err error
 
 	reader := bufio.NewReader(conn)
 
-	headers, err := readTcpHeader(reader)
+	headers, err := TcpReadHeader(reader)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -1042,7 +1042,7 @@ func readTcpMessage(conn net.Conn) (map[string]string, error) {
 	}
 
 	if clen > 0 {
-		_, err = readTcpBody(reader, clen)
+		_, err = TcpReadBody(reader, clen)
 		if err != nil {
 			log.Println(err)
 			return nil, err
@@ -1055,7 +1055,7 @@ func readTcpMessage(conn net.Conn) (map[string]string, error) {
 //---------------------------------------------------------------------------
 // read header of message
 //---------------------------------------------------------------------------
-func readTcpHeader(reader *bufio.Reader) (map[string]string, error) {
+func TcpReadHeader(reader *bufio.Reader) (map[string]string, error) {
 	var err error
 
 	result := make(map[string]string)
@@ -1085,7 +1085,7 @@ func readTcpHeader(reader *bufio.Reader) (map[string]string, error) {
 //---------------------------------------------------------------------------
 // read body of message
 //---------------------------------------------------------------------------
-func readTcpBody(reader *bufio.Reader, clen int) ([]byte, error) {
+func TcpReadBody(reader *bufio.Reader, clen int) ([]byte, error) {
 	var err error
 
 	buf := make([]byte, clen)
@@ -1107,7 +1107,7 @@ func readTcpBody(reader *bufio.Reader, clen int) ([]byte, error) {
 //---------------------------------------------------------------------------
 // send files in the multipart
 //---------------------------------------------------------------------------
-func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
+func TcpSendMultipartFiles(conn net.Conn, pattern string) error {
 	var err error
 
 	files, err := filepath.Glob(pattern)
@@ -1137,7 +1137,7 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 			ctype = http.DetectContentType(fdata)
 		}
 
-		err = sendTcpPart(conn, fdata, ctype)
+		err = TcpSendPart(conn, fdata, ctype)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -1152,7 +1152,7 @@ func sendTcpMultipartFiles(conn net.Conn, pattern string) error {
 //---------------------------------------------------------------------------
 // send a part
 //---------------------------------------------------------------------------
-func sendTcpPart(conn net.Conn, data []byte, ctype string) error {
+func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
 	var err error
 
 	clen := len(data)
@@ -1217,6 +1217,7 @@ func ActWsShooter(hname, hport string) {
 
 //---------------------------------------------------------------------------
 // WebSocket receiver for debugging
+// https://github.com/golang-samples/websocket
 //---------------------------------------------------------------------------
 func ActWsCatcher(hport string) {
 	log.Printf("Happy Media WS Catcher\n")
@@ -1254,7 +1255,7 @@ func WsStreamHandler(ws *websocket.Conn) {
 //---------------------------------------------------------------------------
 // WebSocket send part
 //---------------------------------------------------------------------------
-func WsSendPart() {
+func WsSendPart(ws *websocket.Conn) {
 
 }
 
