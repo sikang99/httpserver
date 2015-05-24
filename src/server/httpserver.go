@@ -876,6 +876,9 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 	fmt.Fprintf(w, message)
 }
 
+//==================================================================================
+//	TCP Socket
+//==================================================================================
 //---------------------------------------------------------------------------
 // TCP sender for debugging
 // http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
@@ -1181,6 +1184,10 @@ func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
 	return err
 }
 
+//==================================================================================
+//	WebSocket(WS, WSS)
+//==================================================================================
+
 //---------------------------------------------------------------------------
 // WebSocket sender for debugging
 //---------------------------------------------------------------------------
@@ -1196,6 +1203,34 @@ func ActWsShooter(hname, hport string) {
 		return
 	}
 
+	WsSummitRequest(ws)
+}
+
+//---------------------------------------------------------------------------
+// WebSocket receiver for debugging
+// https://github.com/golang-samples/websocket
+//---------------------------------------------------------------------------
+func ActWsCatcher(hport string) {
+	log.Printf("Happy Media WS Catcher\n")
+
+	http.Handle("/stream", websocket.Handler(WsStreamHandler))
+	log.Fatal(http.ListenAndServe(":"+hport, nil))
+}
+
+//---------------------------------------------------------------------------
+// WebSocket stream handler in the server
+//---------------------------------------------------------------------------
+func WsStreamHandler(ws *websocket.Conn) {
+	log.Printf("in %s\n", ws.RemoteAddr())
+	defer log.Printf("out %s\n", ws.RemoteAddr())
+
+	WsHandleRequest(ws)
+}
+
+//---------------------------------------------------------------------------
+// WebSocket summit requeest in the client
+//---------------------------------------------------------------------------
+func WsSummitRequest(ws *websocket.Conn) {
 	smsg := []byte("POST /stream HTTP/1.1\r\n\r\n")
 
 	n, err := ws.Write(smsg)
@@ -1216,23 +1251,9 @@ func ActWsShooter(hname, hport string) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket receiver for debugging
-// https://github.com/golang-samples/websocket
+// WebSocket handle request in the server
 //---------------------------------------------------------------------------
-func ActWsCatcher(hport string) {
-	log.Printf("Happy Media WS Catcher\n")
-
-	http.Handle("/stream", websocket.Handler(WsStreamHandler))
-	log.Fatal(http.ListenAndServe(":"+hport, nil))
-}
-
-//---------------------------------------------------------------------------
-// WebSocket stream handler
-//---------------------------------------------------------------------------
-func WsStreamHandler(ws *websocket.Conn) {
-	log.Printf("in %s\n", ws.RemoteAddr())
-	defer log.Printf("out %s\n", ws.RemoteAddr())
-
+func WsHandleRequest(ws *websocket.Conn) {
 	rmsg := make([]byte, 512)
 
 	n, err := ws.Read(rmsg)

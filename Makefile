@@ -72,14 +72,14 @@ rm:
 rs:
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
-# TCP
+# --- TCP
 rts:
 	./$(PROGRAM) -m=sender -port=8080 -ports=8081 -port2=8082
 
 rtr:
 	./$(PROGRAM) -m=receiver -port=8080 -ports=8081 -port2=8082
 
-# WebSocket
+# --- WebSocket
 rws:
 	./$(PROGRAM) -m=shooter -port=8080 -ports=8081 -port2=8082
 
