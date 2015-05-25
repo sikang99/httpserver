@@ -1187,9 +1187,15 @@ func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
 }
 
 //==================================================================================
-//	WebSocket(WS, WSS)
+// WebSocket(WS, WSS)
 // https://github.com/golang-samples/websocket
 //==================================================================================
+type WsConfig struct {
+	Ws       *websocket.Conn
+	Boundary string
+	Mr       *multipart.Reader
+	Mw       *multipart.Writer
+}
 
 //---------------------------------------------------------------------------
 // WebSocket sender for debugging
@@ -1233,13 +1239,17 @@ func WsStreamHandler(ws *websocket.Conn) {
 	log.Printf("in %s\n", ws.RemoteAddr())
 	defer log.Printf("out %s\n", ws.RemoteAddr())
 
-	err := WsHandleRequest(ws)
+	boundary, err := WsHandleRequest(ws)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	WsRecvMultipart(ws, "myboundary")
+	err = WsRecvMultipart(ws, boundary)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }
 
 //---------------------------------------------------------------------------
@@ -1276,7 +1286,7 @@ func WsSummitRequest(ws *websocket.Conn) error {
 //---------------------------------------------------------------------------
 // WebSocket handle request in the server
 //---------------------------------------------------------------------------
-func WsHandleRequest(ws *websocket.Conn) error {
+func WsHandleRequest(ws *websocket.Conn) (string, error) {
 	var err error
 
 	// recv POST request
@@ -1285,9 +1295,12 @@ func WsHandleRequest(ws *websocket.Conn) error {
 	n, err := ws.Read(rmsg)
 	if err != nil {
 		log.Println(err)
-		return err
+		return "", err
 	}
 	fmt.Printf("Recv(%d):\n%s", n, rmsg[:n])
+
+	// parsing message
+	boundary := "myboundary"
 
 	smsg := "HTTP/1.1 200 Ok\r\n"
 	smsg += "Server: Happy Media WS Server\r\n"
@@ -1296,11 +1309,11 @@ func WsHandleRequest(ws *websocket.Conn) error {
 	n, err = ws.Write([]byte(smsg))
 	if err != nil {
 		log.Println(err)
-		return err
+		return boundary, err
 	}
 	fmt.Printf("Send(%d):\n%s", n, smsg)
 
-	return err
+	return boundary, err
 }
 
 //---------------------------------------------------------------------------
@@ -1361,10 +1374,12 @@ func WsRecvMultipart(ws *websocket.Conn, boundary string) error {
 
 	mr := multipart.NewReader(ws, boundary)
 
-	err = recvMultipartToBuffer(mr)
-	if err != nil {
-		log.Println(err)
-		return err
+	for {
+		err = WsRecvPart(mr)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
 	}
 
 	return err
@@ -1387,8 +1402,8 @@ func WsSendPart(mw *multipart.Writer, data []byte, dsize int, dtype string) erro
 		return err
 	}
 
-	buf.Write(data)   // prepare data in the buffer
-	buf.WriteTo(part) // output the part with buffer in multipart format
+	_, err = buf.Write(data)   // dn, prepare data in the buffer
+	_, err = buf.WriteTo(part) // tn(int64), output the part with buffer in multipart format
 
 	return err
 }
@@ -1409,6 +1424,7 @@ func WsRecvPart(mr *multipart.Reader) error {
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s %d\n", p.Header, sl, nl)
+		return err
 	}
 
 	data := make([]byte, nl)
@@ -1422,8 +1438,11 @@ func WsRecvPart(mr *multipart.Reader) error {
 			return err
 		}
 		tn += n
-
 	}
+
+	//t.assert(nl == tn)
+	fmt.Printf("%7s ->  %7d/%7d [%02x %02x - %02x %02x]\n", sl, nl, tn, data[0], data[1], data[nl-2], data[nl-1])
+
 	return err
 }
 
