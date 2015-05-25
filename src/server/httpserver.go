@@ -1197,6 +1197,12 @@ type WsConfig struct {
 	Mw       *multipart.Writer
 }
 
+type DataFrame struct {
+	Type string
+	Size int
+	Data []byte
+}
+
 //---------------------------------------------------------------------------
 // WebSocket shooter for test and debugging
 //---------------------------------------------------------------------------
@@ -1348,23 +1354,10 @@ func WsGetBoundary(msg string) (string, error) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket get boundary string
+// WebSocket get request
 //---------------------------------------------------------------------------
 func WsGetRequest(msg string) (*http.Request, error) {
 	var err error
-
-	/*
-		reader := bufio.NewReader(strings.NewReader(msg))
-		tp := textproto.NewReader(reader)
-
-		mimeHeader, err := tp.ReadMIMEHeader()
-		if err != nil {
-			log.Println(err)
-		}
-
-		httpHeader := http.Header(mimeHeader)
-		fmt.Println(httpHeader)
-	*/
 
 	reader := bufio.NewReader(strings.NewReader(msg))
 	req, err := http.ReadRequest(reader)
@@ -1375,6 +1368,27 @@ func WsGetRequest(msg string) (*http.Request, error) {
 	fmt.Println(req.Header)
 
 	return req, err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket get header
+//---------------------------------------------------------------------------
+func WsGetHeader(msg string) (http.Header, error) {
+	var err error
+
+	reader := bufio.NewReader(strings.NewReader(msg))
+	tp := textproto.NewReader(reader)
+
+	mimeHeader, err := tp.ReadMIMEHeader()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	httpHeader := http.Header(mimeHeader)
+	fmt.Println(httpHeader)
+
+	return httpHeader, err
 }
 
 //---------------------------------------------------------------------------
@@ -1484,7 +1498,7 @@ func WsRecvPart(mr *multipart.Reader) error {
 	sl := p.Header.Get("Content-Length")
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
-		log.Printf("%s %s %d\n", p.Header, sl, nl)
+		log.Printf("%s %s -> %d\n", p.Header, sl, nl)
 		return err
 	}
 

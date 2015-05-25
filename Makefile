@@ -132,7 +132,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "refactor WS send/recv functions"
+	git commit -m "websocket test complete"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
