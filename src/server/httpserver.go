@@ -1328,6 +1328,16 @@ func WsGetBoundary(msg string) (string, error) {
 	var err error
 
 	boundary := "myboundary"
+
+	return boundary, err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket get boundary string
+//---------------------------------------------------------------------------
+func WsGetRequest(msg string) (*http.Request, error) {
+	var err error
+
 	/*
 		reader := bufio.NewReader(strings.NewReader(msg))
 		tp := textproto.NewReader(reader)
@@ -1348,7 +1358,7 @@ func WsGetBoundary(msg string) (string, error) {
 	}
 	log.Println(req.Header)
 
-	return boundary, err
+	return req, err
 }
 
 //---------------------------------------------------------------------------
