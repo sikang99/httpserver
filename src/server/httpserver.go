@@ -183,6 +183,10 @@ func main() {
 	}
 }
 
+//==================================================================================
+// HTTP
+// - http://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
+//==================================================================================
 //---------------------------------------------------------------------------
 // config transport with timeout
 //---------------------------------------------------------------------------
@@ -1189,6 +1193,7 @@ func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
 //==================================================================================
 // WebSocket(WS, WSS)
 // - https://github.com/golang-samples/websocket
+// - http://www.ajanicij.info/content/websocket-tutorial-go
 //==================================================================================
 type WsConfig struct {
 	Ws       *websocket.Conn
