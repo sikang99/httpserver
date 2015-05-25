@@ -1273,6 +1273,7 @@ func WsSummitRequest(ws *websocket.Conn) error {
 	}
 	fmt.Printf("Send(%d):\n%s", n, smsg)
 
+	// recv response
 	rmsg := make([]byte, 512)
 
 	n, err = ws.Read(rmsg)
@@ -1301,12 +1302,14 @@ func WsHandleRequest(ws *websocket.Conn) (string, error) {
 	}
 	fmt.Printf("Recv(%d):\n%s", n, rmsg[:n])
 
+	// parse request
 	boundary, err := WsGetBoundary(string(rmsg[:n]))
 	if err != nil {
 		log.Println(err)
-		return "", err
+		return boundary, err
 	}
 
+	// send response
 	smsg := "HTTP/1.1 200 Ok\r\n"
 	smsg += "Server: Happy Media WS Server\r\n"
 	smsg += "\r\n"
@@ -1327,7 +1330,19 @@ func WsHandleRequest(ws *websocket.Conn) (string, error) {
 func WsGetBoundary(msg string) (string, error) {
 	var err error
 
-	boundary := "myboundary"
+	req, err := WsGetRequest(msg)
+
+	mt, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	fmt.Printf("%v %v\n", params, req.Header.Get("Content-Type"))
+	if err != nil {
+		log.Printf("ParseMediaType: %s %v", mt, err)
+		return "", err
+	}
+
+	boundary := params["boundary"]
+	if !strings.HasPrefix(boundary, "--") {
+		log.Printf("expected boundary to start with --, got %q", boundary)
+	}
 
 	return boundary, err
 }
@@ -1344,19 +1359,20 @@ func WsGetRequest(msg string) (*http.Request, error) {
 
 		mimeHeader, err := tp.ReadMIMEHeader()
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 
 		httpHeader := http.Header(mimeHeader)
-		log.Println(httpHeader)
+		fmt.Println(httpHeader)
 	*/
 
 	reader := bufio.NewReader(strings.NewReader(msg))
 	req, err := http.ReadRequest(reader)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return req, err
 	}
-	log.Println(req.Header)
+	fmt.Println(req.Header)
 
 	return req, err
 }
