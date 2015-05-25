@@ -879,12 +879,12 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 }
 
 //==================================================================================
-//	TCP Socket
+// TCP Socket
+//  - http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
+//  - https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
 //==================================================================================
 //---------------------------------------------------------------------------
-// TCP sender for debugging
-// http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
-// https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
+// act TCP sender for test and debugging
 //---------------------------------------------------------------------------
 func ActTcpSender(hname, hport string) {
 	log.Printf("Happy Media TCP Sender\n")
@@ -1188,7 +1188,7 @@ func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
 
 //==================================================================================
 // WebSocket(WS, WSS)
-// https://github.com/golang-samples/websocket
+// - https://github.com/golang-samples/websocket
 //==================================================================================
 type WsConfig struct {
 	Ws       *websocket.Conn
@@ -1198,7 +1198,7 @@ type WsConfig struct {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket sender for debugging
+// WebSocket shooter for test and debugging
 //---------------------------------------------------------------------------
 func ActWsShooter(hname, hport string) {
 	log.Printf("Happy Media WS Shooter\n")
@@ -1223,7 +1223,7 @@ func ActWsShooter(hname, hport string) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket receiver for debugging
+// WebSocket catcher for test and debugging
 //---------------------------------------------------------------------------
 func ActWsCatcher(hport string) {
 	log.Printf("Happy Media WS Catcher\n")
@@ -1258,9 +1258,11 @@ func WsStreamHandler(ws *websocket.Conn) {
 func WsSummitRequest(ws *websocket.Conn) error {
 	var err error
 
+	boundary := "myboundary"
+
 	// send POST request
 	smsg := "POST /stream HTTP/1.1\r\n"
-	smsg += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", "myboundary")
+	smsg += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", boundary)
 	smsg += "User-Agent: Happy Media WS Client\r\n"
 	smsg += "\r\n"
 
@@ -1299,8 +1301,11 @@ func WsHandleRequest(ws *websocket.Conn) (string, error) {
 	}
 	fmt.Printf("Recv(%d):\n%s", n, rmsg[:n])
 
-	// parsing message
-	boundary := "myboundary"
+	boundary, err := WsGetBoundary(string(rmsg[:n]))
+	if err != nil {
+		log.Println(err)
+		return "", err
+	}
 
 	smsg := "HTTP/1.1 200 Ok\r\n"
 	smsg += "Server: Happy Media WS Server\r\n"
@@ -1312,6 +1317,36 @@ func WsHandleRequest(ws *websocket.Conn) (string, error) {
 		return boundary, err
 	}
 	fmt.Printf("Send(%d):\n%s", n, smsg)
+
+	return boundary, err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket get boundary string
+//---------------------------------------------------------------------------
+func WsGetBoundary(msg string) (string, error) {
+	var err error
+
+	boundary := "myboundary"
+	/*
+		reader := bufio.NewReader(strings.NewReader(msg))
+		tp := textproto.NewReader(reader)
+
+		mimeHeader, err := tp.ReadMIMEHeader()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		httpHeader := http.Header(mimeHeader)
+		log.Println(httpHeader)
+	*/
+
+	reader := bufio.NewReader(strings.NewReader(msg))
+	req, err := http.ReadRequest(reader)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(req.Header)
 
 	return boundary, err
 }
@@ -1446,4 +1481,4 @@ func WsRecvPart(mr *multipart.Reader) error {
 	return err
 }
 
-// ------------------------------E-----N-----D--------------------------------------
+// ---------------------------------E-----N-----D--------------------------------
