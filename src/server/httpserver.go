@@ -80,7 +80,7 @@ var hello_tmpl = `<!DOCTYPE html>
 
 //---------------------------------------------------------------------------
 const (
-	Version   = "0.4.2"
+	Version   = "0.4.4"
 	TCPClient = "Happy Media TCP Server"
 	TCPServer = "Happy Media TCP Server"
 	WSClient  = "Happy Media WS Server"
@@ -91,14 +91,14 @@ const (
 var (
 	NotSupportError = errors.New("Not supported protocol")
 
-	fmode  = flag.String("m", "player", "Working mode of program")
+	fmode  = flag.String("m", "player", "Working mode of program [caster|server|player|reader|sender|receiver|shooter|catcher]")
 	fhost  = flag.String("host", "localhost", "server host address")
 	fport  = flag.String("port", "8000", "TCP port to be used for http")
 	fports = flag.String("ports", "8001", "TCP port to be used for https")
 	fport2 = flag.String("port2", "8002", "TCP port to be used for http2")
-	furl   = flag.String("url", "http://localhost:8000/hello", "url to be accessed")
+	furl   = flag.String("url", "http://localhost:8000/[index|hello|/stream]", "url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
-	vflag  = flag.Bool("version", false, Version)
+	vflag  = flag.Bool("verbose", false, "Verbose display")
 )
 
 func init() {
@@ -106,7 +106,14 @@ func init() {
 	//log.SetPrefix("TRACE: ")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	// parse command options
+	// flag setting and parsing
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "\nUsage: %v [flags], v.%s\n\n", os.Args[0], Version)
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\n")
+		os.Exit(1)
+	}
+
 	flag.Parse()
 }
 
@@ -145,6 +152,11 @@ var conf = ServerConfig{
 //---------------------------------------------------------------------------
 func main() {
 	//flag.Parse()
+
+	// check arguments
+	if flag.NFlag() == 0 && flag.NArg() == 0 {
+		flag.Usage()
+	}
 
 	url, err := url.ParseRequestURI(*furl)
 	if err != nil {
@@ -365,7 +377,7 @@ func recvMultipartToBuffer(r *multipart.Reader) error {
 
 	for {
 		p, err := r.NextPart()
-		if err != nil {
+		if err != nil { // io.EOF
 			log.Println(err)
 			return err
 		}
@@ -375,7 +387,7 @@ func recvMultipartToBuffer(r *multipart.Reader) error {
 		if err != nil {
 			log.Printf("%s %s %d\n", p.Header, sl, nl)
 		}
-		//println(nl)
+
 		data := make([]byte, nl)
 
 		// implement like ReadFull() in jpeg.Decode()
@@ -403,7 +415,7 @@ func recvMultipartDecodeJpeg(r *multipart.Reader) {
 	for {
 		print(".")
 		p, err := r.NextPart()
-		if err != nil {
+		if err != nil { // io.EOF
 			log.Println(err)
 		}
 
@@ -952,9 +964,11 @@ func ActTcpReceiver(hport string) {
 func TcpSummitRequest(conn net.Conn) (map[string]string, error) {
 	var err error
 
+	boundary := "myboundary"
+
 	// send POST request
 	req := "POST /stream HTTP/1.1\r\n"
-	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", "myboundary")
+	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", boundary)
 	req += "User-Agent: Happy Media TCP Client\r\n"
 	req += "\r\n"
 
@@ -1062,7 +1076,7 @@ func TcpReadMessage(conn net.Conn) (map[string]string, error) {
 }
 
 //---------------------------------------------------------------------------
-// read header of message
+// read header of message and return a map
 //---------------------------------------------------------------------------
 func TcpReadHeader(reader *bufio.Reader) (map[string]string, error) {
 	var err error
@@ -1114,7 +1128,7 @@ func TcpReadBody(reader *bufio.Reader, clen int) ([]byte, error) {
 }
 
 //---------------------------------------------------------------------------
-// send files in the multipart
+// send files in multipart
 //---------------------------------------------------------------------------
 func TcpSendMultipartFiles(conn net.Conn, pattern string) error {
 	var err error
@@ -1264,7 +1278,7 @@ func WsStreamHandler(ws *websocket.Conn) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket summit requeest in the client
+// WebSocket summit a request to the server
 //---------------------------------------------------------------------------
 func WsSummitRequest(ws *websocket.Conn) error {
 	var err error
@@ -1298,7 +1312,7 @@ func WsSummitRequest(ws *websocket.Conn) error {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket handle request in the server
+// WebSocket handle a client request in the server
 //---------------------------------------------------------------------------
 func WsHandleRequest(ws *websocket.Conn) (string, error) {
 	var err error
@@ -1336,7 +1350,7 @@ func WsHandleRequest(ws *websocket.Conn) (string, error) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket get boundary string
+// WebSocket get boundary string from message
 //---------------------------------------------------------------------------
 func WsGetBoundary(msg string) (string, error) {
 	var err error
@@ -1359,7 +1373,7 @@ func WsGetBoundary(msg string) (string, error) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket get request
+// WebSocket get http request from message
 //---------------------------------------------------------------------------
 func WsGetRequest(msg string) (*http.Request, error) {
 	var err error
@@ -1376,7 +1390,7 @@ func WsGetRequest(msg string) (*http.Request, error) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket get header
+// WebSocket get header from message
 //---------------------------------------------------------------------------
 func WsGetHeader(msg string) (http.Header, error) {
 	var err error
@@ -1397,7 +1411,7 @@ func WsGetHeader(msg string) (http.Header, error) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket send multipart
+// WebSocket send files in multipart
 //---------------------------------------------------------------------------
 func WsSendMultipartFiles(ws *websocket.Conn, pattern string) error {
 	var err error
@@ -1466,7 +1480,7 @@ func WsRecvMultipart(ws *websocket.Conn, boundary string) error {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket send part
+// WebSocket send a part of multipart
 //---------------------------------------------------------------------------
 func WsSendPart(mw *multipart.Writer, data []byte, dsize int, dtype string) error {
 	var err error
@@ -1489,13 +1503,13 @@ func WsSendPart(mw *multipart.Writer, data []byte, dsize int, dtype string) erro
 }
 
 //---------------------------------------------------------------------------
-// WebSocket recv part
+// WebSocket recv a part of multipart
 //---------------------------------------------------------------------------
 func WsRecvPart(mr *multipart.Reader) error {
 	var err error
 
 	p, err := mr.NextPart()
-	if err != nil {
+	if err != nil { // io.EOF
 		log.Println(err)
 		return err
 	}
@@ -1524,6 +1538,98 @@ func WsRecvPart(mr *multipart.Reader) error {
 	fmt.Printf("%7s ->  %7d/%7d [%02x %02x - %02x %02x]\n", sl, nl, tn, data[0], data[1], data[nl-2], data[nl-1])
 
 	return err
+}
+
+//==================================================================================
+// package stream src/base/stream.go
+// Circular Stream Buffer
+// - https://github.com/zfjagann/golang-ring
+// - http://blog.pivotal.io/labs/labs/a-concurrent-ring-buffer-for-go
+//==================================================================================
+type StreamSlot struct {
+	sync.Mutex
+	Type    string
+	Length  int
+	Content []byte
+}
+
+type StreamBuffer struct {
+	sync.Mutex
+	Slots []StreamSlot
+	Num   int // number of slots used
+	Size  int // number of slots allocated
+	In    int // input position of buffer
+	Out   int // output position of buffer
+	Desc  string
+}
+
+func NewStreamBuffer(num int) *StreamBuffer {
+
+	slot := StreamSlot{
+		Type:    "",
+		Length:  0,
+		Content: make([]byte, 512),
+	}
+
+	var slots []StreamSlot
+	for i := 0; i < num; i++ {
+		slots = append(slots, slot)
+	}
+
+	return &StreamBuffer{
+		Slots: slots,
+		Num:   num, Size: num,
+		In: 0, Out: 0,
+		Desc: "Null stream",
+	}
+}
+
+func (sb *StreamBuffer) Len() int {
+	return sb.Num
+}
+
+func (sb *StreamBuffer) Cap() int {
+	return sb.Size
+}
+
+func (sb *StreamBuffer) String() string {
+	return sb.Desc
+}
+
+func (sb *StreamBuffer) GetSlot() *StreamSlot {
+	return &sb.Slots[sb.Out]
+}
+
+func (sb *StreamBuffer) PutSlot() *StreamSlot {
+	return &sb.Slots[sb.In]
+}
+
+func (sb *StreamBuffer) Clear() {
+	sb.Lock()
+	defer sb.Unlock()
+
+	for i := 0; i < sb.Num; i++ {
+		sb.Slots[i].Type = ""
+		sb.Slots[i].Length = 0
+	}
+}
+
+func (sb *StreamBuffer) Resize(num int) {
+	sb.Lock()
+	defer sb.Unlock()
+
+	if num > sb.Size {
+		slot := StreamSlot{
+			Type:    "",
+			Length:  0,
+			Content: make([]byte, 512),
+		}
+		for i := 0; i < num; i++ {
+			sb.Slots = append(sb.Slots, slot)
+		}
+		sb.Size = num
+	}
+	sb.Num = num
 }
 
 // ---------------------------------E-----N-----D--------------------------------

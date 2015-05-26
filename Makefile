@@ -132,7 +132,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "websocket test complete"
+	git commit -m "write circular buffer package"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
