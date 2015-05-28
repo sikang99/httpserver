@@ -9,7 +9,6 @@ package ring
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 )
@@ -93,6 +92,11 @@ func (sb *StreamBuffer) Cap() int {
 	return sb.Max
 }
 
+func (sb *StreamBuffer) SetPos(pos int) int {
+	sb.In = (pos % sb.Num)
+	return sb.In
+}
+
 func (sb *StreamBuffer) String() string {
 	str := fmt.Sprintf("StreamBuffer: ")
 	str += fmt.Sprintf("Pos: %d,%d\t", sb.In, sb.Out)
@@ -151,13 +155,17 @@ func (sb *StreamBuffer) Reset() {
 	sb.Num = sb.Max
 }
 
-func (sb *StreamBuffer) Resize(num int) {
+func (sb *StreamBuffer) Resize(num int) error {
 	sb.Lock()
 	defer sb.Unlock()
 
+	var err error
+
+	if num < 2 {
+		return fmt.Errorf("%d is Too small, use number than 2", num)
+	}
 	if num > MAX_NUM_SLOTS {
-		log.Printf("%d is Too big for %d\n", num, MAX_NUM_SLOTS)
-		return
+		return fmt.Errorf("%d is Too big for max %d slots", num, MAX_NUM_SLOTS)
 	}
 
 	if num > sb.Max {
@@ -170,6 +178,8 @@ func (sb *StreamBuffer) Resize(num int) {
 		sb.Max = num
 	}
 	sb.Num = num
+
+	return err
 }
 
 // ---------------------------------E-----N-----D-----------------------------------
