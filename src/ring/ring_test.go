@@ -40,7 +40,7 @@ func TestStreamBuffer(t *testing.T) {
 	data := make([]byte, 3)
 	in := NewStreamSlot("image/jpeg", 3, data)
 
-	out, err := sb.PutSlot(in)
+	out, err := sb.PutSlotNext(in)
 	if err != nil {
 		log.Fatalln("PutSlot")
 	}
@@ -49,7 +49,7 @@ func TestStreamBuffer(t *testing.T) {
 	in.Content = []byte("Sample Message")
 	in.Length = len(in.Content)
 
-	out, _ = sb.PutSlot(in)
+	out, _ = sb.PutSlotNext(in)
 
 	in.Type = "text/html"
 	in.Content = []byte("<html>Home Page</html>")
@@ -58,7 +58,7 @@ func TestStreamBuffer(t *testing.T) {
 	out, _ = sb.PutSlotByPos(in, 3)
 	fmt.Println(sb)
 
-	out, _ = sb.GetSlot()
+	out, _ = sb.GetSlotNext()
 	fmt.Println(out)
 
 	out, _ = sb.GetSlotByPos(2)
@@ -78,7 +78,7 @@ func TestStreamBuffer(t *testing.T) {
 }
 
 //----------------------------------------------------------------------------------
-// continuous read from stream buffer
+// test for continuous read from stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamRead(t *testing.T) {
 	n := 5
@@ -86,7 +86,7 @@ func TestStreamRead(t *testing.T) {
 
 	data := make([]byte, 128)
 	in := NewStreamSlot("image/jpeg", len(data), data)
-	sb.PutSlot(in)
+	sb.PutSlotNext(in)
 
 	in.Type = "text/html"
 	in.Content = []byte("<html>Home Page</html>")
@@ -95,8 +95,9 @@ func TestStreamRead(t *testing.T) {
 	sb.PutSlotByPos(in, 3)
 	fmt.Println(sb)
 
+	println("Reading ...")
 	for i := 0; i < 20; i++ {
-		out, err := sb.GetSlot()
+		out, err := sb.GetSlotByPos(i)
 		if err != nil {
 			break
 		}
@@ -110,7 +111,7 @@ func TestStreamRead(t *testing.T) {
 }
 
 //----------------------------------------------------------------------------------
-// continuous write from stream buffer
+// test for continuous write from stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamWrite(t *testing.T) {
 	n := 5
@@ -119,36 +120,53 @@ func TestStreamWrite(t *testing.T) {
 	for i := 1; i < 50; i++ {
 		data := []byte(fmt.Sprintf("count %d", i))
 		in := NewStreamSlot("text/plain", len(data), data)
-		sb.PutSlot(in)
+		sb.PutSlotNext(in)
 	}
 	fmt.Println(sb)
 }
 
 //----------------------------------------------------------------------------------
-// continuous read/write to/from stream buffer
+// test for multiple readers and single writer on the stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamReadWrite(t *testing.T) {
-	n := 2
-	sb := NewStreamBuffer(n, MBYTE)
+	nb := 5
+	sb := NewStreamBuffer(nb, MBYTE)
 
-	go func() {
+	var fend bool
+
+	// define buffer writer
+	writer := func() {
 		for i := 0; i < 20; i++ {
 			data := []byte(fmt.Sprintf("count %d", i))
 			in := NewStreamSlot("text/plain", len(data), data)
-			sb.PutSlot(in)
+			sb.PutSlotNext(in)
 			fmt.Println("i>", in)
-			time.Sleep(time.Second)
-		}
-	}()
-
-	for {
-		out, err := sb.GetSlot()
-		if out == nil && err == nil {
 			time.Sleep(time.Millisecond)
-			continue
 		}
-		fmt.Println("o>", out)
+		fend = true
 	}
+
+	// define buffer reader
+	reader := func(i int) {
+		var pos int
+		for fend == false {
+			npos, out, err := sb.GetSlotByPosNext(pos)
+			if out == nil && err == nil {
+				time.Sleep(time.Millisecond)
+				continue
+			}
+			fmt.Println("o>", i, out, pos, npos)
+			pos = npos
+		}
+	}
+
+	// parallel writer, single writer
+	nr := 3
+	for i := 0; i < nr; i++ {
+		go reader(i)
+	}
+
+	writer()
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

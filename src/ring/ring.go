@@ -131,11 +131,12 @@ func (sb *StreamBuffer) SetPos(pos int) int {
 }
 
 //----------------------------------------------------------------------------------
-// get the pointer for slot to be read
+// get the pointer for slot to be read and move to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlot() (*StreamSlot, error) {
+func (sb *StreamBuffer) GetSlotNext() (*StreamSlot, error) {
 	var err error
 
+	// no data to read
 	if sb.In == sb.Out {
 		return nil, nil
 	}
@@ -152,16 +153,38 @@ func (sb *StreamBuffer) GetSlot() (*StreamSlot, error) {
 func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
 	var err error
 
-	pos = (pos % sb.Num)
+	pos = pos % sb.Num
 	slot := &sb.Slots[pos]
 
 	return slot, err
 }
 
 //----------------------------------------------------------------------------------
-// write the information to the slot to be used in the next
+// get the pointer for slot designated and go to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) PutSlot(slot *StreamSlot) (*StreamSlot, error) {
+func (sb *StreamBuffer) GetSlotByPosNext(pos int) (int, *StreamSlot, error) {
+	var err error
+
+	pos = pos % sb.Num
+
+	// no data to read
+	if sb.In == pos {
+		return pos, nil, nil
+	}
+
+	slot := &sb.Slots[pos]
+	pos = (pos + 1) % sb.Num
+
+	return pos, slot, err
+}
+
+//----------------------------------------------------------------------------------
+// write the information to the slot and go to the next
+//----------------------------------------------------------------------------------
+func (sb *StreamBuffer) PutSlotNext(slot *StreamSlot) (*StreamSlot, error) {
+	sb.Lock()
+	defer sb.Unlock()
+
 	var err error
 
 	if slot.Length > sb.Size {
@@ -179,6 +202,9 @@ func (sb *StreamBuffer) PutSlot(slot *StreamSlot) (*StreamSlot, error) {
 // write the information to the slot designated
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) PutSlotByPos(slot *StreamSlot, pos int) (*StreamSlot, error) {
+	sb.Lock()
+	defer sb.Unlock()
+
 	var err error
 
 	pos = (pos % sb.Num)
