@@ -19,7 +19,7 @@ test t:
 
 buildtest bt:
 	go build
-	go test
+	go test -v
 
 make m:
 	vi Makefile
