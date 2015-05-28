@@ -79,6 +79,11 @@ Internal service structure
 - Forked from [chrismytton/httpserver](https://github.com/chrismytton/httpserver).
 - Inspired by [nodeapps/http-server](https://github.com/nodeapps/http-server).
 
+### WebScoket
+
+- [golang websocket](https://github.com/golang/net/blob/master/websocket/websocket_test.go) - Test example
+- [Chapter 15 Web sockets](http://jan.newmarch.name/go/websockets/chapter-websockets.html)
+
 ### Security
 
 - [HTTPS로 사이트 보안 유지](https://support.google.com/webmasters/answer/6073543?hl=ko)

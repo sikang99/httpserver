@@ -8,7 +8,7 @@
         window.onload = function() {
 
             console.log("onload");
-:q
+
             sock = new WebSocket(wsuri);
 
             sock.onopen = function() {

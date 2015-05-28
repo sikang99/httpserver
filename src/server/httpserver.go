@@ -80,7 +80,7 @@ var hello_tmpl = `<!DOCTYPE html>
 
 //---------------------------------------------------------------------------
 const (
-	Version   = "0.4.4"
+	Version   = "0.4.5"
 	TCPClient = "Happy Media TCP Server"
 	TCPServer = "Happy Media TCP Server"
 	WSClient  = "Happy Media WS Server"
@@ -1206,6 +1206,7 @@ func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
 
 //==================================================================================
 // WebSocket(WS, WSS)
+// - https://godoc.org/golang.org/x/net/websocket
 // - https://github.com/golang-samples/websocket
 // - http://www.ajanicij.info/content/websocket-tutorial-go
 //==================================================================================
@@ -1251,10 +1252,60 @@ func ActWsShooter(hname, hport string) {
 // WebSocket catcher for test and debugging
 //---------------------------------------------------------------------------
 func ActWsCatcher(hport string) {
-	log.Printf("Happy Media WS Catcher\n")
+	log.Printf("Happy Media WS Catcher on ws:%s and wss:%s\n", *fport, *fports)
 
+	http.Handle("/echo", websocket.Handler(WsEchoHandler))
 	http.Handle("/stream", websocket.Handler(WsStreamHandler))
-	log.Fatal(http.ListenAndServe(":"+hport, nil))
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+
+	//log.Fatal(http.ListenAndServe(":"+hport, nil))
+
+	//var wg sync.WaitGroup
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	// HTTP server
+	go serveHttp(&wg)
+
+	wg.Add(1)
+	// HTTPS server
+	go serveHttps(&wg)
+
+	wg.Wait()
+}
+
+//---------------------------------------------------------------------------
+// WebSocket stream handler in the server
+// - http://www.websocket.org/echo.html
+// - http://jan.newmarch.name/go/websockets/chapter-websockets.html
+//---------------------------------------------------------------------------
+func WsEchoHandler(ws *websocket.Conn) {
+	var err error
+
+	// simplest echo function
+	//io.Copy(ws, ws)
+
+	// slightly message change echo
+	for {
+		var reply string
+
+		err = websocket.Message.Receive(ws, &reply)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		fmt.Println("Received back from client: " + reply)
+
+		msg := "Received:  " + reply
+		fmt.Println("Sending to client: " + msg)
+
+		err = websocket.Message.Send(ws, msg)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+	}
 }
 
 //---------------------------------------------------------------------------

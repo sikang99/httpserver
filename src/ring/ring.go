@@ -9,6 +9,8 @@ package ring
 
 import (
 	"fmt"
+	"log"
+	"strings"
 	"sync"
 )
 
@@ -19,6 +21,8 @@ const (
 	GBYTE = 1024 * MBYTE // Giga
 	TBYTE = 1024 * GBYTE // Tera
 	HBYTE = 1024 * TBYTE // Hexa
+
+	MAX_NUM_SLOTS = 512
 )
 
 type StreamSlot struct {
@@ -40,7 +44,11 @@ func NewStreamSlot(ctype string, clen int, cdata []byte) *StreamSlot {
 func (ss *StreamSlot) String() string {
 	str := fmt.Sprintf("Type: %s\t", ss.Type)
 	str += fmt.Sprintf("Length: %d\t", ss.Length)
-	str += fmt.Sprintf("Content: %02x\t", ss.Content[0])
+	if strings.Contains(ss.Type, "text/") {
+		str += fmt.Sprintf("Content: %s\t", string(ss.Content[:ss.Length]))
+	} else {
+		str += fmt.Sprintf("Content: %02x\t", ss.Content[0])
+	}
 	return str
 }
 
@@ -93,28 +101,43 @@ func (sb *StreamBuffer) String() string {
 
 	for i := 0; i < sb.Num; i++ {
 		str += fmt.Sprintf("\n")
-		str += fmt.Sprintf("\t%s", &sb.Slots[i])
+		str += fmt.Sprintf("\t[%d] %s", i, &sb.Slots[i])
 	}
 
 	return str
 }
 
 func (sb *StreamBuffer) GetSlot() *StreamSlot {
-	return &sb.Slots[sb.Out]
+	slot := &sb.Slots[sb.Out]
+	sb.Out = (sb.Out + 1) % sb.Num
+	return slot
 }
 
-func (sb *StreamBuffer) PutSlot() *StreamSlot {
-	return &sb.Slots[sb.In]
+func (sb *StreamBuffer) PutSlot(slot *StreamSlot) *StreamSlot {
+	st := &sb.Slots[sb.In]
+
+	/*
+		st.Type = slot.Type
+		st.Length = slot.Length
+		st.Content = slot.Content
+	*/
+	*st = *slot
+	sb.In = (sb.In + 1) % sb.Num
+
+	return st
 }
 
-func (sb *StreamBuffer) Clear() {
-	sb.Lock()
-	defer sb.Unlock()
+func (sb *StreamBuffer) GetSlotByPos(pos int) *StreamSlot {
+	pos = (pos % sb.Num)
+	slot := &sb.Slots[pos]
+	return slot
+}
 
-	for i := 0; i < sb.Num; i++ {
-		sb.Slots[i].Type = ""
-		sb.Slots[i].Length = 0
-	}
+func (sb *StreamBuffer) PutSlotByPos(pos int, slot *StreamSlot) *StreamSlot {
+	pos = (pos % sb.Num)
+	st := &sb.Slots[pos]
+	*st = *slot
+	return slot
 }
 
 func (sb *StreamBuffer) Reset() {
@@ -131,6 +154,11 @@ func (sb *StreamBuffer) Reset() {
 func (sb *StreamBuffer) Resize(num int) {
 	sb.Lock()
 	defer sb.Unlock()
+
+	if num > MAX_NUM_SLOTS {
+		log.Printf("%d is Too big for %d\n", num, MAX_NUM_SLOTS)
+		return
+	}
 
 	if num > sb.Max {
 		slot := StreamSlot{
