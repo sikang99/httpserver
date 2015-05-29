@@ -109,6 +109,7 @@ clean:
 clobber:
 	@make clean
 	@cd src/sample && make clobber
+	@cd src/streamimage && make clobber
 
 # ---------------------------------------------------------------------------
 git g:

@@ -22,11 +22,11 @@ buildtest bt:
 	go test -v
 
 view v:
-	shotwell clock.png
+	shotwell output.jpg
 	#shotwell output.png
 
-clean:
-	rm -f output.* clock.*
+clobber clean:
+	rm -f output.*
 
 make m:
 	vi Makefile

@@ -4,7 +4,7 @@
 // - https://code.google.com/p/plotinum/wiki/Examples
 //==================================================================================
 
-package image
+package streamimage
 
 import (
 	"fmt"
@@ -84,10 +84,19 @@ func MakeImageFile(img image.Image, fname string, optnum int) error {
 func GenSimpleImage(xz, yz int) image.Image {
 	img := image.NewRGBA(image.Rect(0, 0, xz, yz))
 
+	// fill the color
 	for y := img.Rect.Min.Y; y < img.Rect.Max.Y; y++ {
 		for x := img.Rect.Min.X; x < img.Rect.Max.X; x++ {
 			img.Set(x, y, color.RGBA{0x88, 0xff, 0x88, 0xff})
 		}
+	}
+
+	// fill the color
+	draw.Draw(img, img.Bounds(), &image.Uniform{blue}, image.ZP, draw.Src)
+
+	// draw a line
+	for i := img.Bounds().Min.X; i < img.Bounds().Max.X; i++ {
+		img.Set(i, img.Bounds().Max.Y/2, white) // to change a single pixel
 	}
 
 	return img
@@ -120,17 +129,16 @@ func GenRandomImage(xz, yz int) image.Image {
 // generate clock face image
 // - http://studygolang.com/articles/223
 //----------------------------------------------------------------------------------
-func GenClockImage(size int) image.Image {
-	const clock_size = 400
-	const radius = clock_size / 3
+func GenClockImage(clock_size int) image.Image {
+	radius := float64(clock_size / 3)
 
 	var colour color.RGBA
 
 	circle := func(clock *image.RGBA) {
 		for angle := float64(0); angle < 360; angle++ {
 			radian_angle := math.Pi * 2 * angle / 360
-			x := radius*math.Sin(radian_angle) + clock_size/2
-			y := radius*math.Cos(radian_angle) + clock_size/2
+			x := radius*math.Sin(radian_angle) + float64(clock_size/2)
+			y := radius*math.Cos(radian_angle) + float64(clock_size/2)
 			clock.Set(int(x), int(y), colour)
 		}
 	}
@@ -139,27 +147,78 @@ func GenClockImage(size int) image.Image {
 		x_inc := math.Sin(radian_angle)
 		y_inc := -math.Cos(radian_angle)
 		for i := float64(0); i < length; i++ {
-			x := i*x_inc + clock_size/2
-			y := i*y_inc + clock_size/2
+			x := i*x_inc + float64(clock_size/2)
+			y := i*y_inc + float64(clock_size/2)
 			clock.Set(int(x), int(y), colour)
 		}
 	}
 
-	clock := image.NewRGBA(image.Rect(0, 0, clock_size, clock_size))
+	img := image.NewRGBA(image.Rect(0, 0, clock_size, clock_size))
 	colour.A = 255
-	circle(clock)
+	circle(img)
 
 	time := time.Now()
 	colour.R, colour.G, colour.B = 255, 0, 0
-	hand(clock, (float64(time.Hour())+float64(time.Minute())/60)/12, radius*0.5) // hour hand
+	hand(img, (float64(time.Hour())+float64(time.Minute())/60)/12, radius*0.5) // hour hand
 
 	colour.R, colour.G, colour.B = 0, 255, 0
-	hand(clock, (float64(time.Minute())+float64(time.Second())/60)/60, radius*0.6) // minute hand
+	hand(img, (float64(time.Minute())+float64(time.Second())/60)/60, radius*0.6) // minute hand
 
 	colour.R, colour.G, colour.B = 0, 0, 255
-	hand(clock, float64(time.Second())/60, radius*0.8) // Second hand
+	hand(img, float64(time.Second())/60, radius*0.8) // Second hand
 
-	return clock
+	return img
+}
+
+//----------------------------------------------------------------------------------
+// generate fractal image
+// - https://cyberroadie.wordpress.com/2012/04/28/go-fern-fractal/
+//----------------------------------------------------------------------------------
+func transformPoint(x, y, a, b, c, d, s float32) (float32, float32) {
+	return ((a * x) + (b * y)), ((c * x) + (d * y) + s)
+}
+
+func transform(x float32, y float32) (float32, float32) {
+	rnd := rand.Intn(101)
+	switch {
+	case rnd == 1:
+		x, y = transformPoint(x, y, 0.0, 0.0, 0.0, 0.16, 0.0)
+	case rnd <= 7:
+		x, y = transformPoint(x, y, 0.2, -0.26, 0.23, 0.22, 0.0)
+	case rnd <= 14:
+		x, y = transformPoint(x, y, -0.15, 0.28, 0.26, 0.24, 0.44)
+	case rnd <= 100:
+		x, y = transformPoint(x, y, 0.85, 0.04, -0.04, 0.85, 1.6)
+	}
+	return x, y
+}
+
+func drawPoint(m *image.RGBA, x float32, y float32) {
+	b := m.Bounds()
+	height := float32(b.Max.Y)
+	width := float32(b.Max.X)
+	scale := float32(height / 11)
+	y = (height - 25) - (scale * y)
+	x = (width / 2) + (scale * x)
+	m.Set(int(x), int(y), color.RGBA{0, 255, 0, 255})
+}
+
+func drawFern(m *image.RGBA, x float32, y float32, steps int) {
+	if steps != 0 {
+		x, y = transform(x, y)
+		drawPoint(m, x, y)
+		drawFern(m, x, y, steps-1)
+	}
+}
+
+func GenFractalImage(xz, yz, optnum int) image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, xz, yz))
+
+	blue := color.RGBA{0, 0, 0, 255}
+	draw.Draw(img, img.Bounds(), &image.Uniform{blue}, image.ZP, draw.Src)
+	drawFern(img, float32(xz), float32(yz), optnum)
+
+	return img
 }
 
 // ---------------------------------E-----N-----D-----------------------------------
