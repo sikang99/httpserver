@@ -62,6 +62,7 @@ Internal service structure
 
 ### HTTP
 
+- [HTTP Live Streaming](http://helloworld.naver.com/helloworld/7122)
 - [pikanezi/http](https://github.com/pikanezi/http) - Override of net/http golang library to use Request and ResponseWritter in a more efficient way
 - [aljemala/tls-client](https://gist.github.com/michaljemala/d6f4e01c4834bf47a9c4) - SSL Client Authentication Golang sample
 - [Serving server generated PNGs over HTTP in golang](http://41j.com/blog/2015/03/serving-server-generated-pngs-over-http-in-golang/)
