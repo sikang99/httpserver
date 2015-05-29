@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"stoney/httpserver/src/base"
+	si "stoney/httpserver/src/streamimage"
 
 	"github.com/bradfitz/http2"
 	"golang.org/x/net/websocket"
@@ -136,7 +137,7 @@ func NewServerConfig() *ServerConfig {
 }
 
 var conf = ServerConfig{
-	Title:        "Happy Media System",
+	Title:        "Happy Media System: MJPEG",
 	Image:        "static/image/gophergun.jpg",
 	Addr:         "http://localhost",
 	Host:         *fhost,
@@ -457,13 +458,15 @@ func ActHttpServer() error {
 	// HTTP2 server
 	go serveHttp2(&wg)
 
-	wg.Add(1)
-	// WS server
-	go serveWs(&wg)
+	/*
+		wg.Add(1)
+		// WS server
+		go serveWs(&wg)
 
-	wg.Add(1)
-	// WSS server
-	go serveWss(&wg)
+		wg.Add(1)
+		// WSS server
+		go serveWss(&wg)
+	*/
 
 	wg.Wait()
 
@@ -651,22 +654,20 @@ func sendPage(w http.ResponseWriter, page string) error {
 }
 
 //---------------------------------------------------------------------------
-// send some jpeg files in multipart format
+// send files with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func sendStreamTest(w io.Writer, loop bool) error {
+func sendStreamImage(w io.Writer, dtype string, loop bool) error {
 	var err error
 
-	files := []string{"static/image/arducar.jpg", "static/image/gopher.jpg"}
-
 	for {
-		for i := range files {
-			err = sendStreamFile(w, files[i])
-			if err != nil {
-				log.Println(err)
-				break
-			}
-			time.Sleep(1 * time.Second)
+		err = sendPartImage(w, dtype)
+		if err != nil {
+			log.Println(err)
+			break
 		}
+
+		time.Sleep(time.Second)
+
 		if !loop {
 			break
 		}
@@ -678,11 +679,11 @@ func sendStreamTest(w io.Writer, loop bool) error {
 //---------------------------------------------------------------------------
 // send files with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
+func sendStreamDir(w io.Writer, pat string, loop bool) error {
 	var err error
 
 	// direct pattern matching
-	files, err := filepath.Glob(dir + "*" + ext)
+	files, err := filepath.Glob(pat)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -694,7 +695,7 @@ func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 
 	for {
 		for i := range files {
-			err = sendStreamFile(w, files[i])
+			err = sendPartFile(w, files[i])
 			if err != nil {
 				return err
 			}
@@ -719,7 +720,7 @@ func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 				fpath := dir + f.Name()
 				if filepath.Ext(fpath) == ext {
 					//fmt.Println(fpath)
-					err = sendStreamFile(w, fpath)
+					err = sendPartFile(w, fpath)
 					if err != nil {
 						return err
 					}
@@ -738,7 +739,7 @@ func sendStreamDir(w io.Writer, dir, ext string, loop bool) error {
 //---------------------------------------------------------------------------
 // send any file in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func sendStreamFile(w io.Writer, file string) error {
+func sendPartFile(w io.Writer, file string) error {
 	mw := multipart.NewWriter(w)
 	mw.SetBoundary("myboundary")
 
@@ -766,6 +767,39 @@ func sendStreamFile(w io.Writer, file string) error {
 		return err
 	}
 
+	buf.Write(fdata)  // prepare data in the buffer
+	buf.WriteTo(part) // output the part with buffer in multipart format
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send any file in multipart format with boundary (standard style)
+//---------------------------------------------------------------------------
+func sendPartImage(w io.Writer, dtype string) error {
+
+	img := si.GenSpiralImage(1080, 768)
+	fdata, err := si.PutImageToBuffer(img, dtype, 90)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	fsize := len(fdata)
+
+	ctype := http.DetectContentType(fdata)
+
+	mw := multipart.NewWriter(w)
+	mw.SetBoundary("myboundary")
+	part, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":   {ctype},
+		"Content-Length": {strconv.Itoa(fsize)},
+	})
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	buf := new(bytes.Buffer)
 	buf.Write(fdata)  // prepare data in the buffer
 	buf.WriteTo(part) // output the part with buffer in multipart format
 
@@ -867,7 +901,8 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		err = sendStreamDir(w, "./static/image/", ".jpg", true)
+		//err = sendStreamDir(w, "./static/image/*.jpg", true)
+		err = sendStreamImage(w, "jpg", true)
 		if err != nil {
 			log.Println(err)
 			break

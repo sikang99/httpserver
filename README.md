@@ -1,6 +1,6 @@
 # Static http/https server
 
-Simple http/https test server for some services and tatic files.
+Simple http/https test server for some services and static files.
 
 ## Install
 
@@ -33,8 +33,6 @@ Internal service structure
 	http  --> server(8001)     + --> file server
 	https --> server(8001) --> + --> streaming server
 	http2 --> server(8002)     + --> monitor server
-
-
 
 
 ## References

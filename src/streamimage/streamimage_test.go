@@ -13,30 +13,32 @@ import (
 //----------------------------------------------------------------------------------
 // string information for the slot
 //----------------------------------------------------------------------------------
-func TestGenImages(t *testing.T) {
+func TestMakeImageFiles(t *testing.T) {
 	var err error
 
-	//img := GenSimpleImage(1080, 768)
-	//img := GenRandomImage(1080, 768)
-	img := GenClockImage(1000)
+	//img := GenSimpleImage(1024, 768)
+	//img := GenGradientImage(1024, 768)
+	img := GenSpiralImage(1080, 768)
+	//img := GenRandomImage(1024, 768)
+	//img := GenClockImage(1000)
 	//img := GenFractalImage(800, 800, 100000)
 
-	err = MakeImageFile(img, "output.png", 0)
+	err = PutImageToFile(img, "output.png", 0)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	err = MakeImageFile(img, "output.jpg", 80)
+	err = PutImageToFile(img, "output.jpg", 80)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	err = MakeImageFile(img, "output.gif", 256)
+	err = PutImageToFile(img, "output.gif", 256)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	err = MakeImageFile(img, "output.vid", 999)
+	err = PutImageToFile(img, "output.vid", 999)
 	if err != nil {
 		log.Println(err)
 	}

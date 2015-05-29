@@ -1,7 +1,7 @@
 #
 # Makefile for package
 #
-PACKAGE=image
+PACKAGE=streamimage
 
 all: usage
 

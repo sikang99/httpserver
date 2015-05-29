@@ -1,12 +1,13 @@
 //==================================================================================
 // Image
+// - https://github.com/golang-samples/image
 // - https://www.socketloop.com/tutorials/golang-save-image-to-png-jpeg-or-gif-format
-// - https://code.google.com/p/plotinum/wiki/Examples
 //==================================================================================
 
 package streamimage
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
@@ -14,6 +15,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"log"
 	"math"
 	"math/rand"
@@ -29,9 +31,21 @@ var (
 )
 
 //----------------------------------------------------------------------------------
-// encode image to file in PNG, JPEG, PNG
+// encode image to buffer in PNG, JPEG, GIF
 //----------------------------------------------------------------------------------
-func MakeImageFile(img image.Image, fname string, optnum int) error {
+func PutImageToBuffer(img image.Image, itype string, optnum int) ([]byte, error) {
+	var err error
+
+	buf := new(bytes.Buffer)
+	err = EncodeImageByType(buf, img, itype, optnum)
+
+	return buf.Bytes(), err
+}
+
+//----------------------------------------------------------------------------------
+// encode image to file in PNG, JPEG, GIF
+//----------------------------------------------------------------------------------
+func PutImageToFile(img image.Image, fname string, optnum int) error {
 	var err error
 
 	out, err := os.Create(fname)
@@ -42,16 +56,24 @@ func MakeImageFile(img image.Image, fname string, optnum int) error {
 	defer out.Close()
 
 	itype := filepath.Ext(fname)
+	return EncodeImageByType(out, img, itype[1:], optnum)
+}
+
+//----------------------------------------------------------------------------------
+// encode image to writer in PNG, JPEG, GIF
+//----------------------------------------------------------------------------------
+func EncodeImageByType(out io.Writer, img image.Image, itype string, optnum int) error {
+	var err error
 
 	switch itype {
-	case ".png":
+	case "png":
 		err = png.Encode(out, img)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
 
-	case ".gif":
+	case "gif":
 		var opt gif.Options
 		opt.NumColors = optnum // 256, you can add more parameters if you want
 
@@ -61,7 +83,7 @@ func MakeImageFile(img image.Image, fname string, optnum int) error {
 			return err
 		}
 
-	case ".jpg", ".jpeg":
+	case "jpg", "jpeg":
 		var opt jpeg.Options
 		opt.Quality = optnum // 80
 
@@ -103,13 +125,59 @@ func GenSimpleImage(xz, yz int) image.Image {
 }
 
 //----------------------------------------------------------------------------------
+// generate gradient image
+// - https://github.com/felixpalmer/go_images
+//----------------------------------------------------------------------------------
+func GenGradientImage(xz, yz int) image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, xz, yz))
+	size := img.Bounds().Size()
+
+	for x := 0; x < size.X; x++ {
+		for y := 0; y < size.Y; y++ {
+			color := color.RGBA{
+				uint8(255 * x / size.X),
+				uint8(255 * y / size.Y),
+				55,
+				255}
+			img.Set(x, y, color)
+		}
+	}
+
+	return img
+}
+
+//----------------------------------------------------------------------------------
+// generate gradient image
+// - https://github.com/felixpalmer/go_images
+//----------------------------------------------------------------------------------
+func GenSpiralImage(xz, yz int) image.Image {
+	canvas := NewCanvas(image.Rect(0, 0, xz, yz))
+	canvas.DrawGradient()
+
+	// Draw a set of spirals randomly over the image
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := 0; i < 100; i++ {
+		x := float64(xz) * rand.Float64()
+		y := float64(yz) * rand.Float64()
+		color := color.RGBA{uint8(rand.Intn(255)),
+			uint8(rand.Intn(255)),
+			uint8(rand.Intn(255)),
+			255}
+
+		canvas.DrawSpiral(color, Vector{x, y})
+	}
+
+	return canvas
+}
+
+//----------------------------------------------------------------------------------
 // generate random image
 //----------------------------------------------------------------------------------
 func GenRandomImage(xz, yz int) image.Image {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	imgRect := image.Rect(0, 0, xz, yz)
-	img := image.NewGray(imgRect)
+	img := image.NewRGBA(imgRect)
 	draw.Draw(img, img.Bounds(), &image.Uniform{color.White}, image.ZP, draw.Src)
 
 	for y := 0; y < yz; y += 10 {
