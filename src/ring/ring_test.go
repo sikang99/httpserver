@@ -81,6 +81,7 @@ func TestStreamBuffer(t *testing.T) {
 // test for continuous read from stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamRead(t *testing.T) {
+	// prepare a buffer
 	n := 5
 	sb := NewStreamBuffer(n, MBYTE)
 
@@ -129,22 +130,11 @@ func TestStreamWrite(t *testing.T) {
 // test for multiple readers and single writer on the stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamReadWrite(t *testing.T) {
+	// prepare a buffer
 	nb := 5
 	sb := NewStreamBuffer(nb, MBYTE)
 
-	var fend bool
-
-	// define buffer writer
-	writer := func() {
-		for i := 0; i < 20; i++ {
-			data := []byte(fmt.Sprintf("count %d", i))
-			in := NewStreamSlot("text/plain", len(data), data)
-			sb.PutSlotNext(in)
-			fmt.Println("i>", in)
-			time.Sleep(time.Millisecond)
-		}
-		fend = true
-	}
+	var fend bool = false
 
 	// define buffer reader
 	reader := func(i int) {
@@ -160,13 +150,25 @@ func TestStreamReadWrite(t *testing.T) {
 		}
 	}
 
-	// parallel writer, single writer
+	// define buffer writer
+	writer := func(n int) {
+		for i := 0; i < n; i++ {
+			data := []byte(fmt.Sprintf("count %d", i))
+			in := NewStreamSlot("text/plain", len(data), data)
+			sb.PutSlotNext(in)
+			fmt.Println("i>", in)
+			time.Sleep(time.Millisecond)
+		}
+		fend = true
+	}
+
+	// multi reader, single writer
 	nr := 3
 	for i := 0; i < nr; i++ {
 		go reader(i)
 	}
 
-	writer()
+	writer(20)
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

@@ -34,7 +34,7 @@ type StreamSlot struct {
 }
 
 //----------------------------------------------------------------------------------
-// print information for the slot
+// string information for the slot
 //----------------------------------------------------------------------------------
 func (ss *StreamSlot) String() string {
 	str := fmt.Sprintf("Type: %s\t", ss.Type)
@@ -52,9 +52,10 @@ func (ss *StreamSlot) String() string {
 //----------------------------------------------------------------------------------
 func NewStreamSlot(ctype string, clen int, cdata []byte) *StreamSlot {
 	return &StreamSlot{
-		Type:    ctype,
-		Length:  clen,
-		Content: cdata,
+		Type:      ctype,
+		Length:    clen,
+		LengthMax: LEN_MAX_SLOT,
+		Content:   cdata,
 	}
 }
 
@@ -71,7 +72,7 @@ type StreamBuffer struct {
 }
 
 //----------------------------------------------------------------------------------
-// print information for the stream buffer
+// string information for the stream buffer
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) String() string {
 	str := fmt.Sprintf("StreamBuffer: ")
@@ -112,7 +113,7 @@ func NewStreamBuffer(num int, size int) *StreamBuffer {
 }
 
 //----------------------------------------------------------------------------------
-// get the number of slots in buffer for used and allocted
+// get the number of slots in buffer for used(len) and allocted(cap)
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) Len() int {
 	return sb.Num
@@ -123,15 +124,20 @@ func (sb *StreamBuffer) Cap() int {
 }
 
 //----------------------------------------------------------------------------------
-// set the position of slot to be written
+// set the position of slot to be read and written
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) SetPos(pos int) int {
+func (sb *StreamBuffer) SetPosIn(pos int) int {
 	sb.In = (pos % sb.Num)
 	return sb.In
 }
 
+func (sb *StreamBuffer) SetPosOut(pos int) int {
+	sb.Out = (pos % sb.Num)
+	return sb.Out
+}
+
 //----------------------------------------------------------------------------------
-// get the pointer for slot to be read and move to the next
+// get the pointer of slot to be read and move to the next
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) GetSlotNext() (*StreamSlot, error) {
 	var err error
@@ -148,7 +154,7 @@ func (sb *StreamBuffer) GetSlotNext() (*StreamSlot, error) {
 }
 
 //----------------------------------------------------------------------------------
-// get the pointer for slot designated
+// get the pointer of slot designated
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
 	var err error
@@ -160,7 +166,7 @@ func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
 }
 
 //----------------------------------------------------------------------------------
-// get the pointer for slot designated and go to the next
+// get the pointer of slot designated and go to the next
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) GetSlotByPosNext(pos int) (int, *StreamSlot, error) {
 	var err error
