@@ -55,7 +55,7 @@ func PutImageToFile(img image.Image, fname string, optnum int) error {
 	}
 	defer out.Close()
 
-	itype := filepath.Ext(fname)
+	itype := filepath.Ext(fname) // .(ext) style, i.e, .jpg, .jpeg
 	return EncodeImageByType(out, img, itype[1:], optnum)
 }
 

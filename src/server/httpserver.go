@@ -403,7 +403,6 @@ func recvMultipartToBuffer(r *multipart.Reader) error {
 		}
 
 		fmt.Printf("%s %d/%d [%02x %02x - %02x %02x]\n", p.Header.Get("Content-Type"), tn, nl, data[0], data[1], data[nl-2], data[nl-1])
-		//conf.ImageChannel <- data[:n]
 	}
 
 	return err
@@ -707,32 +706,6 @@ func sendStreamDir(w io.Writer, pat string, loop bool) error {
 		}
 	}
 
-	/*
-		// read dir and compare extension
-		files, err := ioutil.ReadDir(dir)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-
-		for {
-			for _, f := range files {
-				fpath := dir + f.Name()
-				if filepath.Ext(fpath) == ext {
-					//fmt.Println(fpath)
-					err = sendPartFile(w, fpath)
-					if err != nil {
-						return err
-					}
-					time.Sleep(time.Second)
-				}
-			}
-
-			if !loop {
-				break
-			}
-		}
-	*/
 	return err
 }
 
@@ -740,34 +713,35 @@ func sendStreamDir(w io.Writer, pat string, loop bool) error {
 // send any file in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
 func sendPartFile(w io.Writer, file string) error {
-	mw := multipart.NewWriter(w)
-	mw.SetBoundary("myboundary")
+	var err error
 
-	buf := new(bytes.Buffer)
-
-	fdata, err := ioutil.ReadFile(file)
+	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	fsize := len(fdata)
+	dsize := len(data)
 
 	// check the extension at first and its content
 	ctype := mime.TypeByExtension(filepath.Ext(file))
 	if ctype == "" {
-		ctype = http.DetectContentType(fdata)
+		ctype = http.DetectContentType(data)
 	}
+
+	mw := multipart.NewWriter(w)
+	mw.SetBoundary("myboundary")
 
 	part, err := mw.CreatePart(textproto.MIMEHeader{
 		"Content-Type":   {ctype},
-		"Content-Length": {strconv.Itoa(fsize)},
+		"Content-Length": {strconv.Itoa(dsize)},
 	})
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	buf.Write(fdata)  // prepare data in the buffer
+	buf := new(bytes.Buffer)
+	buf.Write(data)   // prepare data in the buffer
 	buf.WriteTo(part) // output the part with buffer in multipart format
 
 	return err
@@ -778,21 +752,22 @@ func sendPartFile(w io.Writer, file string) error {
 //---------------------------------------------------------------------------
 func sendPartImage(w io.Writer, dtype string) error {
 
-	img := si.GenSpiralImage(1080, 768)
-	fdata, err := si.PutImageToBuffer(img, dtype, 90)
+	//img := si.GenSpiralImage(1080, 768)
+	img := si.GenClockImage(800)
+	data, err := si.PutImageToBuffer(img, dtype, 90)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	fsize := len(fdata)
+	dsize := len(data)
 
-	ctype := http.DetectContentType(fdata)
+	ctype := http.DetectContentType(data)
 
 	mw := multipart.NewWriter(w)
 	mw.SetBoundary("myboundary")
 	part, err := mw.CreatePart(textproto.MIMEHeader{
 		"Content-Type":   {ctype},
-		"Content-Length": {strconv.Itoa(fsize)},
+		"Content-Length": {strconv.Itoa(dsize)},
 	})
 	if err != nil {
 		log.Println(err)
@@ -800,7 +775,7 @@ func sendPartImage(w io.Writer, dtype string) error {
 	}
 
 	buf := new(bytes.Buffer)
-	buf.Write(fdata)  // prepare data in the buffer
+	buf.Write(data)   // prepare data in the buffer
 	buf.WriteTo(part) // output the part with buffer in multipart format
 
 	return err
