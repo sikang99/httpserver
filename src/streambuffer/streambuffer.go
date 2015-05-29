@@ -5,7 +5,7 @@
 // - http://blog.pivotal.io/labs/labs/a-concurrent-ring-buffer-for-go
 //==================================================================================
 
-package ring
+package streambuffer
 
 import (
 	"fmt"
@@ -63,12 +63,12 @@ func NewStreamSlot(ctype string, clen int, cdata []byte) *StreamSlot {
 type StreamBuffer struct {
 	sync.Mutex
 	Slots  []StreamSlot
-	Num    int // number of slots used
-	NumMax int // number of slots allocated
-	Size   int // number of slots allocated
-	In     int // input position of buffer
-	Out    int // output position of buffer
-	Desc   string
+	Num    int    // number of slots used
+	NumMax int    // number of slots allocated
+	Size   int    // size of the slot content
+	In     int    // input position of buffer to be written
+	Out    int    // output position of buffer to be read
+	Desc   string // description of buffer
 }
 
 //----------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ type StreamBuffer struct {
 func (sb *StreamBuffer) String() string {
 	str := fmt.Sprintf("StreamBuffer: ")
 	str += fmt.Sprintf("Pos: %d,%d\t", sb.In, sb.Out)
-	str += fmt.Sprintf("Size: %d/%d,%d\t", sb.Num, sb.NumMax, sb.Size)
+	str += fmt.Sprintf("Size: %d/%d, %d KB\t", sb.Num, sb.NumMax, sb.Size/KBYTE)
 	str += fmt.Sprintf("Desc: %s\t", sb.Desc)
 
 	for i := 0; i < sb.Num; i++ {

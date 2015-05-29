@@ -1,7 +1,7 @@
 //==================================================================================
-// Test for ring buffer for streaming
+// Test for stream buffer for multipart media
 //==================================================================================
-package ring
+package streambuffer
 
 import (
 	"fmt"
@@ -25,7 +25,8 @@ func TestStreamSlot(t *testing.T) {
 func TestStreamBuffer(t *testing.T) {
 	var err error
 
-	sb := NewStreamBuffer(3, KBYTE)
+	nb := 3
+	sb := NewStreamBuffer(nb, KBYTE)
 	fmt.Println(sb)
 
 	sb.Resize(2)
@@ -82,8 +83,8 @@ func TestStreamBuffer(t *testing.T) {
 //----------------------------------------------------------------------------------
 func TestStreamRead(t *testing.T) {
 	// prepare a buffer
-	n := 5
-	sb := NewStreamBuffer(n, MBYTE)
+	nb := 5
+	sb := NewStreamBuffer(nb, MBYTE)
 
 	data := make([]byte, 128)
 	in := NewStreamSlot("image/jpeg", len(data), data)
@@ -104,7 +105,7 @@ func TestStreamRead(t *testing.T) {
 		}
 		//sb.Resize(i + 1)
 		fmt.Printf("\t(%d) %s\n", i, out)
-		if (i+1)%n == 0 {
+		if (i+1)%nb == 0 {
 			println()
 			//time.Sleep(time.Second)
 		}
@@ -115,8 +116,8 @@ func TestStreamRead(t *testing.T) {
 // test for continuous write from stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamWrite(t *testing.T) {
-	n := 5
-	sb := NewStreamBuffer(n, MBYTE)
+	nb := 5
+	sb := NewStreamBuffer(nb, MBYTE)
 
 	for i := 1; i < 50; i++ {
 		data := []byte(fmt.Sprintf("count %d", i))

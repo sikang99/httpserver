@@ -1,7 +1,7 @@
 #
 # Makefile for package
 #
-PACKAGE=ring
+PACKAGE=streambuffer
 
 all: usage
 
