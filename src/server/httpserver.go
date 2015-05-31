@@ -753,7 +753,8 @@ func sendPartFile(w io.Writer, file string) error {
 func sendPartImage(w io.Writer, dtype string) error {
 
 	//img := si.GenSpiralImage(1080, 768)
-	img := si.GenClockImage(800)
+	//img := si.GenClockImage(800)
+	img := si.GenRandomImageBlock(1080, 768)
 	data, err := si.PutImageToBuffer(img, dtype, 90)
 	if err != nil {
 		log.Println(err)

@@ -108,7 +108,7 @@ func NewStreamBuffer(num int, size int) *StreamBuffer {
 		Num:   num, NumMax: num,
 		Size: size,
 		In:   0, Out: 0,
-		Desc: "Null stream",
+		Desc: "Null data",
 	}
 }
 
@@ -244,11 +244,8 @@ func (sb *StreamBuffer) Resize(num int) error {
 
 	var err error
 
-	if num < 2 {
-		return fmt.Errorf("%d is Too small, use a number between 2 - %d", num, NUM_MAX_SLOTS)
-	}
-	if num > NUM_MAX_SLOTS {
-		return fmt.Errorf("%d is Too big, use a number between 2 - %d", num, NUM_MAX_SLOTS)
+	if num < 2 || num > NUM_MAX_SLOTS {
+		return fmt.Errorf("%d is invalid, use a number between 2 - %d", num, NUM_MAX_SLOTS)
 	}
 
 	if num > sb.NumMax {

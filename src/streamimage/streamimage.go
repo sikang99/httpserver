@@ -27,6 +27,8 @@ import (
 var (
 	white color.Color = color.RGBA{255, 255, 255, 255}
 	black color.Color = color.RGBA{0, 0, 0, 255}
+	red   color.Color = color.RGBA{255, 0, 0, 255}
+	green color.Color = color.RGBA{0, 255, 0, 255}
 	blue  color.Color = color.RGBA{0, 0, 255, 255}
 )
 
@@ -172,12 +174,30 @@ func GenSpiralImage(xz, yz int) image.Image {
 
 //----------------------------------------------------------------------------------
 // generate random image
+// - http://41j.com/blog/2015/03/serving-server-generated-pngs-over-http-in-golang/
 //----------------------------------------------------------------------------------
-func GenRandomImage(xz, yz int) image.Image {
+func GenRandomImageColor(xz, yz int) image.Image {
+	img := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{xz, yz}})
+
+	// This loop just fills the image with random data
+	for x := 0; x < xz; x++ {
+		for y := 0; y < yz; y++ {
+			c := color.RGBA{uint8(rand.Intn(255)), uint8(rand.Intn(255)), uint8(rand.Intn(255)), 255}
+			img.Set(x, y, c)
+		}
+	}
+
+	return img
+}
+
+//----------------------------------------------------------------------------------
+// generate random image
+//----------------------------------------------------------------------------------
+func GenRandomImageBlock(xz, yz int) image.Image {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	imgRect := image.Rect(0, 0, xz, yz)
-	img := image.NewRGBA(imgRect)
+	rect := image.Rect(0, 0, xz, yz)
+	img := image.NewRGBA(rect)
 	draw.Draw(img, img.Bounds(), &image.Uniform{color.White}, image.ZP, draw.Src)
 
 	for y := 0; y < yz; y += 10 {
