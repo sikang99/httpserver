@@ -27,21 +27,25 @@ const (
 
 type StreamSlot struct {
 	sync.Mutex
-	Type    string
-	Length  int
-	Content []byte
+	Type      string
+	Length    int
+	LengthMax int
+	Content   []byte
 }
 
 //----------------------------------------------------------------------------------
 // string information for the slot
 //----------------------------------------------------------------------------------
 func (ss *StreamSlot) String() string {
-	str := fmt.Sprintf("Type: %s\t", ss.Type)
-	str += fmt.Sprintf("Length: %d\t", ss.Length)
-	if strings.Contains(ss.Type, "text/") {
-		str += fmt.Sprintf("Content: %s\t", string(ss.Content[:ss.Length]))
-	} else {
-		str += fmt.Sprintf("Content: %02x-%02x\t", ss.Content[0], ss.Content[ss.Length-1])
+	str := fmt.Sprintf("\tType: %s", ss.Type)
+	str += fmt.Sprintf("\tLength: %d/%d", ss.Length, ss.LengthMax)
+	str += fmt.Sprintf("\tContent: ")
+	if ss.Length > 0 {
+		if strings.Contains(ss.Type, "text/") {
+			str += fmt.Sprintf("%s", string(ss.Content[:ss.Length]))
+		} else {
+			str += fmt.Sprintf("%02x-%02x", ss.Content[0], ss.Content[ss.Length-1])
+		}
 	}
 	return str
 }
@@ -51,8 +55,9 @@ func (ss *StreamSlot) String() string {
 //----------------------------------------------------------------------------------
 func NewStreamSlotBySize(clen int) *StreamSlot {
 	return &StreamSlot{
-		Length:  clen,
-		Content: make([]byte, clen),
+		Length:    clen,
+		LengthMax: clen,
+		Content:   make([]byte, clen),
 	}
 }
 
@@ -61,36 +66,37 @@ func NewStreamSlotBySize(clen int) *StreamSlot {
 //----------------------------------------------------------------------------------
 func NewStreamSlotByData(ctype string, clen int, cdata []byte) *StreamSlot {
 	return &StreamSlot{
-		Type:    ctype,
-		Length:  clen,
-		Content: cdata,
+		Type:      ctype,
+		Length:    clen,
+		LengthMax: clen,
+		Content:   cdata,
 	}
 }
 
 //----------------------------------------------------------------------------------
 type StreamBuffer struct {
 	sync.Mutex
-	Slots  []StreamSlot
+	Status int
 	Num    int    // number of slots used
 	NumMax int    // number of slots allocated
 	Size   int    // size of the slot content
 	In     int    // input position of buffer to be written
 	Out    int    // output position of buffer to be read
 	Desc   string // description of buffer
+	Slots  []StreamSlot
 }
 
 //----------------------------------------------------------------------------------
 // string information for the stream buffer
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) String() string {
-	str := fmt.Sprintf("StreamBuffer: ")
-	str += fmt.Sprintf("Pos: %d,%d\t", sb.In, sb.Out)
-	str += fmt.Sprintf("Size: %d/%d, %d KB\t", sb.Num, sb.NumMax, sb.Size/KBYTE)
-	str += fmt.Sprintf("Desc: %s\t", sb.Desc)
+	str := fmt.Sprintf("[StreamBuffer]")
+	str += fmt.Sprintf("\tPos: %d,%d", sb.In, sb.Out)
+	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sb.Num, sb.NumMax, sb.Size/KBYTE)
+	str += fmt.Sprintf("\tDesc: %s\n", sb.Desc)
 
 	for i := 0; i < sb.Num; i++ {
-		str += fmt.Sprintf("\n")
-		str += fmt.Sprintf("\t[%d] %s", i, &sb.Slots[i])
+		str += fmt.Sprintf("\t[%d] %s\n", i, &sb.Slots[i])
 	}
 
 	return str
@@ -102,8 +108,9 @@ func (sb *StreamBuffer) String() string {
 func NewStreamBuffer(num int, size int) *StreamBuffer {
 	slot := StreamSlot{
 		//Type:    "application/octet-stream",
-		Length:  size,
-		Content: make([]byte, size),
+		Length:    size,
+		LengthMax: size,
+		Content:   make([]byte, size),
 	}
 
 	var slots []StreamSlot
@@ -206,7 +213,12 @@ func (sb *StreamBuffer) PutSlotNext(slot *StreamSlot) (*StreamSlot, error) {
 	}
 
 	st := &sb.Slots[sb.In]
-	*st = *slot
+
+	//*st = *slot	// CAUTION: Don't copy slot.LengthMax
+	st.Type = slot.Type
+	st.Length = slot.Length
+	copy(st.Content, slot.Content)
+
 	sb.In = (sb.In + 1) % sb.Num
 
 	return st, err
@@ -258,7 +270,9 @@ func (sb *StreamBuffer) Resize(num int) error {
 
 	if num > sb.NumMax {
 		slot := StreamSlot{
-			Content: make([]byte, sb.Size),
+			Length:    sb.Size,
+			LengthMax: sb.Size,
+			Content:   make([]byte, sb.Size),
 		}
 		for i := 0; i < num-sb.NumMax; i++ {
 			sb.Slots = append(sb.Slots, slot)

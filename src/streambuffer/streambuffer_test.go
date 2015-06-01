@@ -17,8 +17,10 @@ func TestStreamSlot(t *testing.T) {
 	slot := NewStreamSlotBySize(1024)
 	fmt.Println(slot)
 
-	data := make([]byte, 12)
+	dsize := 12
+	data := make([]byte, dsize)
 	data[0] = 0xff
+	data[dsize-1] = 0xee
 	slot = NewStreamSlotByData("image/jpeg", len(data), data)
 	fmt.Println(slot)
 }
@@ -158,10 +160,10 @@ func TestStreamReadWrite(t *testing.T) {
 	// define buffer writer
 	writer := func(n int) {
 		for i := 0; i < n; i++ {
-			data := []byte(fmt.Sprintf("count %d", i))
+			data := []byte(fmt.Sprintf("save %d-th data", i))
 			in := NewStreamSlotByData("text/plain", len(data), data)
 			sb.PutSlotNext(in)
-			fmt.Println("i>", in)
+			fmt.Println("i>", i, in)
 			time.Sleep(time.Millisecond)
 		}
 		fend = true
@@ -173,7 +175,7 @@ func TestStreamReadWrite(t *testing.T) {
 		go reader(i)
 	}
 
-	writer(20)
+	writer(10)
 }
 
 // ---------------------------------E-----N-----D-----------------------------------
