@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"stoney/httpserver/src/base"
+	sb "stoney/httpserver/src/streambuffer"
 	si "stoney/httpserver/src/streamimage"
 
 	"github.com/bradfitz/http2"
@@ -86,6 +87,9 @@ const (
 	TCPServer = "Happy Media TCP Server"
 	WSClient  = "Happy Media WS Server"
 	WSServer  = "Happy Media WS Server"
+
+	KBYTE = 1024
+	MBYTE = 1024 * KBYTE
 )
 
 //---------------------------------------------------------------------------
@@ -129,6 +133,7 @@ type ServerConfig struct {
 	Mode         string
 	ImageChannel chan []byte
 	Player       io.Writer
+	Ring         *sb.StreamBuffer
 }
 
 func NewServerConfig() *ServerConfig {
@@ -281,7 +286,6 @@ func httpClientPost(client *http.Client, url string) error {
 
 	mw := multipart.NewWriter(outer)
 	mw.SetBoundary("myboundary")
-	b := new(bytes.Buffer)
 
 	fdata, err := ioutil.ReadFile("static/image/gopher.jpg")
 	fsize := len(fdata)
@@ -292,6 +296,7 @@ func httpClientPost(client *http.Client, url string) error {
 			"Content-Length": {strconv.Itoa(fsize)},
 		})
 
+		b := new(bytes.Buffer)
 		b.Write(fdata)
 		b.WriteTo(part)
 	}
@@ -366,12 +371,113 @@ func ActHttpReader(url string) {
 
 	mr := multipart.NewReader(res.Body, boundary)
 
-	//recvMultipartDecodeJpeg(mr)
 	recvMultipartToBuffer(mr)
+	//recvMultipartToStreamBuffer(mr)
+}
+
+//---------------------------------------------------------------------------
+//	receive a part to buffer
+//---------------------------------------------------------------------------
+func recvPartToBuffer(r *multipart.Reader) ([]byte, error) {
+	var err error
+
+	p, err := r.NextPart()
+	if err != nil { // io.EOF
+		log.Println(err)
+		return nil, err
+	}
+
+	sl := p.Header.Get("Content-Length")
+	nl, err := strconv.Atoi(sl)
+	if err != nil {
+		log.Printf("%s %s %d\n", p.Header, sl, nl)
+		return nil, err
+	}
+
+	data := make([]byte, nl)
+
+	// implement like ReadFull() in jpeg.Decode()
+	var tn int
+	for tn < nl {
+		n, err := p.Read(data[tn:])
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+		tn += n
+	}
+
+	fmt.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get("Content-Type"), tn, nl, data[:2], data[nl-2:])
+
+	return data[:nl], err
+}
+
+//---------------------------------------------------------------------------
+//	receive a part to buffer
+//----------------------------------------s-----------------------------------
+func recvPartToSlot(r *multipart.Reader, s *sb.StreamSlot) error {
+	var err error
+
+	p, err := r.NextPart()
+	if err != nil { // io.EOF
+		log.Println(err)
+		return err
+	}
+
+	sl := p.Header.Get("Content-Length")
+	nl, err := strconv.Atoi(sl)
+	if err != nil {
+		log.Printf("%s %s %d\n", p.Header, sl, nl)
+		return err
+	}
+
+	// implement like ReadFull() in jpeg.Decode()
+	var tn int
+	for tn < nl {
+		n, err := p.Read(sb.Content[tn:])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		tn += n
+	}
+
+	ss.Type = p.Header.Get("Content-Type")
+	ss.Length = nl
+	fmt.Printf(ss)
+
+	return err
 }
 
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
+//---------------------------------------------------------------------------
+func recvMultipartToStreamBuffer(r *multipart.Reader) error {
+	var err error
+
+	// prepare a stream ring buffer
+	nb := 5
+	sbuf := sb.NewStreamBuffer(nb, MBYTE)
+
+	// insert slots to the buffer
+	for i := 0; true; i++ {
+		if i%nb == 0 {
+			fmt.Println(sbuf)
+			break
+		}
+
+		err := recvPartToSlot(r)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+//	receive multipart data and decode jpeg
 //---------------------------------------------------------------------------
 func recvMultipartToBuffer(r *multipart.Reader) error {
 	var err error
@@ -387,6 +493,7 @@ func recvMultipartToBuffer(r *multipart.Reader) error {
 		nl, err := strconv.Atoi(sl)
 		if err != nil {
 			log.Printf("%s %s %d\n", p.Header, sl, nl)
+			continue
 		}
 
 		data := make([]byte, nl)
@@ -402,7 +509,7 @@ func recvMultipartToBuffer(r *multipart.Reader) error {
 			tn += n
 		}
 
-		fmt.Printf("%s %d/%d [%02x %02x - %02x %02x]\n", p.Header.Get("Content-Type"), tn, nl, data[0], data[1], data[nl-2], data[nl-1])
+		fmt.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get("Content-Type"), tn, nl, data[:2], data[nl-2:])
 	}
 
 	return err
@@ -1597,7 +1704,7 @@ func WsRecvPart(mr *multipart.Reader) error {
 	}
 
 	//t.assert(nl == tn)
-	fmt.Printf("%7s ->  %7d/%7d [%02x %02x - %02x %02x]\n", sl, nl, tn, data[0], data[1], data[nl-2], data[nl-1])
+	fmt.Printf("%7s ->  %7d/%7d [%0x - %0x]\n", sl, nl, tn, data[2], data[nl-2:])
 
 	return err
 }

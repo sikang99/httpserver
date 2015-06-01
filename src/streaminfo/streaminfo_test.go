@@ -1,5 +1,5 @@
 //==================================================================================
-// Info
+// Test for Stream Info
 //==================================================================================
 
 package streaminfo
@@ -11,19 +11,33 @@ import (
 )
 
 //----------------------------------------------------------------------------------
-// test for stream info
+// test for stream request info
 //----------------------------------------------------------------------------------
-func TestStreamInfo(t *testing.T) {
+func TestStreamRequest(t *testing.T) {
 	var err error
 
-	uri := "https://localhost:8080/stream?channel=100;200&source=2&timeout=v#f"
+	uri := "https://localhost:8080/stream?channel=100&source=2&timeout=v#f"
 
-	chn, err := GetStreamInfoFromUrl(uri)
+	sreq, err := GetStreamRequestFromURI(uri)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	fmt.Println(chn)
+	fmt.Println(sreq)
+}
+
+//----------------------------------------------------------------------------------
+// test for uuid
+//----------------------------------------------------------------------------------
+func TestUUID(t *testing.T) {
+	uid := StdGetUUID()
+	fmt.Println(uid)
+
+	uib := StdParseUUID(uid)
+	fmt.Println(uib)
+
+	uid = PseudoGetUUID()
+	fmt.Println(uid)
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

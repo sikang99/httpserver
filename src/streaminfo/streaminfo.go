@@ -5,10 +5,16 @@
 package streaminfo
 
 import (
+	"crypto/rand"
 	"fmt"
 	"log"
 	"net/url"
 	"strconv"
+	"time"
+
+	//"github.com/twinj/uuid"
+	//"github.com/nu7hatch/gouuid"
+	uuid "github.com/nu7hatch/gouuid"
 )
 
 //----------------------------------------------------------------------------------
@@ -28,9 +34,10 @@ type Channel struct {
 // string chanel information
 //----------------------------------------------------------------------------------
 func (chn *Channel) String() string {
-	str := fmt.Sprintf("Id: %d\t", chn.Id)
-	str += fmt.Sprintf("Name: %s\t", chn.Name)
-	str += fmt.Sprintf("Desc: %s\n", chn.Desc)
+	str := fmt.Sprintf("[Channel]")
+	str += fmt.Sprintf("\tId: %d", chn.Id)
+	str += fmt.Sprintf("\tName: %s", chn.Name)
+	str += fmt.Sprintf("\tDesc: %s\n", chn.Desc)
 	return str
 }
 
@@ -42,24 +49,36 @@ func (chn *Channel) GetId() int {
 type StreamRequest struct {
 	Channel int
 	Source  int
-	Addr    string
+	When    time.Time // access time
+	Who     string    // string for hostname:port
+	Desc    string
 }
 
 //----------------------------------------------------------------------------------
-// string chanel information
+// string stream request information
 //----------------------------------------------------------------------------------
 func (sr *StreamRequest) String() string {
-	str := fmt.Sprintf("Channel: %d\t", sr.Channel)
-	str += fmt.Sprintf("Source: %d\t", sr.Source)
-	str += fmt.Sprintf("Address: %s\n", sr.Addr)
+	str := fmt.Sprintf("[Request]")
+	str += fmt.Sprintf("\tChannel: %d", sr.Channel)
+	str += fmt.Sprintf("\tSource: %d", sr.Source)
+	str += fmt.Sprintf("\tWho: %s\n", sr.Who)
+	str += fmt.Sprintf("\tWhen: %s", sr.When)
+	str += fmt.Sprintf("\tDesciption: %s\n", sr.Desc)
 	return str
 }
 
-func GetStreamRequest(str string) (*StreamRequest, error) {
+//----------------------------------------------------------------------------------
+// get information of stream request
+//----------------------------------------------------------------------------------
+func GetStreamRequestFrom(str string) (*StreamRequest, error) {
 	var err error
 
 	params, err := url.ParseQuery(str)
-	fmt.Println(params)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	//fmt.Println(params)
 
 	chn, err := strconv.Atoi(params["channel"][0])
 	if err != nil {
@@ -76,45 +95,71 @@ func GetStreamRequest(str string) (*StreamRequest, error) {
 	sreq := &StreamRequest{
 		Channel: chn,
 		Source:  src,
+		When:    time.Now(),
 	}
+	//fmt.Println(sreq)
 
 	return sreq, err
 }
 
 //----------------------------------------------------------------------------------
-// get stream information
+// get information of stream request from URI
 // - https://gobyexample.com/url-parsing
 // - https://www.socketloop.com/tutorials/golang-get-uri-segments-by-number-and-assign-as-variable-example
 //----------------------------------------------------------------------------------
-func GetStreamInfoFromUrl(uri string) (*Channel, error) {
+func GetStreamRequestFromURI(uri string) (*StreamRequest, error) {
 	var err error
 
-	u, err := url.ParseRequestURI(uri)
+	ureq, err := url.ParseRequestURI(uri)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 
-	fmt.Println(u.Scheme)
-	fmt.Println(u.User)
-	fmt.Println(u.RawQuery)
-	fmt.Println(u.Fragment)
-
-	params, _ := url.ParseQuery(u.RawQuery)
-	fmt.Println(params)
-
-	id, err := strconv.Atoi(params["channel"][0])
+	sreq, err := GetStreamRequestFrom(ureq.RawQuery)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 
-	chn := &Channel{
-		Id:   id,
-		Desc: "Sample Channel",
-	}
+	sreq.Desc = uri
 
-	return chn, err
+	return sreq, err
+}
+
+//----------------------------------------------------------------------------------
+// get a new  uuid
+// - http://stackoverflow.com/questions/15130321/is-there-a-method-to-generate-a-uuid-with-go-language
+//----------------------------------------------------------------------------------
+func StdGetUUID() (uid string) {
+	u4, err := uuid.NewV4()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	uid = u4.String()
+	return
+}
+
+func StdParseUUID(uid string) (b []byte) {
+	u, err := uuid.ParseHex(uid)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	copy(b, u[:])
+	return
+}
+
+func PseudoGetUUID() (uid string) {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	uid = fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+	return
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

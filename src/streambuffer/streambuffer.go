@@ -21,16 +21,15 @@ const (
 	TBYTE = 1024 * GBYTE // Tera
 	HBYTE = 1024 * TBYTE // Hexa
 
-	LEN_MAX_SLOT  = MBYTE
+	LEN_MAX_SLOT  = GBYTE
 	NUM_MAX_SLOTS = 512
 )
 
 type StreamSlot struct {
 	sync.Mutex
-	Type      string
-	Length    int
-	LengthMax int
-	Content   []byte
+	Type    string
+	Length  int
+	Content []byte
 }
 
 //----------------------------------------------------------------------------------
@@ -42,20 +41,29 @@ func (ss *StreamSlot) String() string {
 	if strings.Contains(ss.Type, "text/") {
 		str += fmt.Sprintf("Content: %s\t", string(ss.Content[:ss.Length]))
 	} else {
-		str += fmt.Sprintf("Content: %02x\t", ss.Content[0])
+		str += fmt.Sprintf("Content: %02x-%02x\t", ss.Content[0], ss.Content[ss.Length-1])
 	}
 	return str
 }
 
 //----------------------------------------------------------------------------------
-// make a new slot
+// make a new slot of given size
 //----------------------------------------------------------------------------------
-func NewStreamSlot(ctype string, clen int, cdata []byte) *StreamSlot {
+func NewStreamSlotBySize(clen int) *StreamSlot {
 	return &StreamSlot{
-		Type:      ctype,
-		Length:    clen,
-		LengthMax: LEN_MAX_SLOT,
-		Content:   cdata,
+		Length:  clen,
+		Content: make([]byte, clen),
+	}
+}
+
+//----------------------------------------------------------------------------------
+// make a new slot assigned with given data
+//----------------------------------------------------------------------------------
+func NewStreamSlotByData(ctype string, clen int, cdata []byte) *StreamSlot {
+	return &StreamSlot{
+		Type:    ctype,
+		Length:  clen,
+		Content: cdata,
 	}
 }
 
@@ -93,7 +101,7 @@ func (sb *StreamBuffer) String() string {
 //----------------------------------------------------------------------------------
 func NewStreamBuffer(num int, size int) *StreamBuffer {
 	slot := StreamSlot{
-		Type:    "application/octet-stream",
+		//Type:    "application/octet-stream",
 		Length:  size,
 		Content: make([]byte, size),
 	}
@@ -168,20 +176,20 @@ func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
 //----------------------------------------------------------------------------------
 // get the pointer of slot designated and go to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotByPosNext(pos int) (int, *StreamSlot, error) {
+func (sb *StreamBuffer) GetSlotByPosNext(pos int) (*StreamSlot, int, error) {
 	var err error
 
 	pos = pos % sb.Num
 
 	// no data to read
 	if sb.In == pos {
-		return pos, nil, nil
+		return nil, pos, nil
 	}
 
 	slot := &sb.Slots[pos]
 	pos = (pos + 1) % sb.Num
 
-	return pos, slot, err
+	return slot, pos, err
 }
 
 //----------------------------------------------------------------------------------

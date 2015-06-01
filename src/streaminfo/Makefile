@@ -1,5 +1,5 @@
 #
-# Makefile for package
+# Makefile for happy package
 #
 PACKAGE=streaminfo
 
