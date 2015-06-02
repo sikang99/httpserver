@@ -85,7 +85,7 @@ func TestStreamBuffer(t *testing.T) {
 	out, _ = sb.GetSlotOutNext()
 	fmt.Println(out)
 
-	out, _ = sb.GetSlotOutByPos(2)
+	out, _ = sb.GetSlotByPos(2)
 	out.Type = "video/mp4"
 	out.Length = 10
 	fmt.Printf("[%d] ", 2)
@@ -96,7 +96,7 @@ func TestStreamBuffer(t *testing.T) {
 	sb.Resize(4)
 	fmt.Println(sb)
 
-	out, _ = sb.GetSlotOutByPos(3)
+	out, _ = sb.GetSlotByPos(3)
 	fmt.Println(out)
 	fmt.Println(sb)
 }
@@ -122,7 +122,7 @@ func TestStreamRead(t *testing.T) {
 
 	println("Reading ...")
 	for i := 0; i < 20; i++ {
-		out, err := sb.GetSlotOutByPos(i)
+		out, err := sb.GetSlotByPos(i)
 		if err != nil {
 			break
 		}
@@ -165,7 +165,7 @@ func TestStreamReadWrite(t *testing.T) {
 	reader := func(i int) {
 		var pos int
 		for fend == false {
-			out, npos, err := sb.GetSlotOutNextByPos(pos)
+			out, npos, err := sb.GetSlotNextByPos(pos)
 			if out == nil && err == ErrEmpty {
 				time.Sleep(time.Millisecond)
 				continue
@@ -180,19 +180,19 @@ func TestStreamReadWrite(t *testing.T) {
 		for i := 0; i < n; i++ {
 			tn := 100 * i * i * i
 			data := []byte(fmt.Sprintf("saved %d-th data", tn))
+			in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
+			ss, _ := sb.PutSlotInNext(in)
 			/*
-				in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
-				ss, _ := sb.PutSlotInNext(in)
-			*/
-			ss, pos := sb.GetSlotIn()
+				ss, pos := sb.GetSlotIn()
 
-			ss.Type = "text/plain"
-			ss.Length = len(data)
-			copy(ss.Content, data)
+				ss.Type = "text/plain"
+				ss.Length = len(data)
+				copy(ss.Content, data)
+			*/
 
 			fmt.Println("i>", i, ss)
 			fmt.Println(sb)
-			sb.SetPosInByPos(pos + 1)
+			//sb.SetPosInByPos(pos + 1)
 
 			time.Sleep(time.Millisecond)
 		}

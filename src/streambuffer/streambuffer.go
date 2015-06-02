@@ -244,6 +244,18 @@ func (sb *StreamBuffer) GetSlotOut() (*StreamSlot, int) {
 }
 
 //----------------------------------------------------------------------------------
+// get the slot designated
+//----------------------------------------------------------------------------------
+func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
+	var err error
+
+	pos = pos % sb.Num
+	slot := &sb.Slots[pos]
+
+	return slot, err
+}
+
+//----------------------------------------------------------------------------------
 // get the slot to be read and move to the next
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) GetSlotOutNext() (*StreamSlot, error) {
@@ -261,21 +273,9 @@ func (sb *StreamBuffer) GetSlotOutNext() (*StreamSlot, error) {
 }
 
 //----------------------------------------------------------------------------------
-// get the pointer of slot designated
-//----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotOutByPos(pos int) (*StreamSlot, error) {
-	var err error
-
-	pos = pos % sb.Num
-	slot := &sb.Slots[pos]
-
-	return slot, err
-}
-
-//----------------------------------------------------------------------------------
 // get the pointer of slot designated and go to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotOutNextByPos(pos int) (*StreamSlot, int, error) {
+func (sb *StreamBuffer) GetSlotNextByPos(pos int) (*StreamSlot, int, error) {
 	var err error
 
 	pos = pos % sb.Num
