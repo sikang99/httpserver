@@ -92,6 +92,9 @@ rdt:
 rt:
 	curl -I http://localhost:8080/stream
 
+ping:
+	ping -c 3 192.168.0.91
+
 rebuild:
 	rm -f ./$(PROGRAM)
 	go build $(PROGRAM).go
@@ -133,7 +136,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "extend streambuffer package"
+	git commit -m "fix alloc bug for streambuffer"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

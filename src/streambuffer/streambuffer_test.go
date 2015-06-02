@@ -13,7 +13,7 @@ import (
 )
 
 //----------------------------------------------------------------------------------
-// test for slot of stream buffer
+// test for single slot of stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamSlot(t *testing.T) {
 	slot := NewStreamSlotBySize(1024)
@@ -157,6 +157,7 @@ func TestStreamReadWrite(t *testing.T) {
 	// prepare a buffer
 	nb := 5
 	sb := NewStreamBuffer(nb, MBYTE)
+	sb.Desc = "Test buffer"
 
 	var fend bool = false
 
@@ -169,7 +170,7 @@ func TestStreamReadWrite(t *testing.T) {
 				time.Sleep(time.Millisecond)
 				continue
 			}
-			fmt.Println("o>", i, out, pos, npos)
+			//fmt.Println("o>", i, out, pos, npos)
 			pos = npos
 		}
 	}
@@ -177,10 +178,22 @@ func TestStreamReadWrite(t *testing.T) {
 	// define buffer writer
 	writer := func(n int) {
 		for i := 0; i < n; i++ {
-			data := []byte(fmt.Sprintf("save %d-th data", i))
-			in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
-			sb.PutSlotInNext(in)
-			fmt.Println("i>", i, in)
+			tn := 100 * i * i * i
+			data := []byte(fmt.Sprintf("saved %d-th data", tn))
+			/*
+				in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
+				ss, _ := sb.PutSlotInNext(in)
+			*/
+			ss, pos := sb.GetSlotIn()
+
+			ss.Type = "text/plain"
+			ss.Length = len(data)
+			copy(ss.Content, data)
+
+			fmt.Println("i>", i, ss)
+			fmt.Println(sb)
+			sb.SetPosInByPos(pos + 1)
+
 			time.Sleep(time.Millisecond)
 		}
 		fend = true

@@ -433,18 +433,33 @@ func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 
 	// implement like ReadFull() in jpeg.Decode()
 	var tn int
+	/*
+		for tn < nl {
+			n, err := p.Read(ss.Content[tn:])
+			if err != nil {
+				log.Println(err)
+				return err
+			}
+			tn += n
+		}
+	*/
+	data := make([]byte, nl)
 	for tn < nl {
-		n, err := p.Read(ss.Content[tn:])
+		n, err := p.Read(data[tn:])
 		if err != nil {
 			log.Println(err)
 			return err
 		}
 		tn += n
 	}
+	//
+	copy(ss.Content, data)
+	//ss.Content = data
+	//println(len(ss.Content), cap(ss.Content))
 
-	ss.Type = p.Header.Get("Content-Type")
 	ss.Length = nl
-	fmt.Println(ss)
+	ss.Type = p.Header.Get("Content-Type")
+	//fmt.Println(ss)
 
 	return err
 }
@@ -456,23 +471,25 @@ func recvMultipartToStreamBuffer(r *multipart.Reader) error {
 	var err error
 
 	// prepare a stream ring buffer
-	nb := 5
+	nb := 3
 	sbuf := sb.NewStreamBuffer(nb, MBYTE)
+	sbuf.Desc = "AXIS Camera"
 
 	// insert slots to the buffer
 	for i := 0; true; i++ {
-		if i%nb == 0 {
-			fmt.Println(sbuf)
-			//break
-		}
+		pre, pos := sbuf.ReadSlotIn()
+		fmt.Println("P", pos, pre)
 
-		slot, pos := sbuf.GetSlotOut()
+		slot, pos := sbuf.GetSlotIn()
+		fmt.Println("A", pos, slot)
 
 		err = recvPartToSlot(r, slot)
 		if err != nil {
 			log.Println(err)
 			break
 		}
+		fmt.Println("B", pos, slot)
+		//fmt.Println(sbuf)
 
 		sbuf.SetPosInByPos(pos + 1)
 	}

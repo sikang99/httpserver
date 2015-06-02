@@ -43,17 +43,19 @@ type StreamSlot struct {
 }
 
 //----------------------------------------------------------------------------------
-// string information for the slot
+// string information for the single slot
 //----------------------------------------------------------------------------------
 func (ss *StreamSlot) String() string {
 	str := fmt.Sprintf("\tType: %s", ss.Type)
-	str += fmt.Sprintf("\tLength: %d/%d", ss.Length, ss.LengthMax)
+	str += fmt.Sprintf("\tLength: %d/%d(%d)", ss.Length, ss.LengthMax, len(ss.Content))
 	str += fmt.Sprintf("\tContent: ")
 	if ss.Length > 0 {
 		if strings.Contains(ss.Type, "text/") {
-			str += fmt.Sprintf("%s", string(ss.Content[:ss.Length]))
+			//str += fmt.Sprintf("%s [%0x]", string(ss.Content[:ss.Length]), ss.Content[ss.Length-1])
+			str += fmt.Sprintf("%s [%0x:%0x]", string(ss.Content[:ss.Length]), ss.Content[ss.Length-1], ss.Content[ss.Length])
 		} else {
-			str += fmt.Sprintf("%02x-%02x", ss.Content[0], ss.Content[ss.Length-1])
+			str += fmt.Sprintf("[%0x%0x-%0x%0x]", ss.Content[0], ss.Content[1], ss.Content[ss.Length-2], ss.Content[ss.Length-1])
+			//str += fmt.Sprintf("[%0x%0x-%0x%0x:%0x]", ss.Content[0], ss.Content[1], ss.Content[ss.Length-2], ss.Content[ss.Length-1], ss.Content[ss.Length])
 		}
 	}
 	return str
@@ -97,7 +99,7 @@ func NewStreamSlotByData(cmax int, ctype string, clen int, cdata []byte) *Stream
 }
 
 //----------------------------------------------------------------------------------
-// get major and sub type from media type of mime
+// check media type, its major and sub type of content
 //----------------------------------------------------------------------------------
 func (ss *StreamSlot) IsType(ctype string) bool {
 	mt, _, _ := mime.ParseMediaType(ss.Type)
@@ -153,26 +155,35 @@ func (sb *StreamBuffer) String() string {
 	str += fmt.Sprintf("\tDesc: %s\n", sb.Desc)
 
 	for i := 0; i < sb.Num; i++ {
-		str += fmt.Sprintf("\t[%d] %s\n", i, &sb.Slots[i])
+		str += fmt.Sprintf("\t[%d] %s\n", i, sb.Slots[i].String())
 	}
 
 	return str
 }
 
 //----------------------------------------------------------------------------------
-// make a new stream ring buffer
+// make a new circular stream buffer
 //----------------------------------------------------------------------------------
 func NewStreamBuffer(num int, size int) *StreamBuffer {
-	slot := StreamSlot{
-		//Type:    "application/octet-stream",
-		Length:    0,
-		LengthMax: size,
-		Content:   make([]byte, size),
-	}
+	/*
+		// buggy method
+		slot := StreamSlot{
+			//Type:    "application/octet-stream",
+			Length:    0,
+			LengthMax: size,
+			Content:   make([]byte, size),
+		}
 
-	var slots []StreamSlot
+			var slots []StreamSlot
+			for i := 0; i < num; i++ {
+				slots = append(slots, slot)
+			}
+	*/
+
+	slots := make([]StreamSlot, num)
 	for i := 0; i < num; i++ {
-		slots = append(slots, slot)
+		slots[i].Content = make([]byte, size)
+		slots[i].LengthMax = size
 	}
 
 	return &StreamBuffer{
@@ -180,7 +191,7 @@ func NewStreamBuffer(num int, size int) *StreamBuffer {
 		Num:   num, NumMax: num,
 		Size: size,
 		In:   0, Out: 0,
-		Desc: "Null data",
+		Desc: "New empty buffer",
 	}
 }
 
@@ -205,6 +216,17 @@ func (sb *StreamBuffer) SetPosInByPos(pos int) int {
 
 func (sb *StreamBuffer) SetPosOutByPos(pos int) int {
 	sb.Out = (pos % sb.Num)
+	return sb.Out
+}
+
+//----------------------------------------------------------------------------------
+// get the current position of slot to read and write
+//----------------------------------------------------------------------------------
+func (sb *StreamBuffer) GetPosIn() int {
+	return sb.In
+}
+
+func (sb *StreamBuffer) GetPosOut() int {
 	return sb.Out
 }
 
@@ -354,6 +376,15 @@ func (sb *StreamBuffer) Resize(num int) error {
 	sb.Num = num
 
 	return err
+}
+
+//----------------------------------------------------------------------------------
+// change the size of buffer, i.e, the number of slots
+//----------------------------------------------------------------------------------
+func (sb *StreamBuffer) ReadSlotIn() (*StreamSlot, int) {
+	in := &sb.Slots[sb.In]
+	slot := NewStreamSlotByData(sb.Size, in.Type, in.Length, in.Content)
+	return slot, sb.In
 }
 
 // ---------------------------------E-----N-----D-----------------------------------
