@@ -1,5 +1,7 @@
 //==================================================================================
 // Info
+// - https://github.com/nu7hatch/gouuid - Go binding for libuuid
+// - https://github.com/sony/sonyflake - A distributed unique ID generator inspired by Twitter's Snowflake
 //==================================================================================
 
 package streaminfo
@@ -47,11 +49,11 @@ func (chn *Channel) GetId() int {
 
 //----------------------------------------------------------------------------------
 type StreamRequest struct {
-	Channel int
-	Source  int
-	When    time.Time // access time
-	Who     string    // string for hostname:port
-	Desc    string
+	Channel   int
+	Source    int
+	StartTime time.Time // access time
+	Who       string    // string for hostname:port
+	Desc      string
 }
 
 //----------------------------------------------------------------------------------
@@ -62,7 +64,7 @@ func (sr *StreamRequest) String() string {
 	str += fmt.Sprintf("\tChannel: %d", sr.Channel)
 	str += fmt.Sprintf("\tSource: %d", sr.Source)
 	str += fmt.Sprintf("\tWho: %s\n", sr.Who)
-	str += fmt.Sprintf("\tWhen: %s", sr.When)
+	str += fmt.Sprintf("\tStartAt: %s", sr.StartTime)
 	str += fmt.Sprintf("\tDesciption: %s\n", sr.Desc)
 	return str
 }
@@ -93,9 +95,9 @@ func GetStreamRequestFrom(str string) (*StreamRequest, error) {
 	}
 
 	sreq := &StreamRequest{
-		Channel: chn,
-		Source:  src,
-		When:    time.Now(),
+		Channel:   chn,
+		Source:    src,
+		StartTime: time.Now(),
 	}
 	//fmt.Println(sreq)
 
