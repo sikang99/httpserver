@@ -371,8 +371,8 @@ func ActHttpReader(url string) {
 
 	mr := multipart.NewReader(res.Body, boundary)
 
-	recvMultipartToBuffer(mr)
-	//recvMultipartToStreamBuffer(mr)
+	//recvMultipartToBuffer(mr)
+	recvMultipartToStreamBuffer(mr)
 }
 
 //---------------------------------------------------------------------------
@@ -415,7 +415,7 @@ func recvPartToBuffer(r *multipart.Reader) ([]byte, error) {
 //---------------------------------------------------------------------------
 //	receive a part to buffer
 //----------------------------------------s-----------------------------------
-func recvPartToSlot(r *multipart.Reader, s *sb.StreamSlot) error {
+func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 	var err error
 
 	p, err := r.NextPart()
@@ -434,7 +434,7 @@ func recvPartToSlot(r *multipart.Reader, s *sb.StreamSlot) error {
 	// implement like ReadFull() in jpeg.Decode()
 	var tn int
 	for tn < nl {
-		n, err := p.Read(sb.Content[tn:])
+		n, err := p.Read(ss.Content[tn:])
 		if err != nil {
 			log.Println(err)
 			return err
@@ -444,7 +444,7 @@ func recvPartToSlot(r *multipart.Reader, s *sb.StreamSlot) error {
 
 	ss.Type = p.Header.Get("Content-Type")
 	ss.Length = nl
-	fmt.Printf(ss)
+	fmt.Println(ss)
 
 	return err
 }
@@ -463,14 +463,18 @@ func recvMultipartToStreamBuffer(r *multipart.Reader) error {
 	for i := 0; true; i++ {
 		if i%nb == 0 {
 			fmt.Println(sbuf)
+			//break
+		}
+
+		slot, pos := sbuf.GetSlotOut()
+
+		err = recvPartToSlot(r, slot)
+		if err != nil {
+			log.Println(err)
 			break
 		}
 
-		err := recvPartToSlot(r)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
+		sbuf.SetPosInByPos(pos + 1)
 	}
 
 	return err

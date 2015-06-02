@@ -8,7 +8,9 @@
 package streambuffer
 
 import (
+	"errors"
 	"fmt"
+	"mime"
 	"strings"
 	"sync"
 )
@@ -21,8 +23,15 @@ const (
 	TBYTE = 1024 * GBYTE // Tera
 	HBYTE = 1024 * TBYTE // Hexa
 
+	LEN_DEF_SLOT  = MBYTE
 	LEN_MAX_SLOT  = GBYTE
-	NUM_MAX_SLOTS = 512
+	NUM_DEF_SLOTS = 30 // 30fps
+	NUM_MAX_SLOTS = 1024
+)
+
+var (
+	ErrEmpty = errors.New("empty")
+	Errfull  = errors.New("full")
 )
 
 type StreamSlot struct {
@@ -51,26 +60,74 @@ func (ss *StreamSlot) String() string {
 }
 
 //----------------------------------------------------------------------------------
-// make a new slot of given size
+// make a new slot of given max size
 //----------------------------------------------------------------------------------
-func NewStreamSlotBySize(clen int) *StreamSlot {
+func NewStreamSlot() *StreamSlot {
 	return &StreamSlot{
+		Length:    LEN_DEF_SLOT,
+		LengthMax: LEN_DEF_SLOT,
+		Content:   make([]byte, LEN_DEF_SLOT),
+	}
+}
+
+func NewStreamSlotBySize(cmax int) *StreamSlot {
+	return &StreamSlot{
+		Length:    cmax,
+		LengthMax: cmax,
+		Content:   make([]byte, cmax),
+	}
+}
+
+func NewStreamSlotBySlot(cmax int, in *StreamSlot) *StreamSlot {
+	return &StreamSlot{
+		Type:      in.Type,
+		Length:    in.Length,
+		LengthMax: cmax,
+		Content:   in.Content,
+	}
+}
+
+func NewStreamSlotByData(cmax int, ctype string, clen int, cdata []byte) *StreamSlot {
+	return &StreamSlot{
+		Type:      ctype,
 		Length:    clen,
-		LengthMax: clen,
-		Content:   make([]byte, clen),
+		LengthMax: cmax,
+		Content:   cdata,
 	}
 }
 
 //----------------------------------------------------------------------------------
-// make a new slot assigned with given data
+// get major and sub type from media type of mime
 //----------------------------------------------------------------------------------
-func NewStreamSlotByData(ctype string, clen int, cdata []byte) *StreamSlot {
-	return &StreamSlot{
-		Type:      ctype,
-		Length:    clen,
-		LengthMax: clen,
-		Content:   cdata,
+func (ss *StreamSlot) IsType(ctype string) bool {
+	mt, _, _ := mime.ParseMediaType(ss.Type)
+	return strings.EqualFold(mt, ctype)
+}
+
+func (ss *StreamSlot) IsMajorType(ctype string) bool {
+	var res bool
+
+	mt, _, _ := mime.ParseMediaType(ss.Type)
+	st := strings.Split(mt, "/")
+	if len(st) > 0 {
+		mt, ctype = strings.ToUpper(st[0]), strings.ToUpper(ctype)
+		res = strings.Contains(mt, ctype)
 	}
+
+	return res
+}
+
+func (ss *StreamSlot) IsSubType(ctype string) bool {
+	var res bool
+
+	mt, _, _ := mime.ParseMediaType(ss.Type)
+	st := strings.Split(mt, "/")
+	if len(st) > 1 {
+		mt, ctype = strings.ToUpper(st[1]), strings.ToUpper(ctype)
+		res = strings.Contains(mt, ctype)
+	}
+
+	return res
 }
 
 //----------------------------------------------------------------------------------
@@ -108,7 +165,7 @@ func (sb *StreamBuffer) String() string {
 func NewStreamBuffer(num int, size int) *StreamBuffer {
 	slot := StreamSlot{
 		//Type:    "application/octet-stream",
-		Length:    size,
+		Length:    0,
 		LengthMax: size,
 		Content:   make([]byte, size),
 	}
@@ -141,25 +198,38 @@ func (sb *StreamBuffer) Cap() int {
 //----------------------------------------------------------------------------------
 // set the position of slot to be read and written
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) SetPosIn(pos int) int {
+func (sb *StreamBuffer) SetPosInByPos(pos int) int {
 	sb.In = (pos % sb.Num)
 	return sb.In
 }
 
-func (sb *StreamBuffer) SetPosOut(pos int) int {
+func (sb *StreamBuffer) SetPosOutByPos(pos int) int {
 	sb.Out = (pos % sb.Num)
 	return sb.Out
 }
 
 //----------------------------------------------------------------------------------
-// get the pointer of slot to be read and move to the next
+// get the current slot to read and write
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotNext() (*StreamSlot, error) {
+func (sb *StreamBuffer) GetSlotIn() (*StreamSlot, int) {
+	slot := &sb.Slots[sb.In]
+	return slot, sb.In
+}
+
+func (sb *StreamBuffer) GetSlotOut() (*StreamSlot, int) {
+	slot := &sb.Slots[sb.Out]
+	return slot, sb.Out
+}
+
+//----------------------------------------------------------------------------------
+// get the slot to be read and move to the next
+//----------------------------------------------------------------------------------
+func (sb *StreamBuffer) GetSlotOutNext() (*StreamSlot, error) {
 	var err error
 
 	// no data to read
 	if sb.In == sb.Out {
-		return nil, nil
+		return nil, ErrEmpty
 	}
 
 	slot := &sb.Slots[sb.Out]
@@ -171,7 +241,7 @@ func (sb *StreamBuffer) GetSlotNext() (*StreamSlot, error) {
 //----------------------------------------------------------------------------------
 // get the pointer of slot designated
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
+func (sb *StreamBuffer) GetSlotOutByPos(pos int) (*StreamSlot, error) {
 	var err error
 
 	pos = pos % sb.Num
@@ -183,14 +253,14 @@ func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
 //----------------------------------------------------------------------------------
 // get the pointer of slot designated and go to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotByPosNext(pos int) (*StreamSlot, int, error) {
+func (sb *StreamBuffer) GetSlotOutNextByPos(pos int) (*StreamSlot, int, error) {
 	var err error
 
 	pos = pos % sb.Num
 
 	// no data to read
 	if sb.In == pos {
-		return nil, pos, nil
+		return nil, pos, ErrEmpty
 	}
 
 	slot := &sb.Slots[pos]
@@ -202,7 +272,7 @@ func (sb *StreamBuffer) GetSlotByPosNext(pos int) (*StreamSlot, int, error) {
 //----------------------------------------------------------------------------------
 // write the information to the slot and go to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) PutSlotNext(slot *StreamSlot) (*StreamSlot, error) {
+func (sb *StreamBuffer) PutSlotInNext(slot *StreamSlot) (*StreamSlot, error) {
 	sb.Lock()
 	defer sb.Unlock()
 
@@ -214,7 +284,6 @@ func (sb *StreamBuffer) PutSlotNext(slot *StreamSlot) (*StreamSlot, error) {
 
 	st := &sb.Slots[sb.In]
 
-	//*st = *slot	// CAUTION: Don't copy slot.LengthMax
 	st.Type = slot.Type
 	st.Length = slot.Length
 	copy(st.Content, slot.Content)
@@ -227,7 +296,7 @@ func (sb *StreamBuffer) PutSlotNext(slot *StreamSlot) (*StreamSlot, error) {
 //----------------------------------------------------------------------------------
 // write the information to the slot designated
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) PutSlotByPos(slot *StreamSlot, pos int) (*StreamSlot, error) {
+func (sb *StreamBuffer) PutSlotInByPos(slot *StreamSlot, pos int) (*StreamSlot, error) {
 	sb.Lock()
 	defer sb.Unlock()
 
@@ -235,7 +304,10 @@ func (sb *StreamBuffer) PutSlotByPos(slot *StreamSlot, pos int) (*StreamSlot, er
 
 	pos = (pos % sb.Num)
 	st := &sb.Slots[pos]
-	*st = *slot
+
+	st.Type = slot.Type
+	st.Length = slot.Length
+	copy(st.Content, slot.Content)
 
 	return slot, err
 }
