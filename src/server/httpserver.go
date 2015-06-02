@@ -441,21 +441,6 @@ func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 		}
 		tn += n
 	}
-	/*
-		data := make([]byte, nl)
-		for tn < nl {
-			n, err := p.Read(data[tn:])
-			if err != nil {
-				log.Println(err)
-				return err
-			}
-			tn += n
-		}
-		//
-		copy(ss.Content, data)
-		//ss.Content = data
-		//println(len(ss.Content), cap(ss.Content))
-	*/
 
 	ss.Length = nl
 	ss.Type = p.Header.Get("Content-Type")
@@ -470,10 +455,8 @@ func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 func recvMultipartToStreamBuffer(r *multipart.Reader) error {
 	var err error
 
-	// prepare a stream ring buffer
-	nb := 5
-	sbuf := sb.NewStreamBuffer(nb, MBYTE)
-	sbuf.Desc = "AXIS Camera"
+	sbuf := prepareStreamBuffer(5)
+	//sbuf := conf.Ring
 
 	// insert slots to the buffer
 	for i := 0; true; i++ {
@@ -489,7 +472,6 @@ func recvMultipartToStreamBuffer(r *multipart.Reader) error {
 			break
 		}
 		fmt.Println(i, pos, slot)
-		//fmt.Println(sbuf)
 
 		sbuf.SetPosInByPos(pos + 1)
 	}
@@ -555,10 +537,24 @@ func recvMultipartDecodeJpeg(r *multipart.Reader) {
 }
 
 //---------------------------------------------------------------------------
+// prepare a stream buffer
+//---------------------------------------------------------------------------
+func prepareStreamBuffer(nb int) *sb.StreamBuffer {
+
+	sbuf := sb.NewStreamBuffer(nb, MBYTE)
+	sbuf.Desc = "AXIS Camera"
+	fmt.Println(sbuf)
+
+	return sbuf
+}
+
+//---------------------------------------------------------------------------
 // http server entry
 //---------------------------------------------------------------------------
 func ActHttpServer() error {
 	log.Println("Happy Media Server")
+
+	conf.Ring = prepareStreamBuffer(3)
 
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)   // view
@@ -781,7 +777,7 @@ func sendPage(w http.ResponseWriter, page string) error {
 }
 
 //---------------------------------------------------------------------------
-// send files with the given format(extension) in the directory
+// send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
 func sendStreamImage(w io.Writer, dtype string, loop bool) error {
 	var err error
@@ -798,6 +794,34 @@ func sendStreamImage(w io.Writer, dtype string, loop bool) error {
 		if !loop {
 			break
 		}
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send image stream with the given format(extension) in the directory
+//---------------------------------------------------------------------------
+func sendStreamBuffer(w io.Writer) error {
+	var err error
+
+	sbuf := conf.Ring
+
+	var pos int
+	for {
+		slot, npos, err := sbuf.GetSlotNextByPos(pos)
+		if slot == nil && err == sb.ErrEmpty {
+			time.Sleep(time.Millisecond)
+			continue
+		}
+
+		err = sendPartSlot(w, slot)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		pos = npos
 	}
 
 	return err
@@ -876,9 +900,10 @@ func sendPartFile(w io.Writer, file string) error {
 }
 
 //---------------------------------------------------------------------------
-// send any file in multipart format with boundary (standard style)
+// send image in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
 func sendPartImage(w io.Writer, dtype string) error {
+	var err error
 
 	//img := si.GenSpiralImage(1080, 768)
 	//img := si.GenClockImage(800)
@@ -904,8 +929,32 @@ func sendPartImage(w io.Writer, dtype string) error {
 	}
 
 	buf := new(bytes.Buffer)
-	buf.Write(data)   // prepare data in the buffer
-	buf.WriteTo(part) // output the part with buffer in multipart format
+	buf.Write(data)
+	buf.WriteTo(part)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send slot in multipart format with boundary (standard style)
+//---------------------------------------------------------------------------
+func sendPartSlot(w io.Writer, ss *sb.StreamSlot) error {
+	var err error
+
+	mw := multipart.NewWriter(w)
+	mw.SetBoundary("myboundary")
+	part, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":   {ss.Type},
+		"Content-Length": {strconv.Itoa(ss.Length)},
+	})
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	buf.Write(ss.Content[:ss.Length])
+	buf.WriteTo(part)
 
 	return err
 }
@@ -1006,7 +1055,8 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//err = sendStreamDir(w, "./static/image/*.jpg", true)
-		err = sendStreamImage(w, "jpg", true)
+		//err = sendStreamImage(w, "jpg", true)
+		err = sendStreamBuffer(w)
 		if err != nil {
 			log.Println(err)
 			break
