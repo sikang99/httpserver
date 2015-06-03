@@ -29,9 +29,15 @@ const (
 	NUM_MAX_SLOTS = 1024
 )
 
+const (
+	STATUS_IDLE = iota
+	STATUS_USING
+)
+
 var (
-	ErrEmpty = errors.New("empty")
-	Errfull  = errors.New("full")
+	ErrEmpty  = errors.New("empty")
+	ErrFull   = errors.New("full")
+	ErrStatus = errors.New("invalid status")
 )
 
 type StreamSlot struct {
@@ -51,11 +57,9 @@ func (ss *StreamSlot) String() string {
 	str += fmt.Sprintf("\tContent: ")
 	if ss.Length > 0 {
 		if strings.Contains(ss.Type, "text/") {
-			//str += fmt.Sprintf("%s [%0x]", string(ss.Content[:ss.Length]), ss.Content[ss.Length-1])
 			str += fmt.Sprintf("%s [%0x:%0x]", string(ss.Content[:ss.Length]), ss.Content[ss.Length-1], ss.Content[ss.Length])
 		} else {
 			str += fmt.Sprintf("[%0x%0x-%0x%0x]", ss.Content[0], ss.Content[1], ss.Content[ss.Length-2], ss.Content[ss.Length-1])
-			//str += fmt.Sprintf("[%0x%0x-%0x%0x:%0x]", ss.Content[0], ss.Content[1], ss.Content[ss.Length-2], ss.Content[ss.Length-1], ss.Content[ss.Length])
 		}
 	}
 	return str
@@ -150,6 +154,7 @@ type StreamBuffer struct {
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) String() string {
 	str := fmt.Sprintf("[StreamBuffer]")
+	str += fmt.Sprintf("\tStatus: %d", sb.Status)
 	str += fmt.Sprintf("\tPos: %d,%d", sb.In, sb.Out)
 	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sb.Num, sb.NumMax, sb.Size/KBYTE)
 	str += fmt.Sprintf("\tDesc: %s\n", sb.Desc)
@@ -187,8 +192,9 @@ func NewStreamBuffer(num int, size int) *StreamBuffer {
 	}
 
 	return &StreamBuffer{
-		Slots: slots,
-		Num:   num, NumMax: num,
+		Slots:  slots,
+		Status: STATUS_IDLE,
+		Num:    num, NumMax: num,
 		Size: size,
 		In:   0, Out: 0,
 		Desc: "New empty buffer",
@@ -204,6 +210,44 @@ func (sb *StreamBuffer) Len() int {
 
 func (sb *StreamBuffer) Cap() int {
 	return sb.NumMax
+}
+
+//----------------------------------------------------------------------------------
+// set status of buffer
+//----------------------------------------------------------------------------------
+func (sb *StreamBuffer) SetStatus(status int) int {
+	sb.Status = status
+	return sb.Status
+}
+
+func (sb *StreamBuffer) SetStatusUsing() error {
+	var err error
+	if sb.Status != STATUS_IDLE {
+		return ErrStatus
+	}
+	sb.Status = STATUS_USING
+	return err
+}
+
+func (sb *StreamBuffer) SetStatusIdle() error {
+	var err error
+	if sb.Status != STATUS_USING {
+		return ErrStatus
+	}
+	sb.Status = STATUS_IDLE
+	return err
+}
+
+func (sb *StreamBuffer) GetStatus() int {
+	return sb.Status
+}
+
+func (sb *StreamBuffer) IsUsing() bool {
+	return sb.Status == STATUS_USING
+}
+
+func (sb *StreamBuffer) IsIdle() bool {
+	return sb.Status == STATUS_IDLE
 }
 
 //----------------------------------------------------------------------------------
@@ -335,7 +379,7 @@ func (sb *StreamBuffer) PutSlotInByPos(slot *StreamSlot, pos int) (*StreamSlot, 
 }
 
 //----------------------------------------------------------------------------------
-// clear the stream buffer
+// reset(clear) the stream buffer
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) Reset() {
 	sb.Lock()
@@ -346,7 +390,11 @@ func (sb *StreamBuffer) Reset() {
 		sb.Slots[i].Length = 0
 	}
 
+	sb.In = 0
+	sb.Out = 0
 	sb.Num = sb.NumMax
+	sb.Status = STATUS_IDLE
+	sb.Desc = "Buffer is reset"
 }
 
 //----------------------------------------------------------------------------------

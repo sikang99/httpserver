@@ -821,6 +821,10 @@ func sendStreamBuffer(w io.Writer) error {
 
 	sbuf := conf.Ring
 
+	if !sbuf.IsUsing() {
+		return sb.ErrStatus
+	}
+
 	var pos int
 	for {
 		slot, npos, err := sbuf.GetSlotNextByPos(pos)
@@ -894,6 +898,11 @@ func readDirToStreamBuffer(pat string, loop bool) error {
 
 	// use server stream buffer
 	sbuf := conf.Ring
+
+	err = sbuf.SetStatusUsing()
+	if err != nil {
+		return sb.ErrStatus
+	}
 
 	for {
 		for i := range files {
@@ -1776,7 +1785,7 @@ func WsSendMultipartFiles(ws *websocket.Conn, pattern string) error {
 			ctype = http.DetectContentType(fdata)
 		}
 
-		err = WsSendPart(mw, fdata, len(fdata), ctype)
+		err = WsSendPartData(mw, fdata, len(fdata), ctype)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -1797,7 +1806,7 @@ func WsRecvMultipart(ws *websocket.Conn, boundary string) error {
 	mr := multipart.NewReader(ws, boundary)
 
 	for {
-		err = WsRecvPart(mr)
+		err = WsRecvPartToData(mr)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -1810,7 +1819,7 @@ func WsRecvMultipart(ws *websocket.Conn, boundary string) error {
 //---------------------------------------------------------------------------
 // WebSocket send a part of multipart
 //---------------------------------------------------------------------------
-func WsSendPart(mw *multipart.Writer, data []byte, dsize int, dtype string) error {
+func WsSendPartData(mw *multipart.Writer, data []byte, dsize int, dtype string) error {
 	var err error
 
 	buf := new(bytes.Buffer)
@@ -1833,7 +1842,7 @@ func WsSendPart(mw *multipart.Writer, data []byte, dsize int, dtype string) erro
 //---------------------------------------------------------------------------
 // WebSocket recv a part of multipart
 //---------------------------------------------------------------------------
-func WsRecvPart(mr *multipart.Reader) error {
+func WsRecvPartToData(mr *multipart.Reader) error {
 	var err error
 
 	p, err := mr.NextPart()

@@ -188,8 +188,17 @@ func TestStreamRead(t *testing.T) {
 // test for continuous write from stream buffer
 //----------------------------------------------------------------------------------
 func TestStreamWrite(t *testing.T) {
+	var err error
+
 	nb := 5
 	sb := NewStreamBuffer(nb, MBYTE)
+	fmt.Println(sb)
+
+	err = sb.SetStatusUsing()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	sb.Desc = "Testing ..."
 
 	for i := 1; i < 50; i++ {
 		data := []byte(fmt.Sprintf("count %d", i))
@@ -197,6 +206,17 @@ func TestStreamWrite(t *testing.T) {
 		sb.PutSlotInNext(in)
 	}
 	fmt.Println(sb)
+
+	if !sb.IsUsing() {
+		log.Fatalln(err)
+	}
+
+	sb.Reset()
+	fmt.Println(sb)
+
+	if sb.GetStatus() != STATUS_IDLE {
+		log.Fatalln(err)
+	}
 }
 
 //----------------------------------------------------------------------------------
@@ -210,7 +230,7 @@ func TestStreamReadWrite(t *testing.T) {
 
 	var fend bool = false
 
-	// define buffer reader
+	// define buffer reader()
 	reader := func(i int) {
 		var pos int
 		for fend == false {
@@ -224,7 +244,7 @@ func TestStreamReadWrite(t *testing.T) {
 		}
 	}
 
-	// define buffer writer
+	// define buffer writer()
 	writer := func(n int) {
 		for i := 0; i < n; i++ {
 			tn := 100 * i * i * i
