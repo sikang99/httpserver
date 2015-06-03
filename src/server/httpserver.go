@@ -385,7 +385,7 @@ func ActHttpReader(url string) {
 func ActFileReader() {
 	log.Printf("Happy Media File Reader\n")
 
-	readDirToStreamBuffer("./static/image/*.jpg", false)
+	readDirToStreamBuffer("./static/image/*.jpg", true)
 	fmt.Println(conf.Ring)
 }
 
@@ -602,6 +602,8 @@ func ActHttpServer() error {
 		// WSS server
 		go serveWss(&wg)
 	*/
+
+	go ActFileReader()
 
 	wg.Wait()
 
