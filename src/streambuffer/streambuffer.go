@@ -1,5 +1,7 @@
 //==================================================================================
 // Circular Stream Buffer
+// Author : Stoney Kang, sikang99@gmail.com
+//
 // - https://github.com/zfjagann/golang-ring
 // - https://github.com/glycerine/rbuf
 // - http://blog.pivotal.io/labs/labs/a-concurrent-ring-buffer-for-go
@@ -427,7 +429,7 @@ func (sb *StreamBuffer) Resize(num int) error {
 }
 
 //----------------------------------------------------------------------------------
-// change the size of buffer, i.e, the number of slots
+// read out the slot to new one
 //----------------------------------------------------------------------------------
 func (sb *StreamBuffer) ReadSlotIn() (*StreamSlot, int) {
 	in := &sb.Slots[sb.In]

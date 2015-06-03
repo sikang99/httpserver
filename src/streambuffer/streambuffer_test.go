@@ -1,6 +1,8 @@
 //==================================================================================
 // Test for stream buffer for multipart media
+// Author : Stoney Kang, sikang99@gmail.com
 //==================================================================================
+
 package streambuffer
 
 import (

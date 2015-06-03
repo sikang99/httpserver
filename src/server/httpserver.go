@@ -1,6 +1,8 @@
-// ---------------------------------------------------------------------------------
+//=================================================================================
+// Happy Media System
 // one program including agents such as caster, server, player, monitor
-// ---------------------------------------------------------------------------------
+// Author : Stoney Kang, sikang99@gmail.com
+//=================================================================================
 package main
 
 import (
@@ -1844,21 +1846,6 @@ func WsSendPartData(mw *multipart.Writer, data []byte, dsize int, dtype string) 
 //---------------------------------------------------------------------------
 func WsRecvPartToData(mr *multipart.Reader) error {
 	var err error
-
-	/*
-		p, err := mr.NextPart()
-		if err != nil { // io.EOF
-			log.Println(err)
-			return err
-		}
-
-		sl := p.Header.Get("Content-Length")
-		nl, err := strconv.Atoi(sl)
-		if err != nil {
-			log.Printf("%s %s -> %d\n", p.Header, sl, nl)
-			return err
-		}
-	*/
 
 	p, nl, err := ReadPartHeader(mr)
 	if err != nil {
