@@ -139,7 +139,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "add file reader to put files into the buffer"
+	git commit -m "modify part handling of multipart"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

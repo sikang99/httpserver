@@ -200,7 +200,7 @@ func main() {
 	case "filer":
 		ActFileReader()
 	default:
-		fmt.Println("Unknown mode")
+		fmt.Println("Unknown working mode")
 		os.Exit(0)
 	}
 }
@@ -1845,22 +1845,67 @@ func WsSendPartData(mw *multipart.Writer, data []byte, dsize int, dtype string) 
 func WsRecvPartToData(mr *multipart.Reader) error {
 	var err error
 
+	/*
+		p, err := mr.NextPart()
+		if err != nil { // io.EOF
+			log.Println(err)
+			return err
+		}
+
+		sl := p.Header.Get("Content-Length")
+		nl, err := strconv.Atoi(sl)
+		if err != nil {
+			log.Printf("%s %s -> %d\n", p.Header, sl, nl)
+			return err
+		}
+	*/
+
+	p, nl, err := ReadPartHeader(mr)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	data := make([]byte, nl)
+
+	err = ReadPartBodyToData(p, nl, data)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	fmt.Printf("%d [%0x-%0x]\n", nl, data[2], data[nl-2:])
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read a part header and parse it
+//---------------------------------------------------------------------------
+func ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
+	var err error
+
 	p, err := mr.NextPart()
 	if err != nil { // io.EOF
 		log.Println(err)
-		return err
+		return p, 0, err
 	}
 
 	sl := p.Header.Get("Content-Length")
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s -> %d\n", p.Header, sl, nl)
-		return err
+		return p, nl, err
 	}
 
-	data := make([]byte, nl)
+	return p, nl, err
+}
 
-	// implement like ReadFull() in jpeg.Decode()
+//---------------------------------------------------------------------------
+// read a part body to data
+//---------------------------------------------------------------------------
+func ReadPartBodyToData(p *multipart.Part, nl int, data []byte) error {
+	var err error
+
 	var tn int
 	for tn < nl {
 		n, err := p.Read(data[tn:])
@@ -1871,8 +1916,28 @@ func WsRecvPartToData(mr *multipart.Reader) error {
 		tn += n
 	}
 
-	//t.assert(nl == tn)
-	fmt.Printf("%7s ->  %7d/%7d [%0x - %0x]\n", sl, nl, tn, data[2], data[nl-2:])
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read a part body to slot
+//---------------------------------------------------------------------------
+func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sb.StreamSlot) error {
+	var err error
+
+	ss.Length = 0
+
+	var tn int
+	for tn < nl {
+		n, err := p.Read(ss.Content[tn:])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		tn += n
+	}
+
+	ss.Length = nl
 
 	return err
 }
