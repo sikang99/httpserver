@@ -11,8 +11,14 @@ edit e:
 et:
 	vi $(PACKAGE)_test.go
 
+eb:
+	vi $(PACKAGE)_bench.go
+
 build b:
 	go build
+
+bench tb:
+	go test -bench=.
 
 test t:
 	go test -v

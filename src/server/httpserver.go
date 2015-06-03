@@ -82,7 +82,7 @@ var hello_tmpl = `<!DOCTYPE html>
 
 //---------------------------------------------------------------------------
 const (
-	Version   = "0.4.5"
+	Version   = "0.5.7"
 	TCPClient = "Happy Media TCP Server"
 	TCPServer = "Happy Media TCP Server"
 	WSClient  = "Happy Media WS Server"
@@ -175,6 +175,8 @@ func main() {
 	// determine the working type of the program
 	fmt.Printf("Working mode: %s\n", *fmode)
 
+	conf.Ring = prepareStreamBuffer(3, MBYTE, "Server stream")
+
 	// let's do working mode
 	switch *fmode {
 	case "reader":
@@ -195,6 +197,8 @@ func main() {
 		ActWsShooter(*fhost, *fport)
 	case "catcher":
 		ActWsCatcher(*fport)
+	case "filer":
+		ActFileReader()
 	default:
 		fmt.Println("Unknown mode")
 		os.Exit(0)
@@ -371,14 +375,24 @@ func ActHttpReader(url string) {
 
 	mr := multipart.NewReader(res.Body, boundary)
 
-	//recvMultipartToBuffer(mr)
+	//recvMultipartToData(mr)
 	recvMultipartToStreamBuffer(mr)
 }
 
 //---------------------------------------------------------------------------
-//	receive a part to buffer
+//	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
-func recvPartToBuffer(r *multipart.Reader) ([]byte, error) {
+func ActFileReader() {
+	log.Printf("Happy Media File Reader\n")
+
+	readDirToStreamBuffer("./static/image/*.jpg", false)
+	fmt.Println(conf.Ring)
+}
+
+//---------------------------------------------------------------------------
+//	receive a part to data
+//---------------------------------------------------------------------------
+func recvPartToData(r *multipart.Reader) ([]byte, error) {
 	var err error
 
 	p, err := r.NextPart()
@@ -413,7 +427,7 @@ func recvPartToBuffer(r *multipart.Reader) ([]byte, error) {
 }
 
 //---------------------------------------------------------------------------
-//	receive a part to buffer
+//	receive a part to slot of buffer
 //----------------------------------------s-----------------------------------
 func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 	var err error
@@ -455,8 +469,8 @@ func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 func recvMultipartToStreamBuffer(r *multipart.Reader) error {
 	var err error
 
-	sbuf := prepareStreamBuffer(5)
-	//sbuf := conf.Ring
+	//sbuf := prepareStreamBuffer(5, MBYTE, "AXIS Camera")
+	sbuf := conf.Ring
 
 	// insert slots to the buffer
 	for i := 0; true; i++ {
@@ -482,7 +496,7 @@ func recvMultipartToStreamBuffer(r *multipart.Reader) error {
 //---------------------------------------------------------------------------
 //	receive multipart data and decode jpeg
 //---------------------------------------------------------------------------
-func recvMultipartToBuffer(r *multipart.Reader) error {
+func recvMultipartToData(r *multipart.Reader) error {
 	var err error
 
 	for {
@@ -539,10 +553,10 @@ func recvMultipartDecodeJpeg(r *multipart.Reader) {
 //---------------------------------------------------------------------------
 // prepare a stream buffer
 //---------------------------------------------------------------------------
-func prepareStreamBuffer(nb int) *sb.StreamBuffer {
+func prepareStreamBuffer(nb int, size int, desc string) *sb.StreamBuffer {
 
-	sbuf := sb.NewStreamBuffer(nb, MBYTE)
-	sbuf.Desc = "AXIS Camera"
+	sbuf := sb.NewStreamBuffer(nb, size)
+	sbuf.Desc = desc
 	fmt.Println(sbuf)
 
 	return sbuf
@@ -553,8 +567,6 @@ func prepareStreamBuffer(nb int) *sb.StreamBuffer {
 //---------------------------------------------------------------------------
 func ActHttpServer() error {
 	log.Println("Happy Media Server")
-
-	conf.Ring = prepareStreamBuffer(3)
 
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/hello", helloHandler)   // view
@@ -862,6 +874,80 @@ func sendStreamDir(w io.Writer, pat string, loop bool) error {
 }
 
 //---------------------------------------------------------------------------
+// read files with the given pattern in the directory and put them to the buffer
+//---------------------------------------------------------------------------
+func readDirToStreamBuffer(pat string, loop bool) error {
+	var err error
+
+	// direct pattern matching
+	files, err := filepath.Glob(pat)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if files == nil {
+		log.Printf("no matched file for %s\n", pat)
+		return err
+	}
+
+	// use server stream buffer
+	sbuf := conf.Ring
+
+	for {
+		for i := range files {
+			slot, pos := sbuf.GetSlotIn()
+			err = readFileToSlot(files[i], slot)
+			if err != nil {
+				if err == sb.ErrEmpty {
+					continue
+				}
+				log.Println(err)
+				return err
+			}
+			fmt.Println(slot)
+			sbuf.SetPosInByPos(pos + 1)
+			time.Sleep(time.Second)
+		}
+
+		if !loop {
+			break
+		}
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read a file to stream buffer
+//---------------------------------------------------------------------------
+func readFileToSlot(file string, ss *sb.StreamSlot) error {
+	var err error
+
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	dsize := len(data)
+
+	if dsize == 0 {
+		log.Printf("%s(%d) is empty\n", file, dsize)
+		return sb.ErrEmpty
+	}
+
+	ctype := mime.TypeByExtension(filepath.Ext(file))
+	if ctype == "" {
+		ctype = http.DetectContentType(data)
+	}
+
+	copy(ss.Content, data)
+	ss.Length = dsize
+	ss.Type = ctype
+
+	return err
+}
+
+//---------------------------------------------------------------------------
 // send any file in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
 func sendPartFile(w io.Writer, file string) error {
@@ -1045,7 +1131,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 
 		mr := multipart.NewReader(r.Body, boundary)
 
-		recvMultipartToBuffer(mr)
+		recvMultipartToData(mr)
 
 	case "GET": // for Player
 		err := sendStreamResponse(w)

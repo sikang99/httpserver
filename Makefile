@@ -72,6 +72,9 @@ rm:
 rs:
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
+rf:
+	./$(PROGRAM) -m=filer -port=8080 -ports=8081 -port2=8082
+
 # --- TCP
 rts:
 	./$(PROGRAM) -m=sender -port=8080 -ports=8081 -port2=8082
@@ -136,7 +139,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "fix alloc bug for streambuffer"
+	git commit -m "add file reader to put files into the buffer"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
