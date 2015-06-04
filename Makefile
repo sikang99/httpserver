@@ -75,6 +75,10 @@ rs:
 rf:
 	./$(PROGRAM) -m=filer -port=8080 -ports=8081 -port2=8082
 
+rcam:
+	/home/stoney/coding/imt-cam/imt-shot -s localhost:8087
+	
+
 # --- TCP
 rts:
 	./$(PROGRAM) -m=sender -port=8080 -ports=8081 -port2=8082
@@ -139,7 +143,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "modify TCP data handling"
+	git commit -m "wrte prototcp package"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

@@ -613,7 +613,8 @@ func ActHttpServer() error {
 	*/
 
 	//go ActFileReader()
-	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
+	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
+	go ActTcpReceiver("8087")
 
 	wg.Wait()
 
@@ -1258,7 +1259,7 @@ func ActTcpReceiver(hport string) {
 	}
 	defer l.Close()
 
-	log.Printf("Listening on :%s\n", hport)
+	log.Printf("TCP Server on :%s\n", hport)
 
 	for {
 		// Listen for an incoming connection.
@@ -1326,9 +1327,14 @@ func TcpHandleRequest(conn net.Conn) error {
 	}
 
 	sbuf := conf.Ring
+	err = sbuf.SetStatusUsing()
+	if err != nil {
+		return sr.ErrStatus
+	}
+	defer sbuf.Reset()
 
 	//  recv multipart stream
-	//for i := 0; i < 10; i++ {
+	//for i := 0; i < 20; i++ {
 	for {
 		slot, pos := sbuf.GetSlotIn()
 		_, err = TcpReadPart(conn, "--agilemedia", slot)
@@ -1336,9 +1342,13 @@ func TcpHandleRequest(conn net.Conn) error {
 			log.Println(err)
 			return err
 		}
+		if slot.IsMajorType("multipart") {
+			continue
+		}
 		sbuf.SetPosInByPos(pos + 1)
 	}
 
+	fmt.Println(sbuf)
 	return err
 }
 
@@ -1385,6 +1395,7 @@ func TcpReadPart(conn net.Conn, boundary string, ss *sr.StreamSlot) (map[string]
 
 	if clen > 0 {
 		//_, err = TcpReadBodyToData(reader, clen)
+		ss.Type = headers["CONTENT-TYPE"]
 		err = TcpReadBodyToSlot(reader, clen, ss)
 		if err != nil {
 			log.Println(err)
@@ -1460,7 +1471,7 @@ func TcpReadPartHeader(reader *bufio.Reader, boundary string) (map[string]string
 		if len(line) > LEN_MAX_LINE {
 			break
 		}
-		fmt.Println(string(line))
+		//fmt.Println(string(line))
 
 		keyvalue := strings.SplitN(string(line), ":", 2)
 		if len(keyvalue) > 1 {
@@ -1545,7 +1556,7 @@ func TcpReadBodyToSlot(reader *bufio.Reader, clen int, ss *sr.StreamSlot) error 
 
 	ss.Length = clen
 
-	fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
+	//fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
 	return err
 }
 
