@@ -19,38 +19,63 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 )
 
+const (
+	NUM_DEF_TRACKS  = 4
+	NUM_DEF_SOURCES = 2
+)
+
+//----------------------------------------------------------------------------------
+type Uid int
+
+type Track struct {
+	Id   Uid
+	Desc string
+}
+
+//----------------------------------------------------------------------------------
+// string source information
+//----------------------------------------------------------------------------------
+func (trk *Track) String() string {
+	//str := fmt.Sprintf("[Track]")
+	str := fmt.Sprintf("\tId: %v", trk.Id)
+	str += fmt.Sprintf("\tDesc: %s", trk.Desc)
+	return str
+}
+
 //----------------------------------------------------------------------------------
 type Source struct {
-	Id   int
-	Desc string
-	Time time.Time
+	Id     Uid
+	Desc   string
+	Time   time.Time
+	Tracks []Track // media track such as audio, video, text, ...
 }
 
 //----------------------------------------------------------------------------------
 // string source information
 //----------------------------------------------------------------------------------
 func (src *Source) String() string {
-	str := fmt.Sprintf("[Source]")
-	str += fmt.Sprintf("\tId: %d", src.Id)
+	//str := fmt.Sprintf("[Source]")
+	str := fmt.Sprintf("\tId: %v", src.Id)
 	str += fmt.Sprintf("\tTime: %v", src.Time)
-	str += fmt.Sprintf("\tDesc: %s\n", src.Desc)
+	str += fmt.Sprintf("\tDesc: %s", src.Desc)
 	return str
 }
 
-func NewSource() *Source {
+func NewSource(num int) *Source {
 	return &Source{
-		Time: time.Now(),
-		Desc: "blank source",
+		Time:   time.Now(),
+		Desc:   "blank source",
+		Tracks: make([]Track, num),
 	}
 }
 
-func (src *Source) GetId() int {
+func (src *Source) GetId() Uid {
 	return src.Id
 }
 
 //----------------------------------------------------------------------------------
 type Channel struct {
-	Id   int
+	Id   Uid
 	Name string
 	Desc string
 	Time time.Time
@@ -66,9 +91,15 @@ func (chn *Channel) String() string {
 	str += fmt.Sprintf("\tName: %s", chn.Name)
 	str += fmt.Sprintf("\tTime: %v", chn.Time)
 	str += fmt.Sprintf("\tDesc: %s\n", chn.Desc)
+	for i := range chn.Srcs {
+		str += fmt.Sprintf("\t[%d] %s\n", i, &chn.Srcs[i])
+	}
 	return str
 }
 
+//----------------------------------------------------------------------------------
+// make a new channel with the number of sources
+//----------------------------------------------------------------------------------
 func NewChannel(num int) *Channel {
 	return &Channel{
 		Time: time.Now(),
@@ -77,7 +108,15 @@ func NewChannel(num int) *Channel {
 	}
 }
 
-func (chn *Channel) GetId() int {
+//----------------------------------------------------------------------------------
+// get/set channel id
+//----------------------------------------------------------------------------------
+func (chn *Channel) GetId() Uid {
+	return chn.Id
+}
+
+func (chn *Channel) SetId(id Uid) Uid {
+	chn.Id = id
 	return chn.Id
 }
 

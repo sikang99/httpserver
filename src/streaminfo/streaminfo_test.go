@@ -14,7 +14,7 @@ import (
 // test for stream request info
 //----------------------------------------------------------------------------------
 func TestStreamInfo(t *testing.T) {
-	src := NewSource()
+	src := NewSource(4)
 	fmt.Println(src)
 
 	chn := NewChannel(5)
