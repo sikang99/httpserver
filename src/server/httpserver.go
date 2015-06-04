@@ -145,7 +145,7 @@ func NewServerConfig() *ServerConfig {
 
 var conf = ServerConfig{
 	Title:        "Happy Media System: MJPEG",
-	Image:        "static/image/gophergun.jpg",
+	Image:        "static/image/gophergun.png",
 	Addr:         "http://localhost",
 	Host:         *fhost,
 	Port:         *fport,
