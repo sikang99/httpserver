@@ -22,10 +22,13 @@ import (
 const (
 	NUM_DEF_TRACKS  = 4
 	NUM_DEF_SOURCES = 2
+
+	ID_DEF_CHANNEL = 100
+	ID_DEF_SOURCE  = 1
 )
 
 //----------------------------------------------------------------------------------
-type Uid int
+type Uid int // TODO: change uuid?
 
 type Track struct {
 	Id   Uid
@@ -75,11 +78,13 @@ func (src *Source) GetId() Uid {
 
 //----------------------------------------------------------------------------------
 type Channel struct {
-	Id   Uid
-	Name string
-	Desc string
-	Time time.Time
-	Srcs []Source
+	Id     Uid
+	Name   string
+	Desc   string
+	Time   time.Time
+	Status int
+	Use    int
+	Srcs   []Source
 }
 
 //----------------------------------------------------------------------------------
@@ -90,6 +95,8 @@ func (chn *Channel) String() string {
 	str += fmt.Sprintf("\tId: %d", chn.Id)
 	str += fmt.Sprintf("\tName: %s", chn.Name)
 	str += fmt.Sprintf("\tTime: %v", chn.Time)
+	str += fmt.Sprintf("\tStatus: %v", chn.Status)
+	str += fmt.Sprintf("\tUse: %v", chn.Use)
 	str += fmt.Sprintf("\tDesc: %s\n", chn.Desc)
 	for i := range chn.Srcs {
 		str += fmt.Sprintf("\t[%d] %s\n", i, &chn.Srcs[i])
@@ -101,10 +108,16 @@ func (chn *Channel) String() string {
 // make a new channel with the number of sources
 //----------------------------------------------------------------------------------
 func NewChannel(num int) *Channel {
+
+	srcs := make([]Source, num)
+	for i := range srcs {
+		srcs[i].Time = time.Now()
+	}
+
 	return &Channel{
 		Time: time.Now(),
 		Desc: "blank channel",
-		Srcs: make([]Source, num),
+		Srcs: srcs,
 	}
 }
 
@@ -122,30 +135,30 @@ func (chn *Channel) SetId(id Uid) Uid {
 
 //----------------------------------------------------------------------------------
 type StreamRequest struct {
-	Channel   int
-	Source    int
-	StartTime time.Time // access time
-	Who       string    // string for hostname:port
-	Desc      string
+	Channel Uid
+	Source  Uid
+	Time    time.Time // access time
+	Who     string    // string for hostname:port
+	Desc    string
 }
 
 //----------------------------------------------------------------------------------
 // string stream request information
 //----------------------------------------------------------------------------------
-func (sr *StreamRequest) String() string {
+func (sq *StreamRequest) String() string {
 	str := fmt.Sprintf("[Request]")
-	str += fmt.Sprintf("\tChannel: %d", sr.Channel)
-	str += fmt.Sprintf("\tSource: %d", sr.Source)
-	str += fmt.Sprintf("\tWho: %s\n", sr.Who)
-	str += fmt.Sprintf("\tStartAt: %s", sr.StartTime)
-	str += fmt.Sprintf("\tDesciption: %s\n", sr.Desc)
+	str += fmt.Sprintf("\tChannel: %v", sq.Channel)
+	str += fmt.Sprintf("\tSource: %v", sq.Source)
+	str += fmt.Sprintf("\tWho: %s\n", sq.Who)
+	str += fmt.Sprintf("\tStartAt: %s", sq.Time)
+	str += fmt.Sprintf("\tDesciption: %s\n", sq.Desc)
 	return str
 }
 
 //----------------------------------------------------------------------------------
 // get information of stream request
 //----------------------------------------------------------------------------------
-func GetStreamRequestFrom(str string) (*StreamRequest, error) {
+func GetStreamRequestFromQuery(str string) (*StreamRequest, error) {
 	var err error
 
 	params, err := url.ParseQuery(str)
@@ -155,25 +168,26 @@ func GetStreamRequestFrom(str string) (*StreamRequest, error) {
 	}
 	//fmt.Println(params)
 
-	chn, err := strconv.Atoi(params["channel"][0])
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
-	src, err := strconv.Atoi(params["source"][0])
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
+	// assign default values
 	sreq := &StreamRequest{
-		Channel:   chn,
-		Source:    src,
-		StartTime: time.Now(),
+		Channel: Uid(ID_DEF_CHANNEL),
+		Source:  Uid(ID_DEF_SOURCE),
+		Time:    time.Now(),
 	}
-	//fmt.Println(sreq)
 
+	if len(params) > 0 {
+		chn, err := strconv.Atoi(params["channel"][0])
+		if err == nil {
+			sreq.Channel = Uid(chn)
+		}
+
+		src, err := strconv.Atoi(params["source"][0])
+		if err == nil {
+			sreq.Source = Uid(src)
+		}
+	}
+
+	//fmt.Println(sreq)
 	return sreq, err
 }
 
@@ -191,7 +205,7 @@ func GetStreamRequestFromURI(uri string) (*StreamRequest, error) {
 		return nil, err
 	}
 
-	sreq, err := GetStreamRequestFrom(ureq.RawQuery)
+	sreq, err := GetStreamRequestFromQuery(ureq.RawQuery)
 	if err != nil {
 		log.Println(err)
 		return nil, err

@@ -3,7 +3,7 @@
 // Author : Stoney Kang, sikang99@gmail.com
 //==================================================================================
 
-package streambuffer
+package streamring
 
 import (
 	"fmt"
@@ -96,26 +96,26 @@ func TestStreamSlot(t *testing.T) {
 //----------------------------------------------------------------------------------
 // test for handling functions of the stream buffer
 //----------------------------------------------------------------------------------
-func TestStreamBuffer(t *testing.T) {
+func TestStreamRing(t *testing.T) {
 	var err error
 
 	nb := 3
-	sb := NewStreamBuffer(nb, KBYTE)
-	fmt.Println(sb)
+	sr := NewStreamRing(nb, KBYTE)
+	fmt.Println(sr)
 
-	sb.Resize(2)
-	fmt.Println("Len: ", sb.Len(), "Cap: ", sb.Cap())
+	sr.Resize(2)
+	fmt.Println("Len: ", sr.Len(), "Cap: ", sr.Cap())
 
-	sb.Resize(5)
-	fmt.Println(sb)
+	sr.Resize(5)
+	fmt.Println(sr)
 
-	sb.Reset()
-	fmt.Println(sb)
+	sr.Reset()
+	fmt.Println(sr)
 
 	data := make([]byte, 3)
 	in := NewStreamSlotByData(KBYTE, "image/jpeg", 3, data)
 
-	out, err := sb.PutSlotInNext(in)
+	out, err := sr.PutSlotInNext(in)
 	if err != nil {
 		log.Fatalln("PutSlot")
 	}
@@ -124,32 +124,32 @@ func TestStreamBuffer(t *testing.T) {
 	in.Content = []byte("Sample Message")
 	in.Length = len(in.Content)
 
-	out, _ = sb.PutSlotInNext(in)
+	out, _ = sr.PutSlotInNext(in)
 
 	in.Type = "text/html"
 	in.Content = []byte("<html>Home Page</html>")
 	in.Length = len(in.Content)
 
-	out, _ = sb.PutSlotInByPos(in, 3)
-	fmt.Println(sb)
+	out, _ = sr.PutSlotInByPos(in, 3)
+	fmt.Println(sr)
 
-	out, _ = sb.GetSlotOutNext()
+	out, _ = sr.GetSlotOutNext()
 	fmt.Println(out)
 
-	out, _ = sb.GetSlotByPos(2)
+	out, _ = sr.GetSlotByPos(2)
 	out.Type = "video/mp4"
 	out.Length = 10
 	fmt.Printf("[%d] ", 2)
 	fmt.Println(out)
 
-	log.Println(sb.Resize(1))
-	log.Println(sb.Resize(100000))
-	sb.Resize(4)
-	fmt.Println(sb)
+	log.Println(sr.Resize(1))
+	log.Println(sr.Resize(100000))
+	sr.Resize(4)
+	fmt.Println(sr)
 
-	out, _ = sb.GetSlotByPos(3)
+	out, _ = sr.GetSlotByPos(3)
 	fmt.Println(out)
-	fmt.Println(sb)
+	fmt.Println(sr)
 }
 
 //----------------------------------------------------------------------------------
@@ -158,26 +158,26 @@ func TestStreamBuffer(t *testing.T) {
 func TestStreamRead(t *testing.T) {
 	// prepare a buffer
 	nb := 5
-	sb := NewStreamBuffer(nb, MBYTE)
+	sr := NewStreamRing(nb, MBYTE)
 
 	data := make([]byte, 128)
 	in := NewStreamSlotByData(KBYTE, "image/jpeg", len(data), data)
-	sb.PutSlotInNext(in)
+	sr.PutSlotInNext(in)
 
 	in.Type = "text/html"
 	in.Content = []byte("<html>Home Page</html>")
 	in.Length = len(in.Content)
 
-	sb.PutSlotInByPos(in, 3)
-	fmt.Println(sb)
+	sr.PutSlotInByPos(in, 3)
+	fmt.Println(sr)
 
 	println("Reading ...")
 	for i := 0; i < 20; i++ {
-		out, err := sb.GetSlotByPos(i)
+		out, err := sr.GetSlotByPos(i)
 		if err != nil {
 			break
 		}
-		//sb.Resize(i + 1)
+		//sr.Resize(i + 1)
 		fmt.Printf("\t(%d) %s\n", i, out)
 		if (i+1)%nb == 0 {
 			println()
@@ -192,31 +192,31 @@ func TestStreamRead(t *testing.T) {
 func TestStreamWrite(t *testing.T) {
 	var err error
 
-	nb := 5
-	sb := NewStreamBuffer(nb, MBYTE)
-	fmt.Println(sb)
+	ns := 5
+	sr := NewStreamRing(ns, MBYTE)
+	fmt.Println(sr)
 
-	err = sb.SetStatusUsing()
+	err = sr.SetStatusUsing()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	sb.Desc = "Testing ..."
+	sr.Desc = "Testing ..."
 
 	for i := 1; i < 50; i++ {
 		data := []byte(fmt.Sprintf("count %d", i))
 		in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
-		sb.PutSlotInNext(in)
+		sr.PutSlotInNext(in)
 	}
-	fmt.Println(sb)
+	fmt.Println(sr)
 
-	if !sb.IsUsing() {
+	if !sr.IsUsing() {
 		log.Fatalln(err)
 	}
 
-	sb.Reset()
-	fmt.Println(sb)
+	sr.Reset()
+	fmt.Println(sr)
 
-	if sb.GetStatus() != STATUS_IDLE {
+	if sr.GetStatus() != STATUS_IDLE {
 		log.Fatalln(err)
 	}
 }
@@ -227,8 +227,8 @@ func TestStreamWrite(t *testing.T) {
 func TestStreamReadWrite(t *testing.T) {
 	// prepare a buffer
 	nb := 5
-	sb := NewStreamBuffer(nb, MBYTE)
-	sb.Desc = "Test buffer"
+	sr := NewStreamRing(nb, MBYTE)
+	sr.Desc = "Test buffer"
 
 	var fend bool = false
 
@@ -236,7 +236,7 @@ func TestStreamReadWrite(t *testing.T) {
 	reader := func(i int) {
 		var pos int
 		for fend == false {
-			out, npos, err := sb.GetSlotNextByPos(pos)
+			out, npos, err := sr.GetSlotNextByPos(pos)
 			if out == nil && err == ErrEmpty {
 				time.Sleep(time.Millisecond)
 				continue
@@ -252,16 +252,16 @@ func TestStreamReadWrite(t *testing.T) {
 			tn := 100 * i * i * i
 			data := []byte(fmt.Sprintf("saved %d-th data", tn))
 			in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
-			ss, _ := sb.PutSlotInNext(in)
+			ss, _ := sr.PutSlotInNext(in)
 			/*
-				ss, pos := sb.GetSlotIn()
+				ss, pos := sr.GetSlotIn()
 
 				ss.Type = "text/plain"
 				ss.Length = len(data)
 				copy(ss.Content, data)
 
-				fmt.Println(sb)
-				sb.SetPosInByPos(pos + 1)
+				fmt.Println(sr)
+				sr.SetPosInByPos(pos + 1)
 			*/
 			fmt.Println("W>", i, ss)
 			time.Sleep(time.Millisecond)

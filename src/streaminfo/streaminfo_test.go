@@ -28,12 +28,17 @@ func TestStreamRequest(t *testing.T) {
 	var err error
 
 	uri := "https://localhost:8080/stream?channel=100&source=2&timeout=v#f"
-
 	sreq, err := GetStreamRequestFromURI(uri)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	fmt.Println(sreq)
 
+	uri = "ws://localhost:8080/stream"
+	sreq, err = GetStreamRequestFromURI(uri)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	fmt.Println(sreq)
 }
 

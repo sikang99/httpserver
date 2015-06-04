@@ -31,8 +31,8 @@ import (
 	"time"
 
 	"stoney/httpserver/src/base"
-	sb "stoney/httpserver/src/streambuffer"
 	si "stoney/httpserver/src/streamimage"
+	sr "stoney/httpserver/src/streamring"
 
 	"github.com/bradfitz/http2"
 	"golang.org/x/net/websocket"
@@ -92,6 +92,8 @@ const (
 
 	KBYTE = 1024
 	MBYTE = 1024 * KBYTE
+
+	LEN_MAX_LINE = 128
 )
 
 //---------------------------------------------------------------------------
@@ -135,7 +137,7 @@ type ServerConfig struct {
 	Mode         string
 	ImageChannel chan []byte
 	Player       io.Writer
-	Ring         *sb.StreamBuffer
+	Ring         *sr.StreamRing
 }
 
 func NewServerConfig() *ServerConfig {
@@ -177,7 +179,7 @@ func main() {
 	// determine the working type of the program
 	fmt.Printf("Working mode: %s\n", *fmode)
 
-	conf.Ring = prepareStreamBuffer(3, MBYTE, "Server stream")
+	conf.Ring = prepareStreamRing(3, MBYTE, "Server stream")
 
 	// let's do working mode
 	switch *fmode {
@@ -378,7 +380,7 @@ func ActHttpReader(url string) {
 	mr := multipart.NewReader(res.Body, boundary)
 
 	//recvMultipartToData(mr)
-	recvMultipartToStreamBuffer(mr)
+	recvMultipartToStreamRing(mr)
 }
 
 //---------------------------------------------------------------------------
@@ -387,7 +389,7 @@ func ActHttpReader(url string) {
 func ActFileReader() {
 	log.Printf("Happy Media File Reader\n")
 
-	readDirToStreamBuffer("./static/image/*.jpg", true)
+	readDirToStreamRing("./static/image/*.jpg", true)
 	fmt.Println(conf.Ring)
 }
 
@@ -431,7 +433,7 @@ func recvPartToData(r *multipart.Reader) ([]byte, error) {
 //---------------------------------------------------------------------------
 //	receive a part to slot of buffer
 //----------------------------------------s-----------------------------------
-func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
+func recvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
 	var err error
 
 	p, err := r.NextPart()
@@ -467,14 +469,14 @@ func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
 //---------------------------------------------------------------------------
-func recvMultipartToStreamBuffer(r *multipart.Reader) error {
+func recvMultipartToStreamRing(r *multipart.Reader) error {
 	var err error
 
-	//sbuf := prepareStreamBuffer(5, MBYTE, "AXIS Camera")
+	//sbuf := prepareStreamRing(5, MBYTE, "AXIS Camera")
 	sbuf := conf.Ring
 	err = sbuf.SetStatusUsing()
 	if err != nil {
-		return sb.ErrStatus
+		return sr.ErrStatus
 	}
 
 	// insert slots to the buffer
@@ -558,9 +560,9 @@ func recvMultipartDecodeJpeg(r *multipart.Reader) {
 //---------------------------------------------------------------------------
 // prepare a stream buffer
 //---------------------------------------------------------------------------
-func prepareStreamBuffer(nb int, size int, desc string) *sb.StreamBuffer {
+func prepareStreamRing(nb int, size int, desc string) *sr.StreamRing {
 
-	sbuf := sb.NewStreamBuffer(nb, size)
+	sbuf := sr.NewStreamRing(nb, size)
 	sbuf.Desc = desc
 	fmt.Println(sbuf)
 
@@ -577,7 +579,8 @@ func ActHttpServer() error {
 	http.HandleFunc("/hello", helloHandler)   // view
 	http.HandleFunc("/media", mediaHandler)   // on-demand
 	http.HandleFunc("/stream", streamHandler) // live
-	http.HandleFunc("/search", searchHandler) // live
+	http.HandleFunc("/search", searchHandler) // server info
+	http.HandleFunc("/status", statusHandler) // server status
 
 	http.Handle("/websocket/", websocket.Handler(websocketHandler))
 
@@ -823,18 +826,18 @@ func sendStreamImage(w io.Writer, dtype string, loop bool) error {
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func sendStreamBuffer(w io.Writer) error {
+func sendStreamRing(w io.Writer) error {
 	var err error
 
 	sbuf := conf.Ring
 	if !sbuf.IsUsing() {
-		return sb.ErrStatus
+		return sr.ErrStatus
 	}
 
 	var pos int
 	for {
 		slot, npos, err := sbuf.GetSlotNextByPos(pos)
-		if slot == nil && err == sb.ErrEmpty {
+		if slot == nil && err == sr.ErrEmpty {
 			time.Sleep(time.Millisecond)
 			continue
 		}
@@ -888,7 +891,7 @@ func sendStreamDir(w io.Writer, pat string, loop bool) error {
 //---------------------------------------------------------------------------
 // read files with the given pattern in the directory and put them to the buffer
 //---------------------------------------------------------------------------
-func readDirToStreamBuffer(pat string, loop bool) error {
+func readDirToStreamRing(pat string, loop bool) error {
 	var err error
 
 	// direct pattern matching
@@ -906,7 +909,7 @@ func readDirToStreamBuffer(pat string, loop bool) error {
 	sbuf := conf.Ring
 	err = sbuf.SetStatusUsing()
 	if err != nil {
-		return sb.ErrStatus
+		return sr.ErrStatus
 	}
 
 	for {
@@ -914,7 +917,7 @@ func readDirToStreamBuffer(pat string, loop bool) error {
 			slot, pos := sbuf.GetSlotIn()
 			err = readFileToSlot(files[i], slot)
 			if err != nil {
-				if err == sb.ErrEmpty {
+				if err == sr.ErrEmpty {
 					continue
 				}
 				log.Println(err)
@@ -936,7 +939,7 @@ func readDirToStreamBuffer(pat string, loop bool) error {
 //---------------------------------------------------------------------------
 // read a file to stream buffer
 //---------------------------------------------------------------------------
-func readFileToSlot(file string, ss *sb.StreamSlot) error {
+func readFileToSlot(file string, ss *sr.StreamSlot) error {
 	var err error
 
 	data, err := ioutil.ReadFile(file)
@@ -948,7 +951,7 @@ func readFileToSlot(file string, ss *sb.StreamSlot) error {
 
 	if dsize == 0 {
 		log.Printf("%s(%d) is empty\n", file, dsize)
-		return sb.ErrEmpty
+		return sr.ErrEmpty
 	}
 
 	ctype := mime.TypeByExtension(filepath.Ext(file))
@@ -1040,7 +1043,7 @@ func sendPartImage(w io.Writer, dtype string) error {
 //---------------------------------------------------------------------------
 // send slot in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func sendPartSlot(w io.Writer, ss *sb.StreamSlot) error {
+func sendPartSlot(w io.Writer, ss *sr.StreamSlot) error {
 	var err error
 
 	mw := multipart.NewWriter(w)
@@ -1158,7 +1161,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 
 		//err = sendStreamDir(w, "./static/image/*.jpg", true)
 		//err = sendStreamImage(w, "jpg", true)
-		err = sendStreamBuffer(w)
+		err = sendStreamRing(w)
 		if err != nil {
 			log.Println(err)
 			break
@@ -1177,9 +1180,18 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 func searchHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	Responder(w, r, 200, "Not yet implemented")
+	Responder(w, r, 200, "/search: Not yet implemented")
 
 	return
+}
+
+//---------------------------------------------------------------------------
+// handle /search access
+//---------------------------------------------------------------------------
+func statusHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+
+	Responder(w, r, 200, "/status: Not yet implemented")
 }
 
 //---------------------------------------------------------------------------
@@ -1291,7 +1303,7 @@ func TcpSummitRequest(conn net.Conn) (map[string]string, error) {
 }
 
 //---------------------------------------------------------------------------
-// handle request
+// 41 handle request, please close socket after use
 //---------------------------------------------------------------------------
 func TcpHandleRequest(conn net.Conn) error {
 	var err error
@@ -1313,13 +1325,18 @@ func TcpHandleRequest(conn net.Conn) error {
 		return err
 	}
 
+	sbuf := conf.Ring
+
 	//  recv multipart stream
+	//for i := 0; i < 10; i++ {
 	for {
-		_, err = TcpReadMessage(conn)
+		slot, pos := sbuf.GetSlotIn()
+		_, err = TcpReadPart(conn, "--agilemedia", slot)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
+		sbuf.SetPosInByPos(pos + 1)
 	}
 
 	return err
@@ -1349,6 +1366,38 @@ func TcpSendResponse(conn net.Conn) error {
 //---------------------------------------------------------------------------
 // read a message in http header style
 //---------------------------------------------------------------------------
+func TcpReadPart(conn net.Conn, boundary string, ss *sr.StreamSlot) (map[string]string, error) {
+	var err error
+
+	reader := bufio.NewReader(conn)
+
+	headers, err := TcpReadPartHeader(reader, boundary)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	clen := 0
+	value, ok := headers["CONTENT-LENGTH"]
+	if ok {
+		clen, _ = strconv.Atoi(value)
+	}
+
+	if clen > 0 {
+		//_, err = TcpReadBodyToData(reader, clen)
+		err = TcpReadBodyToSlot(reader, clen, ss)
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+	}
+
+	return headers, err
+}
+
+//---------------------------------------------------------------------------
+// read a message in http header style
+//---------------------------------------------------------------------------
 func TcpReadMessage(conn net.Conn) (map[string]string, error) {
 	var err error
 
@@ -1367,7 +1416,7 @@ func TcpReadMessage(conn net.Conn) (map[string]string, error) {
 	}
 
 	if clen > 0 {
-		_, err = TcpReadBody(reader, clen)
+		_, err = TcpReadBodyToData(reader, clen)
 		if err != nil {
 			log.Println(err)
 			return nil, err
@@ -1375,6 +1424,52 @@ func TcpReadMessage(conn net.Conn) (map[string]string, error) {
 	}
 
 	return headers, err
+}
+
+//---------------------------------------------------------------------------
+// read header of message and return a map
+//---------------------------------------------------------------------------
+func TcpReadPartHeader(reader *bufio.Reader, boundary string) (map[string]string, error) {
+	var err error
+
+	result := make(map[string]string)
+
+	fstart := false
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			log.Println(err)
+			return result, err
+		}
+
+		// find header start of part
+		if string(line) == "" {
+			if fstart {
+				break
+			} else {
+				continue
+			}
+		}
+		if !fstart {
+			if strings.Contains(string(line), boundary) || strings.Contains(string(line), "POST") {
+				fstart = true
+			}
+		}
+
+		// if maybe invalid header data
+		if len(line) > LEN_MAX_LINE {
+			break
+		}
+		fmt.Println(string(line))
+
+		keyvalue := strings.SplitN(string(line), ":", 2)
+		if len(keyvalue) > 1 {
+			result[strings.ToUpper(keyvalue[0])] = strings.TrimSpace(keyvalue[1])
+		}
+	}
+
+	//fmt.Println(result)
+	return result, err
 }
 
 //---------------------------------------------------------------------------
@@ -1392,7 +1487,7 @@ func TcpReadHeader(reader *bufio.Reader) (map[string]string, error) {
 			return result, err
 		}
 		if string(line) == "" {
-			return result, err
+			break
 		}
 
 		fmt.Println(string(line))
@@ -1410,14 +1505,14 @@ func TcpReadHeader(reader *bufio.Reader) (map[string]string, error) {
 //---------------------------------------------------------------------------
 // read body of message
 //---------------------------------------------------------------------------
-func TcpReadBody(reader *bufio.Reader, clen int) ([]byte, error) {
+func TcpReadBodyToData(reader *bufio.Reader, clen int) ([]byte, error) {
 	var err error
 
-	buf := make([]byte, clen)
+	data := make([]byte, clen)
 
 	tn := 0
 	for tn < clen {
-		n, err := reader.Read(buf[tn:])
+		n, err := reader.Read(data[tn:])
 		if err != nil {
 			log.Println(err)
 			break
@@ -1425,8 +1520,33 @@ func TcpReadBody(reader *bufio.Reader, clen int) ([]byte, error) {
 		tn += n
 	}
 
+	//fmt.Printf(string(data[:tn]))
 	fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
-	return buf, err
+	return data, err
+}
+
+//---------------------------------------------------------------------------
+// read body of message
+//---------------------------------------------------------------------------
+func TcpReadBodyToSlot(reader *bufio.Reader, clen int, ss *sr.StreamSlot) error {
+	var err error
+
+	ss.Length = 0
+
+	tn := 0
+	for tn < clen {
+		n, err := reader.Read(ss.Content[tn:])
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		tn += n
+	}
+
+	ss.Length = clen
+
+	fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
+	return err
 }
 
 //---------------------------------------------------------------------------
@@ -1923,7 +2043,7 @@ func ReadPartBodyToData(p *multipart.Part, nl int, data []byte) error {
 //---------------------------------------------------------------------------
 // read a part body to slot
 //---------------------------------------------------------------------------
-func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sb.StreamSlot) error {
+func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
 	var err error
 
 	ss.Length = 0

@@ -1,7 +1,7 @@
 #
 # Makefile for package
 #
-PACKAGE=streambuffer
+PACKAGE=streambase
 
 all: usage
 

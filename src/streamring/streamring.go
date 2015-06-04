@@ -1,5 +1,5 @@
 //==================================================================================
-// Circular Stream Buffer
+// Circular Stream Buffer : Ring
 // Author : Stoney Kang, sikang99@gmail.com
 //
 // - https://github.com/zfjagann/golang-ring
@@ -7,7 +7,7 @@
 // - http://blog.pivotal.io/labs/labs/a-concurrent-ring-buffer-for-go
 //==================================================================================
 
-package streambuffer
+package streamring
 
 import (
 	"errors"
@@ -139,7 +139,7 @@ func (ss *StreamSlot) IsSubType(ctype string) bool {
 }
 
 //----------------------------------------------------------------------------------
-type StreamBuffer struct {
+type StreamRing struct {
 	sync.Mutex
 	Status int
 	Num    int    // number of slots used
@@ -154,15 +154,15 @@ type StreamBuffer struct {
 //----------------------------------------------------------------------------------
 // string information for the stream buffer
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) String() string {
-	str := fmt.Sprintf("[StreamBuffer]")
-	str += fmt.Sprintf("\tStatus: %d", sb.Status)
-	str += fmt.Sprintf("\tPos: %d,%d", sb.In, sb.Out)
-	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sb.Num, sb.NumMax, sb.Size/KBYTE)
-	str += fmt.Sprintf("\tDesc: %s\n", sb.Desc)
+func (sr *StreamRing) String() string {
+	str := fmt.Sprintf("[StreamRing]")
+	str += fmt.Sprintf("\tStatus: %d", sr.Status)
+	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
+	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/KBYTE)
+	str += fmt.Sprintf("\tDesc: %s\n", sr.Desc)
 
-	for i := 0; i < sb.Num; i++ {
-		str += fmt.Sprintf("\t[%d] %s\n", i, sb.Slots[i].String())
+	for i := 0; i < sr.Num; i++ {
+		str += fmt.Sprintf("\t[%d] %s\n", i, sr.Slots[i].String())
 	}
 
 	return str
@@ -171,7 +171,7 @@ func (sb *StreamBuffer) String() string {
 //----------------------------------------------------------------------------------
 // make a new circular stream buffer
 //----------------------------------------------------------------------------------
-func NewStreamBuffer(num int, size int) *StreamBuffer {
+func NewStreamRing(num int, size int) *StreamRing {
 	/*
 		// buggy method
 		slot := StreamSlot{
@@ -193,7 +193,7 @@ func NewStreamBuffer(num int, size int) *StreamBuffer {
 		slots[i].LengthMax = size
 	}
 
-	return &StreamBuffer{
+	return &StreamRing{
 		Slots:  slots,
 		Status: STATUS_IDLE,
 		Num:    num, NumMax: num,
@@ -206,97 +206,97 @@ func NewStreamBuffer(num int, size int) *StreamBuffer {
 //----------------------------------------------------------------------------------
 // get the number of slots in buffer for used(len) and allocted(cap)
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) Len() int {
-	return sb.Num
+func (sr *StreamRing) Len() int {
+	return sr.Num
 }
 
-func (sb *StreamBuffer) Cap() int {
-	return sb.NumMax
+func (sr *StreamRing) Cap() int {
+	return sr.NumMax
 }
 
 //----------------------------------------------------------------------------------
 // set status of buffer
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) SetStatus(status int) int {
-	sb.Status = status
-	return sb.Status
+func (sr *StreamRing) SetStatus(status int) int {
+	sr.Status = status
+	return sr.Status
 }
 
-func (sb *StreamBuffer) SetStatusUsing() error {
+func (sr *StreamRing) SetStatusUsing() error {
 	var err error
-	if sb.Status != STATUS_IDLE {
+	if sr.Status != STATUS_IDLE {
 		return ErrStatus
 	}
-	sb.Status = STATUS_USING
+	sr.Status = STATUS_USING
 	return err
 }
 
-func (sb *StreamBuffer) SetStatusIdle() error {
+func (sr *StreamRing) SetStatusIdle() error {
 	var err error
-	if sb.Status != STATUS_USING {
+	if sr.Status != STATUS_USING {
 		return ErrStatus
 	}
-	sb.Status = STATUS_IDLE
+	sr.Status = STATUS_IDLE
 	return err
 }
 
-func (sb *StreamBuffer) GetStatus() int {
-	return sb.Status
+func (sr *StreamRing) GetStatus() int {
+	return sr.Status
 }
 
-func (sb *StreamBuffer) IsUsing() bool {
-	return sb.Status == STATUS_USING
+func (sr *StreamRing) IsUsing() bool {
+	return sr.Status == STATUS_USING
 }
 
-func (sb *StreamBuffer) IsIdle() bool {
-	return sb.Status == STATUS_IDLE
+func (sr *StreamRing) IsIdle() bool {
+	return sr.Status == STATUS_IDLE
 }
 
 //----------------------------------------------------------------------------------
 // set the position of slot to be read and written
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) SetPosInByPos(pos int) int {
-	sb.In = (pos % sb.Num)
-	return sb.In
+func (sr *StreamRing) SetPosInByPos(pos int) int {
+	sr.In = (pos % sr.Num)
+	return sr.In
 }
 
-func (sb *StreamBuffer) SetPosOutByPos(pos int) int {
-	sb.Out = (pos % sb.Num)
-	return sb.Out
+func (sr *StreamRing) SetPosOutByPos(pos int) int {
+	sr.Out = (pos % sr.Num)
+	return sr.Out
 }
 
 //----------------------------------------------------------------------------------
 // get the current position of slot to read and write
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetPosIn() int {
-	return sb.In
+func (sr *StreamRing) GetPosIn() int {
+	return sr.In
 }
 
-func (sb *StreamBuffer) GetPosOut() int {
-	return sb.Out
+func (sr *StreamRing) GetPosOut() int {
+	return sr.Out
 }
 
 //----------------------------------------------------------------------------------
 // get the current slot to read and write
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotIn() (*StreamSlot, int) {
-	slot := &sb.Slots[sb.In]
-	return slot, sb.In
+func (sr *StreamRing) GetSlotIn() (*StreamSlot, int) {
+	slot := &sr.Slots[sr.In]
+	return slot, sr.In
 }
 
-func (sb *StreamBuffer) GetSlotOut() (*StreamSlot, int) {
-	slot := &sb.Slots[sb.Out]
-	return slot, sb.Out
+func (sr *StreamRing) GetSlotOut() (*StreamSlot, int) {
+	slot := &sr.Slots[sr.Out]
+	return slot, sr.Out
 }
 
 //----------------------------------------------------------------------------------
 // get the slot designated
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
+func (sr *StreamRing) GetSlotByPos(pos int) (*StreamSlot, error) {
 	var err error
 
-	pos = pos % sb.Num
-	slot := &sb.Slots[pos]
+	pos = pos % sr.Num
+	slot := &sr.Slots[pos]
 
 	return slot, err
 }
@@ -304,16 +304,16 @@ func (sb *StreamBuffer) GetSlotByPos(pos int) (*StreamSlot, error) {
 //----------------------------------------------------------------------------------
 // get the slot to be read and move to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotOutNext() (*StreamSlot, error) {
+func (sr *StreamRing) GetSlotOutNext() (*StreamSlot, error) {
 	var err error
 
 	// no data to read
-	if sb.In == sb.Out {
+	if sr.In == sr.Out {
 		return nil, ErrEmpty
 	}
 
-	slot := &sb.Slots[sb.Out]
-	sb.Out = (sb.Out + 1) % sb.Num
+	slot := &sr.Slots[sr.Out]
+	sr.Out = (sr.Out + 1) % sr.Num
 
 	return slot, err
 }
@@ -321,18 +321,18 @@ func (sb *StreamBuffer) GetSlotOutNext() (*StreamSlot, error) {
 //----------------------------------------------------------------------------------
 // get the pointer of slot designated and go to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) GetSlotNextByPos(pos int) (*StreamSlot, int, error) {
+func (sr *StreamRing) GetSlotNextByPos(pos int) (*StreamSlot, int, error) {
 	var err error
 
-	pos = pos % sb.Num
+	pos = pos % sr.Num
 
 	// no data to read
-	if sb.In == pos {
+	if sr.In == pos {
 		return nil, pos, ErrEmpty
 	}
 
-	slot := &sb.Slots[pos]
-	pos = (pos + 1) % sb.Num
+	slot := &sr.Slots[pos]
+	pos = (pos + 1) % sr.Num
 
 	return slot, pos, err
 }
@@ -340,23 +340,23 @@ func (sb *StreamBuffer) GetSlotNextByPos(pos int) (*StreamSlot, int, error) {
 //----------------------------------------------------------------------------------
 // write the information to the slot and go to the next
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) PutSlotInNext(slot *StreamSlot) (*StreamSlot, error) {
-	sb.Lock()
-	defer sb.Unlock()
+func (sr *StreamRing) PutSlotInNext(slot *StreamSlot) (*StreamSlot, error) {
+	sr.Lock()
+	defer sr.Unlock()
 
 	var err error
 
-	if slot.Length > sb.Size {
+	if slot.Length > sr.Size {
 		return nil, fmt.Errorf("too big data size")
 	}
 
-	st := &sb.Slots[sb.In]
+	st := &sr.Slots[sr.In]
 
 	st.Type = slot.Type
 	st.Length = slot.Length
 	copy(st.Content, slot.Content)
 
-	sb.In = (sb.In + 1) % sb.Num
+	sr.In = (sr.In + 1) % sr.Num
 
 	return st, err
 }
@@ -364,14 +364,14 @@ func (sb *StreamBuffer) PutSlotInNext(slot *StreamSlot) (*StreamSlot, error) {
 //----------------------------------------------------------------------------------
 // write the information to the slot designated
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) PutSlotInByPos(slot *StreamSlot, pos int) (*StreamSlot, error) {
-	sb.Lock()
-	defer sb.Unlock()
+func (sr *StreamRing) PutSlotInByPos(slot *StreamSlot, pos int) (*StreamSlot, error) {
+	sr.Lock()
+	defer sr.Unlock()
 
 	var err error
 
-	pos = (pos % sb.Num)
-	st := &sb.Slots[pos]
+	pos = (pos % sr.Num)
+	st := &sr.Slots[pos]
 
 	st.Type = slot.Type
 	st.Length = slot.Length
@@ -383,28 +383,28 @@ func (sb *StreamBuffer) PutSlotInByPos(slot *StreamSlot, pos int) (*StreamSlot, 
 //----------------------------------------------------------------------------------
 // reset(clear) the stream buffer
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) Reset() {
-	sb.Lock()
-	defer sb.Unlock()
+func (sr *StreamRing) Reset() {
+	sr.Lock()
+	defer sr.Unlock()
 
-	for i := 0; i < sb.NumMax; i++ {
-		sb.Slots[i].Type = ""
-		sb.Slots[i].Length = 0
+	for i := 0; i < sr.NumMax; i++ {
+		sr.Slots[i].Type = ""
+		sr.Slots[i].Length = 0
 	}
 
-	sb.In = 0
-	sb.Out = 0
-	sb.Num = sb.NumMax
-	sb.Status = STATUS_IDLE
-	sb.Desc = "Buffer is reset"
+	sr.In = 0
+	sr.Out = 0
+	sr.Num = sr.NumMax
+	sr.Status = STATUS_IDLE
+	sr.Desc = "Buffer is reset"
 }
 
 //----------------------------------------------------------------------------------
 // change the size of buffer, i.e, the number of slots
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) Resize(num int) error {
-	sb.Lock()
-	defer sb.Unlock()
+func (sr *StreamRing) Resize(num int) error {
+	sr.Lock()
+	defer sr.Unlock()
 
 	var err error
 
@@ -412,18 +412,18 @@ func (sb *StreamBuffer) Resize(num int) error {
 		return fmt.Errorf("%d is invalid, use a number between 2 - %d", num, NUM_MAX_SLOTS)
 	}
 
-	if num > sb.NumMax {
+	if num > sr.NumMax {
 		slot := StreamSlot{
-			Length:    sb.Size,
-			LengthMax: sb.Size,
-			Content:   make([]byte, sb.Size),
+			Length:    sr.Size,
+			LengthMax: sr.Size,
+			Content:   make([]byte, sr.Size),
 		}
-		for i := 0; i < num-sb.NumMax; i++ {
-			sb.Slots = append(sb.Slots, slot)
+		for i := 0; i < num-sr.NumMax; i++ {
+			sr.Slots = append(sr.Slots, slot)
 		}
-		sb.NumMax = num
+		sr.NumMax = num
 	}
-	sb.Num = num
+	sr.Num = num
 
 	return err
 }
@@ -431,10 +431,10 @@ func (sb *StreamBuffer) Resize(num int) error {
 //----------------------------------------------------------------------------------
 // read out the slot to new one
 //----------------------------------------------------------------------------------
-func (sb *StreamBuffer) ReadSlotIn() (*StreamSlot, int) {
-	in := &sb.Slots[sb.In]
-	slot := NewStreamSlotByData(sb.Size, in.Type, in.Length, in.Content)
-	return slot, sb.In
+func (sr *StreamRing) ReadSlotIn() (*StreamSlot, int) {
+	in := &sr.Slots[sr.In]
+	slot := NewStreamSlotByData(sr.Size, in.Type, in.Length, in.Content)
+	return slot, sr.In
 }
 
 // ---------------------------------E-----N-----D-----------------------------------
