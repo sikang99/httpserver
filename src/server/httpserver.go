@@ -447,7 +447,6 @@ func recvPartToSlot(r *multipart.Reader, ss *sb.StreamSlot) error {
 		return err
 	}
 
-	// implement like ReadFull() in jpeg.Decode()
 	var tn int
 	for tn < nl {
 		n, err := p.Read(ss.Content[tn:])
@@ -473,6 +472,10 @@ func recvMultipartToStreamBuffer(r *multipart.Reader) error {
 
 	//sbuf := prepareStreamBuffer(5, MBYTE, "AXIS Camera")
 	sbuf := conf.Ring
+	err = sbuf.SetStatusUsing()
+	if err != nil {
+		return sb.ErrStatus
+	}
 
 	// insert slots to the buffer
 	for i := 0; true; i++ {
@@ -574,6 +577,7 @@ func ActHttpServer() error {
 	http.HandleFunc("/hello", helloHandler)   // view
 	http.HandleFunc("/media", mediaHandler)   // on-demand
 	http.HandleFunc("/stream", streamHandler) // live
+	http.HandleFunc("/search", searchHandler) // live
 
 	http.Handle("/websocket/", websocket.Handler(websocketHandler))
 
@@ -605,7 +609,8 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	go ActFileReader()
+	//go ActFileReader()
+	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
 
 	wg.Wait()
 
@@ -822,7 +827,6 @@ func sendStreamBuffer(w io.Writer) error {
 	var err error
 
 	sbuf := conf.Ring
-
 	if !sbuf.IsUsing() {
 		return sb.ErrStatus
 	}
@@ -900,7 +904,6 @@ func readDirToStreamBuffer(pat string, loop bool) error {
 
 	// use server stream buffer
 	sbuf := conf.Ring
-
 	err = sbuf.SetStatusUsing()
 	if err != nil {
 		return sb.ErrStatus
@@ -1164,6 +1167,17 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		log.Println("Unknown method: ", r.Method)
 	}
+
+	return
+}
+
+//---------------------------------------------------------------------------
+// handle /search access
+//---------------------------------------------------------------------------
+func searchHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+
+	Responder(w, r, 200, "Not yet implemented")
 
 	return
 }

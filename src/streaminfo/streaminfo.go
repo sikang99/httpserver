@@ -23,13 +23,38 @@ import (
 type Source struct {
 	Id   int
 	Desc string
+	Time time.Time
 }
 
+//----------------------------------------------------------------------------------
+// string source information
+//----------------------------------------------------------------------------------
+func (src *Source) String() string {
+	str := fmt.Sprintf("[Source]")
+	str += fmt.Sprintf("\tId: %d", src.Id)
+	str += fmt.Sprintf("\tTime: %v", src.Time)
+	str += fmt.Sprintf("\tDesc: %s\n", src.Desc)
+	return str
+}
+
+func NewSource() *Source {
+	return &Source{
+		Time: time.Now(),
+		Desc: "blank source",
+	}
+}
+
+func (src *Source) GetId() int {
+	return src.Id
+}
+
+//----------------------------------------------------------------------------------
 type Channel struct {
 	Id   int
 	Name string
-	Srcs []Source
 	Desc string
+	Time time.Time
+	Srcs []Source
 }
 
 //----------------------------------------------------------------------------------
@@ -39,8 +64,17 @@ func (chn *Channel) String() string {
 	str := fmt.Sprintf("[Channel]")
 	str += fmt.Sprintf("\tId: %d", chn.Id)
 	str += fmt.Sprintf("\tName: %s", chn.Name)
+	str += fmt.Sprintf("\tTime: %v", chn.Time)
 	str += fmt.Sprintf("\tDesc: %s\n", chn.Desc)
 	return str
+}
+
+func NewChannel(num int) *Channel {
+	return &Channel{
+		Time: time.Now(),
+		Desc: "blank channel",
+		Srcs: make([]Source, num),
+	}
 }
 
 func (chn *Channel) GetId() int {

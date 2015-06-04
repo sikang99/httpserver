@@ -13,6 +13,17 @@ import (
 //----------------------------------------------------------------------------------
 // test for stream request info
 //----------------------------------------------------------------------------------
+func TestStreamInfo(t *testing.T) {
+	src := NewSource()
+	fmt.Println(src)
+
+	chn := NewChannel(5)
+	fmt.Println(chn)
+}
+
+//----------------------------------------------------------------------------------
+// test for stream request info
+//----------------------------------------------------------------------------------
 func TestStreamRequest(t *testing.T) {
 	var err error
 
