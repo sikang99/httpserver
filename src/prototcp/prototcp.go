@@ -30,37 +30,62 @@ const (
 	MBYTE = 1024 * KBYTE
 
 	LEN_MAX_LINE = 128
+
+	STR_DEF_HOST = "localhost"
+	STR_DEF_PORT = "8080"
 )
 
 //---------------------------------------------------------------------------
 type ProtoTcp struct {
-	hname string
-	hport string
+	Host string
+	Port string
+	Conn net.Conn
+	Desc string
 }
 
 //---------------------------------------------------------------------------
 // string ProtoTcp information
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) String() string {
-	str := fmt.Sprintf("Hostname: %s", pt.hname)
-	str += fmt.Sprintf("Port: %s", pt.hport)
+	str := fmt.Sprintf("\tHost: %s", pt.Host)
+	str += fmt.Sprintf("\tPort: %s", pt.Port)
+	str += fmt.Sprintf("\tConn: %v", pt.Conn)
+	str += fmt.Sprintf("\tDesc: %s", pt.Desc)
 	return str
+}
+
+func (pt *ProtoTcp) Reset() {
+	pt.Host = STR_DEF_HOST
+	pt.Port = STR_DEF_PORT
+	pt.Conn = nil
+	pt.Desc = "reset"
+}
+
+func (pt *ProtoTcp) Clear() {
+	pt.Host = ""
+	pt.Port = ""
+	pt.Conn = nil
+	pt.Desc = ""
 }
 
 //---------------------------------------------------------------------------
 // new ProtoTcp struct
 //---------------------------------------------------------------------------
-func NewProtoTcp() *ProtoTcp {
-	return &ProtoTcp{}
+func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
+	return &ProtoTcp{
+		Host: hname,
+		Port: hport,
+		Desc: desc,
+	}
 }
 
 //---------------------------------------------------------------------------
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActSender(hname, hport string) {
+func ActSender(pt *ProtoTcp) {
 	log.Printf("Happy Media TCP Sender\n")
 
-	addr, _ := net.ResolveTCPAddr("tcp", hname+":"+hport)
+	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		log.Println(err)
@@ -83,23 +108,26 @@ func (pt *ProtoTcp) ActSender(hname, hport string) {
 	}
 	fmt.Println(headers)
 
+	// send multipart stream, ex) jpg files
+	err = pt.SendMultipartFiles(conn, "../../static/image/*.jpg")
+
 	return
 }
 
 //---------------------------------------------------------------------------
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActReceiver(hport string) {
+func ActReceiver(pt *ProtoTcp) {
 	log.Printf("Happy Media TCP Receiver\n")
 
-	l, err := net.Listen("tcp", ":"+hport)
+	l, err := net.Listen("tcp", ":"+pt.Port)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
 	defer l.Close()
 
-	log.Printf("TCP Server on :%s\n", hport)
+	log.Printf("TCP Server on :%s\n", pt.Port)
 
 	sbuf := sr.NewStreamRing(5, MBYTE)
 
@@ -138,9 +166,10 @@ func (pt *ProtoTcp) SummitRequest(conn net.Conn) (map[string]string, error) {
 	}
 
 	_, err = pt.ReadMessage(conn)
-
-	// send multipart stream, ex) jpg files
-	err = pt.SendMultipartFiles(conn, "static/image/*.jpg")
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
 
 	return nil, err
 }
@@ -151,7 +180,7 @@ func (pt *ProtoTcp) SummitRequest(conn net.Conn) (map[string]string, error) {
 func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 	var err error
 
-	log.Printf("in %s\n", conn.RemoteAddr())
+	log.Printf("in from client at %s\n", conn.RemoteAddr())
 	defer log.Printf("out %s\n", conn.RemoteAddr())
 	defer conn.Close()
 
@@ -440,7 +469,7 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 			return err
 		}
 
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond)
 	}
 
 	return err

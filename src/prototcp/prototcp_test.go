@@ -6,13 +6,36 @@
 
 package prototcp
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+	"time"
+)
 
 //---------------------------------------------------------------------------
 // test
 //---------------------------------------------------------------------------
 func TestSender(t *testing.T) {
+	tcp := NewProtoTcp("www.google.com", "9000", "Testing")
+	fmt.Println(tcp)
 
+	tcp.Reset()
+	fmt.Println(tcp)
+
+	tcp.Clear()
+	fmt.Println(tcp)
+}
+
+func TestSendReceive(t *testing.T) {
+	//var wg sync.WaitGroup
+
+	rx := NewProtoTcp("localhost", "8087", "Rx")
+	go ActReceiver(rx)
+
+	time.Sleep(time.Second)
+
+	tx := NewProtoTcp("localhost", "8087", "Tx")
+	ActSender(tx)
 }
 
 // ---------------------------------E-----N-----D--------------------------------
