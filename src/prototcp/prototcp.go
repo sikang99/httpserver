@@ -9,6 +9,7 @@ package prototcp
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -35,6 +36,14 @@ const (
 	STR_DEF_HOST = "localhost"
 	STR_DEF_PORT = "8080"
 	STR_DEF_BDRY = "myboundary"
+
+	STR_PGM_SENDER = "Happy Media TCP Sender"
+	STR_PGM_RECVER = "Happy Media TCP Receiver"
+)
+
+var (
+	ErrSize = errors.New("Invalid size")
+	ErrNone = errors.New("Nothing to do")
 )
 
 //---------------------------------------------------------------------------
@@ -147,7 +156,7 @@ func ActReceiver(pt *ProtoTcp) {
 
 	log.Printf("TCP Server on :%s\n", pt.Port)
 
-	sbuf := sr.NewStreamRing(5, MBYTE)
+	sbuf := sr.NewStreamRing(2, MBYTE)
 
 	for {
 		// Listen for an incoming connection.
@@ -162,7 +171,7 @@ func ActReceiver(pt *ProtoTcp) {
 }
 
 //---------------------------------------------------------------------------
-// summit TCP request
+// summit a TCP request
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) SummitRequest(conn net.Conn) (map[string]string, error) {
 	var err error
@@ -191,7 +200,7 @@ func (pt *ProtoTcp) SummitRequest(conn net.Conn) (map[string]string, error) {
 }
 
 //---------------------------------------------------------------------------
-// 41 handle request, please close socket after use
+// handle request, please close socket after use
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 	var err error
@@ -280,9 +289,9 @@ func (pt *ProtoTcp) ReadPart(conn net.Conn, ss *sr.StreamSlot) (map[string]strin
 	}
 
 	if clen > 0 {
-		//_, err = pt.ReadBodyToData(reader, clen)
+		//_, err = pt.ReadMessageBodyToData(reader, clen)
 		ss.Type = headers["CONTENT-TYPE"]
-		err = pt.ReadBodyToSlot(reader, clen, ss)
+		err = pt.ReadMessageBodyToSlot(reader, clen, ss)
 		if err != nil {
 			log.Println(err)
 			return nil, err
@@ -293,7 +302,7 @@ func (pt *ProtoTcp) ReadPart(conn net.Conn, ss *sr.StreamSlot) (map[string]strin
 }
 
 //---------------------------------------------------------------------------
-// read a message in http header style
+// get boundary string for multipart
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) GetBoundary(str string) error {
 	var err error
@@ -324,7 +333,7 @@ func (pt *ProtoTcp) ReadMessage(conn net.Conn) (map[string]string, error) {
 
 	reader := bufio.NewReader(conn)
 
-	headers, err := pt.ReadHeader(reader)
+	headers, err := pt.ReadMessageHeader(reader)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -342,7 +351,7 @@ func (pt *ProtoTcp) ReadMessage(conn net.Conn) (map[string]string, error) {
 	}
 
 	if clen > 0 {
-		_, err = pt.ReadBodyToData(reader, clen)
+		_, err = pt.ReadMessageBodyToData(reader, clen)
 		if err != nil {
 			log.Println(err)
 			return nil, err
@@ -382,7 +391,7 @@ func (pt *ProtoTcp) ReadPartHeader(reader *bufio.Reader) (map[string]string, err
 			}
 		}
 
-		// if maybe invalid header data
+		// if maybe invalid header data, TODO: stop or ignore?
 		if len(line) > LEN_MAX_LINE {
 			break
 		}
@@ -401,7 +410,7 @@ func (pt *ProtoTcp) ReadPartHeader(reader *bufio.Reader) (map[string]string, err
 //---------------------------------------------------------------------------
 // read header of message and return a map
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadHeader(reader *bufio.Reader) (map[string]string, error) {
+func (pt *ProtoTcp) ReadMessageHeader(reader *bufio.Reader) (map[string]string, error) {
 	var err error
 
 	result := make(map[string]string)
@@ -429,9 +438,9 @@ func (pt *ProtoTcp) ReadHeader(reader *bufio.Reader) (map[string]string, error) 
 }
 
 //---------------------------------------------------------------------------
-// read body of message
+// read(recv) body of message to data
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadBodyToData(reader *bufio.Reader, clen int) ([]byte, error) {
+func (pt *ProtoTcp) ReadMessageBodyToData(reader *bufio.Reader, clen int) ([]byte, error) {
 	var err error
 
 	data := make([]byte, clen)
@@ -452,9 +461,9 @@ func (pt *ProtoTcp) ReadBodyToData(reader *bufio.Reader, clen int) ([]byte, erro
 }
 
 //---------------------------------------------------------------------------
-// read body of message
+// read(recv) body of message to slot of ring buffer
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadBodyToSlot(reader *bufio.Reader, clen int, ss *sr.StreamSlot) error {
+func (pt *ProtoTcp) ReadMessageBodyToSlot(reader *bufio.Reader, clen int, ss *sr.StreamSlot) error {
 	var err error
 
 	ss.Length = 0
@@ -488,28 +497,15 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 	}
 	if files == nil {
 		log.Printf("no file for '%s'\n", pattern)
-		return err
+		return ErrNone
 	}
 
 	for i := range files {
-		fdata, err := ioutil.ReadFile(files[i])
+		err = pt.SendPartFile(conn, files[i])
 		if err != nil {
-			log.Println(err)
-			return err
-		}
-
-		if len(fdata) == 0 {
-			fmt.Printf(">> ignore '%s' of zero size\n", files[i])
-			continue
-		}
-
-		ctype := mime.TypeByExtension(files[i])
-		if ctype == "" {
-			ctype = http.DetectContentType(fdata)
-		}
-
-		err = pt.SendPartData(conn, fdata, ctype)
-		if err != nil {
+			if err == ErrSize {
+				continue
+			}
 			log.Println(err)
 			return err
 		}
@@ -521,7 +517,38 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 }
 
 //---------------------------------------------------------------------------
-// send a part
+// send a part file
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) SendPartFile(conn net.Conn, file string) error {
+	var err error
+
+	fdata, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if len(fdata) == 0 {
+		fmt.Printf(">> ignore '%s' of zero size\n", file)
+		return ErrSize
+	}
+
+	ctype := mime.TypeByExtension(file)
+	if ctype == "" {
+		ctype = http.DetectContentType(fdata)
+	}
+
+	err = pt.SendPartData(conn, fdata, ctype)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send a part data
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) SendPartData(conn net.Conn, data []byte, ctype string) error {
 	var err error
@@ -532,8 +559,6 @@ func (pt *ProtoTcp) SendPartData(conn net.Conn, data []byte, ctype string) error
 	req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
 	req += fmt.Sprintf("Content-Length: %d\r\n", clen)
 	req += "\r\n"
-
-	defer fmt.Printf("SEND [%d,%d]\n%s", len(req), clen, req)
 
 	_, err = conn.Write([]byte(req))
 	if err != nil {
@@ -549,6 +574,7 @@ func (pt *ProtoTcp) SendPartData(conn net.Conn, data []byte, ctype string) error
 		}
 	}
 
+	fmt.Printf("SEND [%d,%d]\n%s", len(req), clen, req)
 	return err
 }
 

@@ -1,4 +1,5 @@
 //==================================================================================
+// Author: Stoney Kang, sikang99@gmail.com, 2015
 // Image
 // - https://github.com/golang-samples/image
 // - https://www.socketloop.com/tutorials/golang-save-image-to-png-jpeg-or-gif-format

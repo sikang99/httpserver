@@ -1,4 +1,5 @@
 //==================================================================================
+// Author: Stoney Kang, sikang99@gmail.com, 2015
 // Info
 // - https://github.com/nu7hatch/gouuid - Go binding for libuuid
 // - https://github.com/sony/sonyflake - A distributed unique ID generator inspired by Twitter's Snowflake

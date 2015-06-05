@@ -1,6 +1,6 @@
 //==================================================================================
+// Author: Stoney Kang, sikang99@gmail.com, 2015
 // Test for stream buffer for multipart media
-// Author : Stoney Kang, sikang99@gmail.com
 //==================================================================================
 
 package streambase

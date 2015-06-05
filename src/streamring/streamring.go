@@ -1,7 +1,6 @@
 //==================================================================================
+// Author : Stoney Kang, sikang99@gmail.com, 2015
 // Circular Stream Buffer : Ring
-// Author : Stoney Kang, sikang99@gmail.com
-//
 // - https://github.com/zfjagann/golang-ring
 // - https://github.com/glycerine/rbuf
 // - http://blog.pivotal.io/labs/labs/a-concurrent-ring-buffer-for-go
