@@ -50,12 +50,6 @@ type WsConfig struct {
 	Mw       *multipart.Writer
 }
 
-type DataFrame struct {
-	Type string
-	Size int
-	Data []byte
-}
-
 type ProtoWs struct {
 	Host     string
 	Port     string
@@ -122,7 +116,7 @@ func NewProtoWs(hname, hport, hptls, desc string) *ProtoWs {
 //---------------------------------------------------------------------------
 // WebSocket shooter for test and debugging
 //---------------------------------------------------------------------------
-func ActWsShooter(pw *ProtoWs) {
+func ActShooter(pw *ProtoWs) {
 	log.Printf("Happy Media WS Shooter\n")
 
 	origin := fmt.Sprintf("http://%s/", pw.Host)
@@ -147,7 +141,7 @@ func ActWsShooter(pw *ProtoWs) {
 //---------------------------------------------------------------------------
 // WebSocket catcher for test and debugging
 //---------------------------------------------------------------------------
-func ActWsCatcher(pw *ProtoWs) {
+func ActCatcher(pw *ProtoWs) {
 	log.Printf("Happy Media WS Catcher on ws:%s and wss:%s\n", pw.Port, pw.PortTls)
 
 	http.Handle("/echo", websocket.Handler(pw.EchoHandler))

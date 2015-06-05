@@ -8,8 +8,11 @@ package protows
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
+//---------------------------------------------------------------------------------
+// test for
 //---------------------------------------------------------------------------------
 func TestProtoInfo(t *testing.T) {
 	ws := NewProtoWs("www.google.com", "9000", "8443", "Testing")
@@ -23,6 +26,19 @@ func TestProtoInfo(t *testing.T) {
 
 	ws.SetAddr("www.facebook.com", "8080", "8443", "Redirect")
 	fmt.Println(ws)
+}
+
+//---------------------------------------------------------------------------------
+// test for
+//---------------------------------------------------------------------------------
+func TestSingleShootCatch(t *testing.T) {
+	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
+	go ActCatcher(rx)
+
+	time.Sleep(time.Millisecond)
+
+	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
+	ActShooter(tx)
 }
 
 // ----------------------------------E-----N-----D---------------------------------
