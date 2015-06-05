@@ -1,4 +1,5 @@
 //=================================================================================
+// Author: Stoney Kang, sikang99@gmail.com, 2015
 // Package for TCP Socket
 //  - http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
 //  - https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
@@ -33,14 +34,16 @@ const (
 
 	STR_DEF_HOST = "localhost"
 	STR_DEF_PORT = "8080"
+	STR_DEF_BDRY = "myboundary"
 )
 
 //---------------------------------------------------------------------------
 type ProtoTcp struct {
-	Host string
-	Port string
-	Conn net.Conn
-	Desc string
+	Host     string
+	Port     string
+	Desc     string
+	Boundary string
+	Conn     net.Conn
 }
 
 //---------------------------------------------------------------------------
@@ -50,22 +53,36 @@ func (pt *ProtoTcp) String() string {
 	str := fmt.Sprintf("\tHost: %s", pt.Host)
 	str += fmt.Sprintf("\tPort: %s", pt.Port)
 	str += fmt.Sprintf("\tConn: %v", pt.Conn)
+	str += fmt.Sprintf("\tBoundary: %s", pt.Boundary)
 	str += fmt.Sprintf("\tDesc: %s", pt.Desc)
 	return str
+}
+
+func (pt *ProtoTcp) SetAddr(hname, hport, desc string) {
+	pt.Host = hname
+	pt.Port = hport
+	pt.Desc = desc
 }
 
 func (pt *ProtoTcp) Reset() {
 	pt.Host = STR_DEF_HOST
 	pt.Port = STR_DEF_PORT
-	pt.Conn = nil
+	pt.Boundary = STR_DEF_BDRY
 	pt.Desc = "reset"
+	if pt.Conn != nil {
+		pt.Conn.Close()
+		pt.Conn = nil
+	}
 }
 
 func (pt *ProtoTcp) Clear() {
 	pt.Host = ""
 	pt.Port = ""
-	pt.Conn = nil
 	pt.Desc = ""
+	if pt.Conn != nil {
+		pt.Conn.Close()
+		pt.Conn = nil
+	}
 }
 
 //---------------------------------------------------------------------------
@@ -73,9 +90,10 @@ func (pt *ProtoTcp) Clear() {
 //---------------------------------------------------------------------------
 func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
 	return &ProtoTcp{
-		Host: hname,
-		Port: hport,
-		Desc: desc,
+		Host:     hname,
+		Port:     hport,
+		Desc:     desc,
+		Boundary: STR_DEF_BDRY,
 	}
 }
 
@@ -108,8 +126,8 @@ func ActSender(pt *ProtoTcp) {
 	}
 	fmt.Println(headers)
 
-	// send multipart stream, ex) jpg files
-	err = pt.SendMultipartFiles(conn, "../../static/image/*.jpg")
+	// send multipart stream of files
+	err = pt.SendMultipartFiles(conn, "../../static/image/*")
 
 	return
 }
@@ -149,11 +167,9 @@ func ActReceiver(pt *ProtoTcp) {
 func (pt *ProtoTcp) SummitRequest(conn net.Conn) (map[string]string, error) {
 	var err error
 
-	boundary := "myboundary"
-
 	// send POST request
 	req := "POST /stream HTTP/1.1\r\n"
-	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", boundary)
+	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pt.Boundary)
 	req += "User-Agent: Happy Media TCP Client\r\n"
 	req += "\r\n"
 
@@ -207,7 +223,7 @@ func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 	//for i := 0; i < 20; i++ {
 	for {
 		slot, pos := sbuf.GetSlotIn()
-		_, err = pt.ReadPart(conn, "--agilemedia", slot)
+		_, err = pt.ReadPart(conn, slot)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -246,12 +262,12 @@ func (pt *ProtoTcp) SendResponse(conn net.Conn) error {
 //---------------------------------------------------------------------------
 // read a message in http header style
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadPart(conn net.Conn, boundary string, ss *sr.StreamSlot) (map[string]string, error) {
+func (pt *ProtoTcp) ReadPart(conn net.Conn, ss *sr.StreamSlot) (map[string]string, error) {
 	var err error
 
 	reader := bufio.NewReader(conn)
 
-	headers, err := pt.ReadPartHeader(reader, boundary)
+	headers, err := pt.ReadPartHeader(reader)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -279,6 +295,30 @@ func (pt *ProtoTcp) ReadPart(conn net.Conn, boundary string, ss *sr.StreamSlot) 
 //---------------------------------------------------------------------------
 // read a message in http header style
 //---------------------------------------------------------------------------
+func (pt *ProtoTcp) GetBoundary(str string) error {
+	var err error
+
+	_, params, err := mime.ParseMediaType(str)
+	//fmt.Printf("%v %v %s\n", mt, params, str)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	boundary := params["boundary"]
+	if !strings.HasPrefix(boundary, "--") {
+		log.Printf("expected boundary to start with --, got %q", boundary)
+	}
+
+	pt.Boundary = boundary
+	fmt.Println(pt)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read a message in http header style
+//---------------------------------------------------------------------------
 func (pt *ProtoTcp) ReadMessage(conn net.Conn) (map[string]string, error) {
 	var err error
 
@@ -290,8 +330,13 @@ func (pt *ProtoTcp) ReadMessage(conn net.Conn) (map[string]string, error) {
 		return nil, err
 	}
 
+	value, ok := headers["CONTENT-TYPE"]
+	if ok {
+		pt.GetBoundary(value)
+	}
+
 	clen := 0
-	value, ok := headers["CONTENT-LENGTH"]
+	value, ok = headers["CONTENT-LENGTH"]
 	if ok {
 		clen, _ = strconv.Atoi(value)
 	}
@@ -310,7 +355,7 @@ func (pt *ProtoTcp) ReadMessage(conn net.Conn) (map[string]string, error) {
 //---------------------------------------------------------------------------
 // read header of message and return a map
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadPartHeader(reader *bufio.Reader, boundary string) (map[string]string, error) {
+func (pt *ProtoTcp) ReadPartHeader(reader *bufio.Reader) (map[string]string, error) {
 	var err error
 
 	result := make(map[string]string)
@@ -332,7 +377,7 @@ func (pt *ProtoTcp) ReadPartHeader(reader *bufio.Reader, boundary string) (map[s
 			}
 		}
 		if !fstart {
-			if strings.Contains(string(line), boundary) || strings.Contains(string(line), "POST") {
+			if strings.Contains(string(line), pt.Boundary) || strings.Contains(string(line), "POST") {
 				fstart = true
 			}
 		}
@@ -454,7 +499,7 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 		}
 
 		if len(fdata) == 0 {
-			fmt.Printf(">> ignore '%s'\n", files[i])
+			fmt.Printf(">> ignore '%s' of zero size\n", files[i])
 			continue
 		}
 
@@ -463,7 +508,7 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 			ctype = http.DetectContentType(fdata)
 		}
 
-		err = pt.SendPart(conn, fdata, ctype)
+		err = pt.SendPartData(conn, fdata, ctype)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -478,12 +523,12 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 //---------------------------------------------------------------------------
 // send a part
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) SendPart(conn net.Conn, data []byte, ctype string) error {
+func (pt *ProtoTcp) SendPartData(conn net.Conn, data []byte, ctype string) error {
 	var err error
 
 	clen := len(data)
 
-	req := fmt.Sprintf("--%s\r\n", "myboundary")
+	req := fmt.Sprintf("--%s\r\n", pt.Boundary)
 	req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
 	req += fmt.Sprintf("Content-Length: %d\r\n", clen)
 	req += "\r\n"
