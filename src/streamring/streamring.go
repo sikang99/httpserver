@@ -56,11 +56,11 @@ func (ss *StreamSlot) String() string {
 	str := fmt.Sprintf("\tType: %s", ss.Type)
 	str += fmt.Sprintf("\tLength: %d/%d(%d)", ss.Length, ss.LengthMax, len(ss.Content))
 	str += fmt.Sprintf("\tContent: ")
-	if ss.Length > 0 {
+	if ss.Length > 1 {
 		if strings.Contains(ss.Type, "text/") {
-			str += fmt.Sprintf("%s [%0x:%0x]", string(ss.Content[:ss.Length]), ss.Content[ss.Length-1], ss.Content[ss.Length])
+			str += fmt.Sprintf("%s [%0x:%0x]", string(ss.Content[:ss.Length]), ss.Content[:2], ss.Content[ss.Length-2:ss.Length])
 		} else {
-			str += fmt.Sprintf("[%0x%0x-%0x%0x]", ss.Content[0], ss.Content[1], ss.Content[ss.Length-2], ss.Content[ss.Length-1])
+			str += fmt.Sprintf("[%0x-%0x]", ss.Content[:2], ss.Content[ss.Length-2:ss.Length])
 		}
 	}
 	return str

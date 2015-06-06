@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 )
 
 type Config struct {
@@ -29,5 +30,17 @@ func ShowNetInterfaces() {
 		for j, addr := range addrs {
 			fmt.Printf("\t%d %v\n", j, addr)
 		}
+	}
+}
+
+func openLogFile(logfile string) {
+	if logfile != "" {
+		lf, err := os.OpenFile(logfile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0640)
+
+		if err != nil {
+			log.Fatal("OpenLogfile: os.OpenFile:", err)
+		}
+
+		log.SetOutput(lf)
 	}
 }

@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"errors"
@@ -30,8 +31,6 @@ import (
 	"time"
 
 	"stoney/httpserver/src/base"
-	pt "stoney/httpserver/src/prototcp"
-	pw "stoney/httpserver/src/protows"
 	si "stoney/httpserver/src/streamimage"
 	sr "stoney/httpserver/src/streamring"
 
@@ -195,17 +194,13 @@ func main() {
 	case "server":
 		ActHttpServer()
 	case "sender":
-		ts := pt.NewProtoTcp("localhost", "8087", "T-Tx")
-		pt.ActSender(ts)
+		ActTcpSender(*fhost, *fport)
 	case "receiver":
-		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-		pt.ActReceiver(tr, conf.Ring)
+		ActTcpReceiver(*fport)
 	case "shooter":
-		ws := pw.NewProtoWs("localhost", "8087", "8443", "W-Tx")
-		pw.ActShooter(ws)
+		ActWsShooter(*fhost, *fport)
 	case "catcher":
-		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		pw.ActCatcher(wr)
+		ActWsCatcher(*fport)
 	case "filer":
 		ActFileReader()
 	default:
@@ -619,9 +614,7 @@ func ActHttpServer() error {
 
 	//go ActFileReader()
 	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
-
-	tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-	go pt.ActReceiver(tr, conf.Ring)
+	go ActTcpReceiver("8087")
 
 	wg.Wait()
 
@@ -1214,6 +1207,871 @@ func Responder(w http.ResponseWriter, r *http.Request, status int, message strin
 	w.WriteHeader(status)
 	log.Println(message)
 	fmt.Fprintf(w, message)
+}
+
+//==================================================================================
+// TCP Socket
+//  - http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
+//  - https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
+//==================================================================================
+//---------------------------------------------------------------------------
+// act TCP sender for test and debugging
+//---------------------------------------------------------------------------
+func ActTcpSender(hname, hport string) {
+	log.Printf("Happy Media TCP Sender\n")
+
+	addr, _ := net.ResolveTCPAddr("tcp", hname+":"+hport)
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
+
+	err = conn.SetNoDelay(true)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Printf("Connecting to %s\n", addr)
+
+	headers, err := TcpSummitRequest(conn)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Println(headers)
+
+	return
+}
+
+//---------------------------------------------------------------------------
+// TCP receiver for debugging
+//---------------------------------------------------------------------------
+func ActTcpReceiver(hport string) {
+	log.Printf("Happy Media TCP Receiver\n")
+
+	l, err := net.Listen("tcp", ":"+hport)
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	defer l.Close()
+
+	log.Printf("TCP Server on :%s\n", hport)
+
+	for {
+		// Listen for an incoming connection.
+		conn, err := l.Accept()
+		if err != nil {
+			log.Println(err)
+			os.Exit(1)
+		}
+
+		go TcpHandleRequest(conn)
+	}
+}
+
+//---------------------------------------------------------------------------
+// 31 summit TCP request
+//---------------------------------------------------------------------------
+func TcpSummitRequest(conn net.Conn) (map[string]string, error) {
+	var err error
+
+	boundary := "myboundary"
+
+	// send POST request
+	req := "POST /stream HTTP/1.1\r\n"
+	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", boundary)
+	req += "User-Agent: Happy Media TCP Client\r\n"
+	req += "\r\n"
+
+	fmt.Printf("SEND [%d]\n%s", len(req), req)
+
+	_, err = conn.Write([]byte(req))
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	_, err = TcpReadMessage(conn)
+
+	// send multipart stream, ex) jpg files
+	err = TcpSendMultipartFiles(conn, "static/image/*.jpg")
+
+	return nil, err
+}
+
+//---------------------------------------------------------------------------
+// 41 handle request, please close socket after use
+//---------------------------------------------------------------------------
+func TcpHandleRequest(conn net.Conn) error {
+	var err error
+
+	log.Printf("in %s\n", conn.RemoteAddr())
+	defer log.Printf("out %s\n", conn.RemoteAddr())
+	defer conn.Close()
+
+	// recv POST request
+	_, err = TcpReadMessage(conn)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	err = TcpSendResponse(conn)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	sbuf := conf.Ring
+	err = sbuf.SetStatusUsing()
+	if err != nil {
+		return sr.ErrStatus
+	}
+	defer sbuf.Reset()
+
+	//  recv multipart stream
+	//for i := 0; i < 20; i++ {
+	for {
+		slot, pos := sbuf.GetSlotIn()
+		_, err = TcpReadPart(conn, "--agilemedia", slot)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		if slot.IsMajorType("multipart") {
+			continue
+		}
+		sbuf.SetPosInByPos(pos + 1)
+	}
+
+	fmt.Println(sbuf)
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send TCP response
+//---------------------------------------------------------------------------
+func TcpSendResponse(conn net.Conn) error {
+	var err error
+
+	res := "HTTP/1.1 200 Ok\r\n"
+	res += "Server: Happy Media TCP Server\r\n"
+	res += "\r\n"
+
+	fmt.Printf("SEND [%d]\n%s", len(res), res)
+
+	_, err = conn.Write([]byte(res))
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read a message in http header style
+//---------------------------------------------------------------------------
+func TcpReadPart(conn net.Conn, boundary string, ss *sr.StreamSlot) (map[string]string, error) {
+	var err error
+
+	reader := bufio.NewReader(conn)
+
+	headers, err := TcpReadPartHeader(reader, boundary)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	clen := 0
+	value, ok := headers["CONTENT-LENGTH"]
+	if ok {
+		clen, _ = strconv.Atoi(value)
+	}
+
+	if clen > 0 {
+		//_, err = TcpReadBodyToData(reader, clen)
+		ss.Type = headers["CONTENT-TYPE"]
+		err = TcpReadBodyToSlot(reader, clen, ss)
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+	}
+
+	return headers, err
+}
+
+//---------------------------------------------------------------------------
+// read a message in http header style
+//---------------------------------------------------------------------------
+func TcpReadMessage(conn net.Conn) (map[string]string, error) {
+	var err error
+
+	reader := bufio.NewReader(conn)
+
+	headers, err := TcpReadHeader(reader)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	clen := 0
+	value, ok := headers["CONTENT-LENGTH"]
+	if ok {
+		clen, _ = strconv.Atoi(value)
+	}
+
+	if clen > 0 {
+		_, err = TcpReadBodyToData(reader, clen)
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+	}
+
+	return headers, err
+}
+
+//---------------------------------------------------------------------------
+// read header of message and return a map
+//---------------------------------------------------------------------------
+func TcpReadPartHeader(reader *bufio.Reader, boundary string) (map[string]string, error) {
+	var err error
+
+	result := make(map[string]string)
+
+	fstart := false
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			log.Println(err)
+			return result, err
+		}
+
+		// find header start of part
+		if string(line) == "" {
+			if fstart {
+				break
+			} else {
+				continue
+			}
+		}
+		if !fstart {
+			if strings.Contains(string(line), boundary) || strings.Contains(string(line), "POST") {
+				fstart = true
+			}
+		}
+
+		// if maybe invalid header data
+		if len(line) > LEN_MAX_LINE {
+			break
+		}
+		//fmt.Println(string(line))
+
+		keyvalue := strings.SplitN(string(line), ":", 2)
+		if len(keyvalue) > 1 {
+			result[strings.ToUpper(keyvalue[0])] = strings.TrimSpace(keyvalue[1])
+		}
+	}
+
+	//fmt.Println(result)
+	return result, err
+}
+
+//---------------------------------------------------------------------------
+// read header of message and return a map
+//---------------------------------------------------------------------------
+func TcpReadHeader(reader *bufio.Reader) (map[string]string, error) {
+	var err error
+
+	result := make(map[string]string)
+
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			log.Println(err)
+			return result, err
+		}
+		if string(line) == "" {
+			break
+		}
+
+		fmt.Println(string(line))
+
+		keyvalue := strings.SplitN(string(line), ":", 2)
+		if len(keyvalue) > 1 {
+			result[strings.ToUpper(keyvalue[0])] = strings.TrimSpace(keyvalue[1])
+		}
+	}
+
+	fmt.Println(result)
+	return result, err
+}
+
+//---------------------------------------------------------------------------
+// read body of message
+//---------------------------------------------------------------------------
+func TcpReadBodyToData(reader *bufio.Reader, clen int) ([]byte, error) {
+	var err error
+
+	data := make([]byte, clen)
+
+	tn := 0
+	for tn < clen {
+		n, err := reader.Read(data[tn:])
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		tn += n
+	}
+
+	//fmt.Printf(string(data[:tn]))
+	fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
+	return data, err
+}
+
+//---------------------------------------------------------------------------
+// read body of message
+//---------------------------------------------------------------------------
+func TcpReadBodyToSlot(reader *bufio.Reader, clen int, ss *sr.StreamSlot) error {
+	var err error
+
+	ss.Length = 0
+
+	tn := 0
+	for tn < clen {
+		n, err := reader.Read(ss.Content[tn:])
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		tn += n
+	}
+
+	ss.Length = clen
+
+	//fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send files in multipart
+//---------------------------------------------------------------------------
+func TcpSendMultipartFiles(conn net.Conn, pattern string) error {
+	var err error
+
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if files == nil {
+		log.Printf("no file for '%s'\n", pattern)
+		return err
+	}
+
+	for i := range files {
+		fdata, err := ioutil.ReadFile(files[i])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		if len(fdata) == 0 {
+			fmt.Printf(">> ignore '%s'\n", files[i])
+			continue
+		}
+
+		ctype := mime.TypeByExtension(files[i])
+		if ctype == "" {
+			ctype = http.DetectContentType(fdata)
+		}
+
+		err = TcpSendPart(conn, fdata, ctype)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send a part
+//---------------------------------------------------------------------------
+func TcpSendPart(conn net.Conn, data []byte, ctype string) error {
+	var err error
+
+	clen := len(data)
+
+	req := fmt.Sprintf("--%s\r\n", "myboundary")
+	req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
+	req += fmt.Sprintf("Content-Length: %d\r\n", clen)
+	req += "\r\n"
+
+	defer fmt.Printf("SEND [%d,%d]\n%s", len(req), clen, req)
+
+	_, err = conn.Write([]byte(req))
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if clen > 0 {
+		_, err = conn.Write(data)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+	}
+
+	return err
+}
+
+//==================================================================================
+// WebSocket(WS, WSS)
+// - https://godoc.org/golang.org/x/net/websocket
+// - https://github.com/golang-samples/websocket
+// - http://www.ajanicij.info/content/websocket-tutorial-go
+//==================================================================================
+type WsConfig struct {
+	Ws       *websocket.Conn
+	Boundary string
+	Mr       *multipart.Reader
+	Mw       *multipart.Writer
+}
+
+type DataFrame struct {
+	Type string
+	Size int
+	Data []byte
+}
+
+//---------------------------------------------------------------------------
+// WebSocket shooter for test and debugging
+//---------------------------------------------------------------------------
+func ActWsShooter(hname, hport string) {
+	log.Printf("Happy Media WS Shooter\n")
+
+	origin := fmt.Sprintf("http://%s/", hname)
+	url := fmt.Sprintf("ws://%s:%s/stream", hname, hport)
+
+	// connect to the server
+	ws, err := websocket.Dial(url, "", origin)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = WsSummitRequest(ws)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	WsSendMultipartFiles(ws, "static/image/*.jpg")
+}
+
+//---------------------------------------------------------------------------
+// WebSocket catcher for test and debugging
+//---------------------------------------------------------------------------
+func ActWsCatcher(hport string) {
+	log.Printf("Happy Media WS Catcher on ws:%s and wss:%s\n", *fport, *fports)
+
+	http.Handle("/echo", websocket.Handler(WsEchoHandler))
+	http.Handle("/stream", websocket.Handler(WsStreamHandler))
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+
+	//log.Fatal(http.ListenAndServe(":"+hport, nil))
+
+	//var wg sync.WaitGroup
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	// HTTP server
+	go serveHttp(&wg)
+
+	wg.Add(1)
+	// HTTPS server
+	go serveHttps(&wg)
+
+	wg.Wait()
+}
+
+//---------------------------------------------------------------------------
+// WebSocket stream handler in the server
+// - http://www.websocket.org/echo.html
+// - http://jan.newmarch.name/go/websockets/chapter-websockets.html
+//---------------------------------------------------------------------------
+func WsEchoHandler(ws *websocket.Conn) {
+	var err error
+
+	// simplest echo function
+	//io.Copy(ws, ws)
+
+	// slightly message change echo
+	for {
+		var reply string
+
+		err = websocket.Message.Receive(ws, &reply)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		fmt.Println("Received back from client: " + reply)
+
+		msg := "Received:  " + reply
+		fmt.Println("Sending to client: " + msg)
+
+		err = websocket.Message.Send(ws, msg)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+	}
+}
+
+//---------------------------------------------------------------------------
+// WebSocket stream handler in the server
+//---------------------------------------------------------------------------
+func WsStreamHandler(ws *websocket.Conn) {
+	log.Printf("in %s\n", ws.RemoteAddr())
+	defer log.Printf("out %s\n", ws.RemoteAddr())
+
+	boundary, err := WsHandleRequest(ws)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = WsRecvMultipart(ws, boundary)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+}
+
+//---------------------------------------------------------------------------
+// WebSocket summit a request to the server
+//---------------------------------------------------------------------------
+func WsSummitRequest(ws *websocket.Conn) error {
+	var err error
+
+	boundary := "myboundary"
+
+	// send POST request
+	smsg := "POST /stream HTTP/1.1\r\n"
+	smsg += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", boundary)
+	smsg += "User-Agent: Happy Media WS Client\r\n"
+	smsg += "\r\n"
+
+	n, err := ws.Write([]byte(smsg))
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	fmt.Printf("Send(%d):\n%s", n, smsg)
+
+	// recv response
+	rmsg := make([]byte, 512)
+
+	n, err = ws.Read(rmsg)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	fmt.Printf("Recv(%d):\n%s", n, rmsg[:n])
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket handle a client request in the server
+//---------------------------------------------------------------------------
+func WsHandleRequest(ws *websocket.Conn) (string, error) {
+	var err error
+
+	// recv POST request
+	rmsg := make([]byte, 512)
+
+	n, err := ws.Read(rmsg)
+	if err != nil {
+		log.Println(err)
+		return "", err
+	}
+	fmt.Printf("Recv(%d):\n%s", n, rmsg[:n])
+
+	// parse request
+	boundary, err := WsGetBoundary(string(rmsg[:n]))
+	if err != nil {
+		log.Println(err)
+		return boundary, err
+	}
+
+	// send response
+	smsg := "HTTP/1.1 200 Ok\r\n"
+	smsg += "Server: Happy Media WS Server\r\n"
+	smsg += "\r\n"
+
+	n, err = ws.Write([]byte(smsg))
+	if err != nil {
+		log.Println(err)
+		return boundary, err
+	}
+	fmt.Printf("Send(%d):\n%s", n, smsg)
+
+	return boundary, err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket get boundary string from message
+//---------------------------------------------------------------------------
+func WsGetBoundary(msg string) (string, error) {
+	var err error
+
+	req, err := WsGetRequest(msg)
+
+	mt, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	fmt.Printf("%v %v\n", params, req.Header.Get("Content-Type"))
+	if err != nil {
+		log.Printf("ParseMediaType: %s %v", mt, err)
+		return "", err
+	}
+
+	boundary := params["boundary"]
+	if !strings.HasPrefix(boundary, "--") {
+		log.Printf("expected boundary to start with --, got %q", boundary)
+	}
+
+	return boundary, err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket get http request from message
+//---------------------------------------------------------------------------
+func WsGetRequest(msg string) (*http.Request, error) {
+	var err error
+
+	reader := bufio.NewReader(strings.NewReader(msg))
+	req, err := http.ReadRequest(reader)
+	if err != nil {
+		log.Println(err)
+		return req, err
+	}
+	fmt.Println(req.Header)
+
+	return req, err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket get header from message
+//---------------------------------------------------------------------------
+func WsGetHeader(msg string) (http.Header, error) {
+	var err error
+
+	reader := bufio.NewReader(strings.NewReader(msg))
+	tp := textproto.NewReader(reader)
+
+	mimeHeader, err := tp.ReadMIMEHeader()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	httpHeader := http.Header(mimeHeader)
+	fmt.Println(httpHeader)
+
+	return httpHeader, err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket send files in multipart
+//---------------------------------------------------------------------------
+func WsSendMultipartFiles(ws *websocket.Conn, pattern string) error {
+	var err error
+
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if files == nil {
+		log.Printf("no file for '%s'\n", pattern)
+		return err
+	}
+
+	//mw := multipart.NewWriter(os.Stdout)	// for debug
+	mw := multipart.NewWriter(ws)
+	mw.SetBoundary("myboundary")
+
+	for i := range files {
+		fmt.Println(files[i])
+		fdata, err := ioutil.ReadFile(files[i])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		if len(fdata) == 0 {
+			fmt.Printf(">> ignore '%s'\n", files[i])
+			continue
+		}
+
+		ctype := mime.TypeByExtension(files[i])
+		if ctype == "" {
+			ctype = http.DetectContentType(fdata)
+		}
+
+		err = WsSendPartData(mw, fdata, len(fdata), ctype)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket recv multipart
+//---------------------------------------------------------------------------
+func WsRecvMultipart(ws *websocket.Conn, boundary string) error {
+	var err error
+
+	mr := multipart.NewReader(ws, boundary)
+
+	for {
+		err = WsRecvPartToData(mr)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket send a part of multipart
+//---------------------------------------------------------------------------
+func WsSendPartData(mw *multipart.Writer, data []byte, dsize int, dtype string) error {
+	var err error
+
+	buf := new(bytes.Buffer)
+
+	part, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Type":   {dtype},
+		"Content-Length": {strconv.Itoa(dsize)},
+	})
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	_, err = buf.Write(data)   // dn, prepare data in the buffer
+	_, err = buf.WriteTo(part) // tn(int64), output the part with buffer in multipart format
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// WebSocket recv a part of multipart
+//---------------------------------------------------------------------------
+func WsRecvPartToData(mr *multipart.Reader) error {
+	var err error
+
+	p, nl, err := ReadPartHeader(mr)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	data := make([]byte, nl)
+
+	err = ReadPartBodyToData(p, nl, data)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	fmt.Printf("%d [%0x-%0x]\n", nl, data[2], data[nl-2:])
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read a part header and parse it
+//---------------------------------------------------------------------------
+func ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
+	var err error
+
+	p, err := mr.NextPart()
+	if err != nil { // io.EOF
+		log.Println(err)
+		return p, 0, err
+	}
+
+	sl := p.Header.Get("Content-Length")
+	nl, err := strconv.Atoi(sl)
+	if err != nil {
+		log.Printf("%s %s -> %d\n", p.Header, sl, nl)
+		return p, nl, err
+	}
+
+	return p, nl, err
+}
+
+//---------------------------------------------------------------------------
+// read a part body to data
+//---------------------------------------------------------------------------
+func ReadPartBodyToData(p *multipart.Part, nl int, data []byte) error {
+	var err error
+
+	var tn int
+	for tn < nl {
+		n, err := p.Read(data[tn:])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		tn += n
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read a part body to slot
+//---------------------------------------------------------------------------
+func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
+	var err error
+
+	ss.Length = 0
+
+	var tn int
+	for tn < nl {
+		n, err := p.Read(ss.Content[tn:])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		tn += n
+	}
+
+	ss.Length = nl
+
+	return err
 }
 
 // ---------------------------------E-----N-----D--------------------------------

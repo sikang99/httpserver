@@ -7,9 +7,15 @@ package protows
 
 import (
 	"fmt"
+	"log"
 	"testing"
 	"time"
 )
+
+func init() {
+	//log.SetFlags(log.Lshortfile)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 //---------------------------------------------------------------------------------
 // test for
@@ -29,16 +35,38 @@ func TestProtoInfo(t *testing.T) {
 }
 
 //---------------------------------------------------------------------------------
-// test for
+// test for echo
 //---------------------------------------------------------------------------------
-func TestSingleShootCatch(t *testing.T) {
+func TestEcho(t *testing.T) {
 	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
 	go ActCatcher(rx)
 
 	time.Sleep(time.Millisecond)
 
 	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
+	for i := 0; i < 5; i++ {
+		EchoClient(tx, "Hello World!")
+	}
+}
+
+//---------------------------------------------------------------------------------
+// test for single shoot
+//---------------------------------------------------------------------------------
+func TestSingleShootCatch(t *testing.T) {
+	/*
+		rx := NewProtoWs("localhost", "8087", "8443", "Rx")
+		go ActCatcher(rx)
+
+		time.Sleep(time.Millisecond)
+	*/
+	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
 	ActShooter(tx)
+}
+
+//---------------------------------------------------------------------------------
+// test for multi shooters
+//---------------------------------------------------------------------------------
+func TestMultiShootCatch(t *testing.T) {
 }
 
 // ----------------------------------E-----N-----D---------------------------------

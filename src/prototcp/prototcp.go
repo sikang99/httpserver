@@ -17,7 +17,6 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -147,26 +146,24 @@ func ActSender(pt *ProtoTcp) {
 //---------------------------------------------------------------------------
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
-func ActReceiver(pt *ProtoTcp) {
+func ActReceiver(pt *ProtoTcp, sbuf *sr.StreamRing) {
 	log.Printf("Happy Media TCP Receiver\n")
 
 	l, err := net.Listen("tcp", ":"+pt.Port)
 	if err != nil {
 		log.Println(err)
-		os.Exit(1)
+		return
 	}
 	defer l.Close()
 
 	log.Printf("TCP Server on :%s\n", pt.Port)
-
-	sbuf := sr.NewStreamRing(2, MBYTE)
 
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
 			log.Println(err)
-			os.Exit(1)
+			return
 		}
 
 		go pt.HandleRequest(conn, sbuf)

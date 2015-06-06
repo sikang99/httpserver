@@ -21,6 +21,9 @@ buildtest bt:
 	go build
 	go test -v
 
+gencert:
+	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 9999 -nodes
+
 view v:
 	shotwell output.jpg
 

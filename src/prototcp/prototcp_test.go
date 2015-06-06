@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	sr "stoney/httpserver/src/streamring"
 )
 
 //---------------------------------------------------------------------------
@@ -33,7 +35,8 @@ func TestHandleInfo(t *testing.T) {
 //---------------------------------------------------------------------------
 func TestSingleSendReceive(t *testing.T) {
 	rx := NewProtoTcp("localhost", "8087", "Rx")
-	go ActReceiver(rx)
+	sbuf := sr.NewStreamRing(2, MBYTE)
+	go ActReceiver(rx, sbuf)
 
 	time.Sleep(time.Millisecond)
 
