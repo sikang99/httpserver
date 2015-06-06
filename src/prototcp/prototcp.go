@@ -67,6 +67,9 @@ func (pt *ProtoTcp) String() string {
 	return str
 }
 
+//---------------------------------------------------------------------------
+// info handling
+//---------------------------------------------------------------------------
 func (pt *ProtoTcp) SetAddr(hname, hport, desc string) {
 	pt.Host = hname
 	pt.Port = hport

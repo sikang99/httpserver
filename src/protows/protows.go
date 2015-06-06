@@ -60,7 +60,7 @@ type ProtoWs struct {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket shooter for test and debugging
+// string information
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) String() string {
 	str := fmt.Sprintf("\tHost: %s", pw.Host)
@@ -71,6 +71,9 @@ func (pw *ProtoWs) String() string {
 	return str
 }
 
+//---------------------------------------------------------------------------
+// info handling
+//---------------------------------------------------------------------------
 func (pw *ProtoWs) SetAddr(hname, hport, hptls, desc string) {
 	pw.Host = hname
 	pw.Port = hport
