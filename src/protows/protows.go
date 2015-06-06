@@ -125,7 +125,7 @@ func NewProtoWs(hname, hport, hptls, desc string) *ProtoWs {
 //---------------------------------------------------------------------------
 // Echo client
 //---------------------------------------------------------------------------
-func EchoClient(pw *ProtoWs, smsg string) {
+func (pw *ProtoWs) EchoClient(smsg string) {
 	log.Printf("Happy Media WS Echo Client\n")
 
 	origin := fmt.Sprintf("http://%s/", pw.Host)
@@ -155,7 +155,7 @@ func EchoClient(pw *ProtoWs, smsg string) {
 //---------------------------------------------------------------------------
 // Echo server
 //---------------------------------------------------------------------------
-func EchoServer(pw *ProtoWs) {
+func (pw *ProtoWs) EchoServer() {
 	log.Printf("Happy Media WS Echo Server\n")
 
 	fmt.Println("TODO")
@@ -164,7 +164,7 @@ func EchoServer(pw *ProtoWs) {
 //---------------------------------------------------------------------------
 // shooter for test and debugging
 //---------------------------------------------------------------------------
-func ActShooter(pw *ProtoWs) {
+func (pw *ProtoWs) ActShooter() {
 	log.Printf("Happy Media WS Shooter\n")
 
 	origin := fmt.Sprintf("http://%s/", pw.Host)
@@ -189,7 +189,7 @@ func ActShooter(pw *ProtoWs) {
 //---------------------------------------------------------------------------
 // catcher server
 //---------------------------------------------------------------------------
-func ActCatcher(pw *ProtoWs) {
+func (pw *ProtoWs) ActCatcher() {
 	log.Printf("Happy Media WS Catcher on ws:%s and wss:%s\n", pw.Port, pw.PortTls)
 
 	http.Handle("/echo", websocket.Handler(pw.EchoHandler))

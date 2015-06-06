@@ -196,16 +196,16 @@ func main() {
 		ActHttpServer()
 	case "sender":
 		ts := pt.NewProtoTcp("localhost", "8087", "T-Tx")
-		pt.ActSender(ts)
+		ts.ActSender()
 	case "receiver":
 		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-		pt.ActReceiver(tr, conf.Ring)
+		tr.ActReceiver(conf.Ring)
 	case "shooter":
 		ws := pw.NewProtoWs("localhost", "8087", "8443", "W-Tx")
-		pw.ActShooter(ws)
+		ws.ActShooter()
 	case "catcher":
 		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		pw.ActCatcher(wr)
+		wr.ActCatcher()
 	case "filer":
 		ActFileReader()
 	default:
@@ -621,7 +621,7 @@ func ActHttpServer() error {
 	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
 
 	tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-	go pt.ActReceiver(tr, conf.Ring)
+	go tr.ActReceiver(conf.Ring)
 
 	wg.Wait()
 

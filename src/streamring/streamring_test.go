@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 //----------------------------------------------------------------------------------
 // - http://stackoverflow.com/questions/30525184/array-vs-slice-accessing-speed
 // - https://github.com/ChristianSiegert/go-testing-example

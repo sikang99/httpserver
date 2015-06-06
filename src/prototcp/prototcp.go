@@ -111,7 +111,7 @@ func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
 //---------------------------------------------------------------------------
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
-func ActSender(pt *ProtoTcp) {
+func (pt *ProtoTcp) ActSender() {
 	log.Printf("Happy Media TCP Sender\n")
 
 	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
@@ -146,7 +146,7 @@ func ActSender(pt *ProtoTcp) {
 //---------------------------------------------------------------------------
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
-func ActReceiver(pt *ProtoTcp, sbuf *sr.StreamRing) {
+func (pt *ProtoTcp) ActReceiver(sbuf *sr.StreamRing) {
 	log.Printf("Happy Media TCP Receiver\n")
 
 	l, err := net.Listen("tcp", ":"+pt.Port)

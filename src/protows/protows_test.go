@@ -39,13 +39,13 @@ func TestProtoInfo(t *testing.T) {
 //---------------------------------------------------------------------------------
 func TestEcho(t *testing.T) {
 	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
-	go ActCatcher(rx)
+	go rx.ActCatcher()
 
 	time.Sleep(time.Millisecond)
 
 	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
 	for i := 0; i < 5; i++ {
-		EchoClient(tx, "Hello World!")
+		tx.EchoClient("Hello World!")
 	}
 }
 
@@ -60,7 +60,7 @@ func TestSingleShootCatch(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	*/
 	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
-	ActShooter(tx)
+	tx.ActShooter()
 }
 
 //---------------------------------------------------------------------------------

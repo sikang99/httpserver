@@ -7,11 +7,16 @@ package prototcp
 
 import (
 	"fmt"
+	"log"
 	"testing"
 	"time"
 
 	sr "stoney/httpserver/src/streamring"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 //---------------------------------------------------------------------------
 // test for info handling
@@ -34,14 +39,15 @@ func TestHandleInfo(t *testing.T) {
 // test for single send and receive
 //---------------------------------------------------------------------------
 func TestSingleSendReceive(t *testing.T) {
-	rx := NewProtoTcp("localhost", "8087", "Rx")
 	sbuf := sr.NewStreamRing(2, MBYTE)
-	go ActReceiver(rx, sbuf)
+
+	rx := NewProtoTcp("localhost", "8087", "Rx")
+	go rx.ActReceiver(sbuf)
 
 	time.Sleep(time.Millisecond)
 
 	tx := NewProtoTcp("localhost", "8087", "Tx")
-	ActSender(tx)
+	tx.ActSender()
 }
 
 //---------------------------------------------------------------------------
