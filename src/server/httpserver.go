@@ -215,8 +215,8 @@ func main() {
 
 	// package protofile
 	case "filer":
-		fr := pf.NewProtoFile("localhost", "8087", "T-Tx")
-		fr.ActReader(conf.Ring)
+		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Tx")
+		fr.ActReader(conf.Ring, "./static/image/*.jpg")
 
 	default:
 		fmt.Println("Unknown working mode")
@@ -478,7 +478,6 @@ func recvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
 func recvMultipartToRing(r *multipart.Reader) error {
 	var err error
 
-	//sbuf := prepareStreamRing(5, MBYTE, "AXIS Camera")
 	sbuf := conf.Ring
 	err = sbuf.SetStatusUsing()
 	if err != nil {
@@ -623,8 +622,8 @@ func ActHttpServer() error {
 	//tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
 	//go tr.ActReceiver(conf.Ring)
 
-	fr := pf.NewProtoFile("localhost", "8087", "F-Rx")
-	go fr.ActReader(conf.Ring)
+	fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rx")
+	go fr.ActReader(conf.Ring, "./static/image/*.jpg")
 
 	wg.Wait()
 

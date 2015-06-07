@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"testing"
+
+	sr "stoney/httpserver/src/streamring"
 )
 
 func init() {
@@ -19,7 +21,7 @@ func init() {
 // test for info handling
 //---------------------------------------------------------------------------
 func TestHandleInfo(t *testing.T) {
-	file := NewProtoFile("www.google.com", "9000", "Testing")
+	file := NewProtoFile("../../static/image/*", "Testing")
 	fmt.Println(file)
 
 	file.Reset()
@@ -33,7 +35,11 @@ func TestHandleInfo(t *testing.T) {
 // test for single send and receive
 //---------------------------------------------------------------------------
 func TestReader(t *testing.T) {
+	sbuf := sr.NewStreamRing(5, MBYTE)
+	fmt.Println(sbuf)
 
+	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
+	fr.ActReader(sbuf, "../../static/image/*.jpg")
 }
 
 // ---------------------------------E-----N-----D--------------------------------

@@ -12,8 +12,8 @@ import (
 	"io/ioutil"
 	"log"
 	"mime"
-	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -30,6 +30,7 @@ const (
 	STR_DEF_HOST = "localhost"
 	STR_DEF_PORT = "8080"
 	STR_DEF_BDRY = "myboundary"
+	STR_DEF_PATN = "*.jpg"
 
 	STR_PGM_READER = "Happy Media File Reader"
 	STR_PGM_WRITER = "Happy Media File Writer"
@@ -37,20 +38,16 @@ const (
 
 //---------------------------------------------------------------------------
 type ProtoFile struct {
-	Host     string
-	Port     string
+	Pattern  string
 	Desc     string
 	Boundary string
-	Conn     net.Conn
 }
 
 //---------------------------------------------------------------------------
 // string ProtoTcp information
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) String() string {
-	str := fmt.Sprintf("\tHost: %s", pf.Host)
-	str += fmt.Sprintf("\tPort: %s", pf.Port)
-	str += fmt.Sprintf("\tConn: %v", pf.Conn)
+	str := fmt.Sprintf("\tPattern: %s", pf.Pattern)
 	str += fmt.Sprintf("\tBoundary: %s", pf.Boundary)
 	str += fmt.Sprintf("\tDesc: %s", pf.Desc)
 	return str
@@ -60,18 +57,23 @@ func (pf *ProtoFile) String() string {
 // info handling
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) Reset() {
+	pf.Pattern = STR_DEF_PATN
+	pf.Boundary = STR_DEF_BDRY
+	pf.Desc = "reset"
 }
 
 func (pf *ProtoFile) Clear() {
+	pf.Pattern = ""
+	pf.Boundary = ""
+	pf.Desc = "clear"
 }
 
 //---------------------------------------------------------------------------
 // new ProtoTcp struct
 //---------------------------------------------------------------------------
-func NewProtoFile(hname, hport, desc string) *ProtoFile {
+func NewProtoFile(pat, desc string) *ProtoFile {
 	return &ProtoFile{
-		Host:     hname,
-		Port:     hport,
+		Pattern:  pat,
 		Desc:     desc,
 		Boundary: STR_DEF_BDRY,
 	}
@@ -80,10 +82,10 @@ func NewProtoFile(hname, hport, desc string) *ProtoFile {
 //---------------------------------------------------------------------------
 // act file reader
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
+func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing, pat string) {
 	log.Println(STR_PGM_READER)
 
-	pf.ReadDirToRing("./static/image/*.jpg", true, sbuf)
+	pf.ReadDirToRing(sbuf, pat, true)
 	fmt.Println(sbuf)
 
 	return
@@ -104,13 +106,20 @@ func (pf *ProtoFile) Actwriter(sbuf *sr.StreamRing) {
 func (pf *ProtoFile) WriteRingToFile(sbuf *sr.StreamRing, file string) error {
 	var err error
 
+	out, err := os.Open(file)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer out.Close()
+
 	return err
 }
 
 //---------------------------------------------------------------------------
 // read files with the given pattern in the directory and put them to the ring buffer
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ReadDirToRing(pat string, loop bool, sbuf *sr.StreamRing) error {
+func (pf *ProtoFile) ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 	var err error
 
 	// direct pattern matching
@@ -154,7 +163,7 @@ func (pf *ProtoFile) ReadDirToRing(pat string, loop bool, sbuf *sr.StreamRing) e
 }
 
 //---------------------------------------------------------------------------
-// read a file to stream ring
+// read a file to slot of ring buffer
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	var err error
