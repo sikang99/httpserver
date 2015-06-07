@@ -1,17 +1,14 @@
-//=================================================================================
-// Happy Media System
-// one program including agents such as caster, server, player, monitor
-// Author : Stoney Kang, sikang99@gmail.com
-//=================================================================================
-package main
+//=========================================================================
+// Author : Stoney Kang, sikang99@gmail.com, 2015
+// for HTTP streaming
+//=========================================================================
+
+package protohttp
 
 import (
 	"bytes"
 	"crypto/tls"
-	"errors"
-	"flag"
 	"fmt"
-	"image/jpeg"
 	"io"
 	"io/ioutil"
 	"log"
@@ -20,215 +17,19 @@ import (
 	"net"
 	"net/http"
 	"net/textproto"
-	"net/url"
 	"os"
 	"path/filepath"
+	"stoney/httpserver/src/base"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
 
-	"stoney/httpserver/src/base"
-	pf "stoney/httpserver/src/protofile"
-	pt "stoney/httpserver/src/prototcp"
-	pw "stoney/httpserver/src/protows"
-	si "stoney/httpserver/src/streamimage"
-	sr "stoney/httpserver/src/streamring"
-
 	"github.com/bradfitz/http2"
 	"golang.org/x/net/websocket"
 )
 
-//---------------------------------------------------------------------------
-var index_tmpl = `<!DOCTYPE html>
-<html>
-<head>
-</head>
-<body>
-<center>
-<h2>Hello! from Stoney Kang, a Novice Gopher</h2>.
-<img src="{{ .Image }}">Gopher with a gun</img>
-</center>
-</body>
-</html>
-`
-
-var hello_tmpl = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<script type="text/javascript" src="static/eventemitter2.min.js"></script>
-<script type="text/javascript" src="static/mjpegcanvas.min.bak.js"></script>
-  
-<script type="text/javascript" type="text/javascript">
-  function init() {
-    var viewer = new MJPEGCANVAS.Viewer({
-      divID : 'mjpeg',
-      host : '{{ .Addr }}',
-      port : {{ .Port }},
-      width : 1024,
-      height : 768,
-      topic : 'agilecam'
-    });
-  }
-</script>
-</head>
-
-<body onload="init()">
-<center>
-  <h1>{{ .Title }}</h1>
-  <div id="mjpeg"></div>
-</center>
-</body>
-</html>
-`
-
-//---------------------------------------------------------------------------
-const (
-	Version   = "0.5.7"
-	TCPClient = "Happy Media TCP Server"
-	TCPServer = "Happy Media TCP Server"
-	WSClient  = "Happy Media WS Server"
-	WSServer  = "Happy Media WS Server"
-
-	KBYTE = 1024
-	MBYTE = 1024 * KBYTE
-
-	LEN_MAX_LINE = 128
-)
-
-//---------------------------------------------------------------------------
-var (
-	NotSupportError = errors.New("Not supported protocol")
-
-	fmode  = flag.String("m", "player", "Working mode of program [caster|server|player|reader|sender|receiver|shooter|catcher]")
-	fhost  = flag.String("host", "localhost", "server host address")
-	fport  = flag.String("port", "8000", "TCP port to be used for http")
-	fports = flag.String("ports", "8001", "TCP port to be used for https")
-	fport2 = flag.String("port2", "8002", "TCP port to be used for http2")
-	furl   = flag.String("url", "http://localhost:8000/[index|hello|/stream]", "url to be accessed")
-	froot  = flag.String("root", ".", "Define the root filesystem path")
-	vflag  = flag.Bool("verbose", false, "Verbose display")
-)
-
-func init() {
-	//log.SetOutput(os.Stdout)
-	//log.SetPrefix("TRACE: ")
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
-	// flag setting and parsing
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "\nUsage: %v [flags], v.%s\n\n", os.Args[0], Version)
-		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\n")
-		os.Exit(1)
-	}
-
-	flag.Parse()
-}
-
-type ServerConfig struct {
-	Title        string
-	Image        string
-	Addr         string
-	Host         string
-	Port         string
-	PortS        string
-	Port2        string
-	Mode         string
-	ImageChannel chan []byte
-	Player       io.Writer
-	Ring         *sr.StreamRing
-}
-
-func NewServerConfig() *ServerConfig {
-	return &ServerConfig{
-		ImageChannel: make(chan []byte, 2)}
-}
-
-var conf = ServerConfig{
-	Title:        "Happy Media System: MJPEG",
-	Image:        "static/image/gophergun.png",
-	Addr:         "http://localhost",
-	Host:         *fhost,
-	Port:         *fport,
-	PortS:        *fports,
-	Port2:        *fport2,
-	Mode:         *fmode,
-	ImageChannel: make(chan []byte, 2),
-}
-
-//---------------------------------------------------------------------------
-// a single program including client and server in go style
-//---------------------------------------------------------------------------
-func main() {
-	//flag.Parse()
-
-	// check arguments
-	if flag.NFlag() == 0 && flag.NArg() == 0 {
-		flag.Usage()
-	}
-
-	url, err := url.ParseRequestURI(*furl)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	fmt.Printf("Happy Media System, v.%s\n", Version)
-	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
-
-	// determine the working type of the program
-	fmt.Printf("Working mode: %s\n", *fmode)
-
-	conf.Ring = prepareStreamRing(3, MBYTE, "Server stream")
-
-	// let's do working mode
-	switch *fmode {
-	// package protohttp
-	case "reader":
-		ActHttpReader(*furl)
-	case "player":
-		ActHttpPlayer(*furl)
-	case "caster":
-		ActHttpCaster(*furl)
-	case "monitor":
-		ActHttpMonitor()
-	case "server":
-		ActHttpServer()
-
-	// package prototcp
-	case "sender":
-		ts := pt.NewProtoTcp("localhost", "8087", "T-Tx")
-		ts.ActSender()
-	case "receiver":
-		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-		tr.ActReceiver(conf.Ring)
-
-	// package protows
-	case "shooter":
-		ws := pw.NewProtoWs("localhost", "8087", "8443", "W-Tx")
-		ws.ActShooter()
-	case "catcher":
-		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		wr.ActCatcher()
-
-	// package protofile
-	case "filer":
-		fr := pf.NewProtoFile("localhost", "8087", "T-Tx")
-		fr.ActReader(conf.Ring)
-
-	default:
-		fmt.Println("Unknown working mode")
-		os.Exit(0)
-	}
-}
-
-//==================================================================================
-// HTTP
-// - http://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
-// - http://stackoverflow.com/questions/30552447/how-to-set-which-ip-to-use-for-a-http-request
-//==================================================================================
 //---------------------------------------------------------------------------
 // config transport with timeout
 //---------------------------------------------------------------------------
@@ -300,7 +101,7 @@ func httpClientGet(client *http.Client, url string) error {
 }
 
 //---------------------------------------------------------------------------
-// 21 http POST to server
+// http POST to server
 // http://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
 // http://www.tagwith.com/question_781711_golang-adding-multiple-files-to-a-http-multipart-request
 //---------------------------------------------------------------------------
@@ -546,24 +347,6 @@ func recvMultipartToData(r *multipart.Reader) error {
 }
 
 //---------------------------------------------------------------------------
-//	receive multipart data and decode jpeg
-//---------------------------------------------------------------------------
-func recvMultipartDecodeJpeg(r *multipart.Reader) {
-	for {
-		print(".")
-		p, err := r.NextPart()
-		if err != nil { // io.EOF
-			log.Println(err)
-		}
-
-		_, err = jpeg.Decode(p)
-		if err != nil {
-			log.Println(err)
-		}
-	}
-}
-
-//---------------------------------------------------------------------------
 // prepare a stream buffer
 //---------------------------------------------------------------------------
 func prepareStreamRing(nb int, size int, desc string) *sr.StreamRing {
@@ -618,13 +401,11 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
+	//go ActFileReader()
 	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
 
-	//tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-	//go tr.ActReceiver(conf.Ring)
-
-	fr := pf.NewProtoFile("localhost", "8087", "F-Rx")
-	go fr.ActReader(conf.Ring)
+	tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+	go tr.ActReceiver(conf.Ring)
 
 	wg.Wait()
 
@@ -993,40 +774,6 @@ func sendPartSlot(w io.Writer, ss *sr.StreamSlot) error {
 	buf := new(bytes.Buffer)
 	buf.Write(ss.Content[:ss.Length])
 	buf.WriteTo(part)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send an jpeg file in multipart format with boundary (brute force style)
-//---------------------------------------------------------------------------
-const boundary = "myboundary"
-const frameheader = "\r\n" +
-	"--" + boundary + "\r\n" +
-	"Content-Type: video/mjpeg\r\n" +
-	"Content-Length: %d\r\n" +
-	"X-Timestamp: 0.000000\r\n" +
-	"\r\n"
-
-func sendStreamJpeg(w io.Writer, file string) error {
-	var err error
-
-	jpeg, err := ioutil.ReadFile(file)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	//fmt.Printf("%s [%d] : %0x%0x - %0x%0x\n", file, len(jpeg), jpeg[0], jpeg[1], jpeg[len(jpeg)-2], jpeg[len(jpeg)-1])
-
-	header := fmt.Sprintf(frameheader, len(jpeg))
-	frame := make([]byte, (len(header) + len(jpeg)))
-
-	copy(frame, header)
-	copy(frame[len(header):], jpeg)
-
-	_, err = w.Write(frame)
-	//n, err := w.Write(frame)
-	//fmt.Printf("%s [%d=%d] : \n", file, len(header)+len(jpeg), n)
 
 	return err
 }

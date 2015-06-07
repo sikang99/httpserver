@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
+	"time"
 )
 
 type Config struct {
@@ -43,4 +45,24 @@ func openLogFile(logfile string) {
 
 		log.SetOutput(lf)
 	}
+}
+
+// http://stackoverflow.com/questions/30552447/how-to-set-which-ip-to-use-for-a-http-request
+// Create a transport like http.DefaultTransport, but with a specified localAddr
+func setConfig() {
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			//LocalAddr: localAddr,
+		}).Dial,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	fmt.Println(client)
 }
