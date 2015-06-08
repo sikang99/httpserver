@@ -216,7 +216,7 @@ func main() {
 	// package protofile
 	case "filer":
 		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Tx")
-		fr.ActReader(conf.Ring, "./static/image/*.jpg")
+		fr.ActReader(conf.Ring)
 
 	default:
 		fmt.Println("Unknown working mode")
@@ -623,7 +623,7 @@ func ActHttpServer() error {
 	//go tr.ActReceiver(conf.Ring)
 
 	fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rx")
-	go fr.ActReader(conf.Ring, "./static/image/*.jpg")
+	go fr.ActReader(conf.Ring)
 
 	wg.Wait()
 

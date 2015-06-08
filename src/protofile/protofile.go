@@ -82,10 +82,10 @@ func NewProtoFile(pat, desc string) *ProtoFile {
 //---------------------------------------------------------------------------
 // act file reader
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing, pat string) {
+func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
 	log.Println(STR_PGM_READER)
 
-	pf.ReadDirToRing(sbuf, pat, true)
+	pf.ReadDirToRing(sbuf, pf.Pattern, true)
 	fmt.Println(sbuf)
 
 	return
@@ -94,10 +94,10 @@ func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing, pat string) {
 //---------------------------------------------------------------------------
 // act file writer
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) Actwriter(sbuf *sr.StreamRing) {
+func (pf *ProtoFile) ActWriter(sbuf *sr.StreamRing) {
 	log.Println(STR_PGM_WRITER)
 
-	pf.WriteRingToFile(sbuf, "./static/output.mjpg")
+	pf.WriteRingToFile(sbuf, pf.Pattern)
 }
 
 //---------------------------------------------------------------------------

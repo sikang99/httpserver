@@ -32,14 +32,25 @@ func TestHandleInfo(t *testing.T) {
 }
 
 //---------------------------------------------------------------------------
-// test for single send and receive
+// test for reader
 //---------------------------------------------------------------------------
 func TestReader(t *testing.T) {
 	sbuf := sr.NewStreamRing(5, MBYTE)
 	fmt.Println(sbuf)
 
 	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
-	fr.ActReader(sbuf, "../../static/image/*.jpg")
+	fr.ActReader(sbuf)
+}
+
+//---------------------------------------------------------------------------
+// test for writer
+//---------------------------------------------------------------------------
+func TestWriter(t *testing.T) {
+	sbuf := sr.NewStreamRing(5, MBYTE)
+	fmt.Println(sbuf)
+
+	fw := NewProtoFile("output.mjpg", "Testing")
+	fw.ActWriter(sbuf)
 }
 
 // ---------------------------------E-----N-----D--------------------------------
