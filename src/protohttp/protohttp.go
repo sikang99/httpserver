@@ -42,6 +42,29 @@ type ProtoHttp struct {
 }
 
 //---------------------------------------------------------------------------
+// string information for package struct
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) String() string {
+	str := fmt.Sprintf("\tUrl: %s", ph.Url)
+	str += fmt.Sprintf("\tHost: %s", ph.Host)
+	str += fmt.Sprintf("\tPort: %s,%s,%s", ph.Port, ph.PortTls, ph.Port2)
+	str += fmt.Sprintf("\tBoundary: %s", ph.Boundary)
+	str += fmt.Sprintf("\tDesc: %s", ph.Desc)
+	return str
+}
+
+//---------------------------------------------------------------------------
+// make a new struct
+//---------------------------------------------------------------------------
+func NewProtoHttp(hname, hport string) *ProtoHttp {
+
+	return &ProtoHttp{
+		Host: hname,
+		Port: hport,
+	}
+}
+
+//---------------------------------------------------------------------------
 // config transport with timeout
 //---------------------------------------------------------------------------
 var timeout = time.Duration(3 * time.Second)
@@ -50,7 +73,7 @@ func dialTimeout(network, addr string) (net.Conn, error) {
 	return net.DialTimeout(network, addr, timeout)
 }
 
-func (ph *ProtoHttp) httpClientConfig() *http.Client {
+func (ph *ProtoHttp) GetClientConfig() *http.Client {
 	// simple timeout and tls setting
 	tp := &http.Transport{
 		Dial:            dialTimeout,
@@ -63,7 +86,7 @@ func (ph *ProtoHttp) httpClientConfig() *http.Client {
 //---------------------------------------------------------------------------
 // http GET to server
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) httpClientGet(client *http.Client, url string) error {
+func (ph *ProtoHttp) SummitRequestGet(client *http.Client, url string) error {
 	res, err := client.Get(url)
 	if err != nil {
 		log.Fatal(err)
@@ -75,22 +98,22 @@ func (ph *ProtoHttp) httpClientGet(client *http.Client, url string) error {
 		log.Fatal(err)
 	}
 
-	ph.printHttpResponse(res, body)
+	ph.PrintResponse(res, body)
 
 	return err
 }
 
 //---------------------------------------------------------------------------
 // http POST to server
-// http://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
-// http://www.tagwith.com/question_781711_golang-adding-multiple-files-to-a-http-multipart-request
 //---------------------------------------------------------------------------
-func httpClientPost(client *http.Client, url string) error {
+func (ph *ProtoHttp) SummitRequestPost(client *http.Client, url string) error {
+	var err error
+
 	// send multipart data
 	outer := new(bytes.Buffer)
 
 	mw := multipart.NewWriter(outer)
-	mw.SetBoundary("myboundary")
+	mw.SetBoundary(ph.Boundary)
 
 	fdata, err := ioutil.ReadFile("static/image/gopher.jpg")
 	fsize := len(fdata)
@@ -111,7 +134,7 @@ func httpClientPost(client *http.Client, url string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "multipart/x-mixed-replace; boundary=--myboundary")
+	req.Header.Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+ph.Boundary)
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -125,7 +148,7 @@ func httpClientPost(client *http.Client, url string) error {
 //---------------------------------------------------------------------------
 // print response headers and body (text case) for debugging
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) printHttpResponse(res *http.Response, body []byte) {
+func (ph *ProtoHttp) PrintResponse(res *http.Response, body []byte) {
 	h := res.Header
 	for k, v := range h {
 		fmt.Println("key:", k, "value:", v)
@@ -145,7 +168,7 @@ func (ph *ProtoHttp) printHttpResponse(res *http.Response, body []byte) {
 //---------------------------------------------------------------------------
 //	receive a part to data
 //---------------------------------------------------------------------------
-func recvPartToData(r *multipart.Reader) ([]byte, error) {
+func (ph *ProtoHttp) RecvPartToData(r *multipart.Reader) ([]byte, error) {
 	var err error
 
 	p, err := r.NextPart()
@@ -182,7 +205,7 @@ func recvPartToData(r *multipart.Reader) ([]byte, error) {
 //---------------------------------------------------------------------------
 //	receive a part to slot of buffer
 //----------------------------------------s-----------------------------------
-func recvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
+func (ph *ProtoHttp) RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
 	var err error
 
 	p, err := r.NextPart()
@@ -218,7 +241,7 @@ func recvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
 //---------------------------------------------------------------------------
-func recvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
+func (ph *ProtoHttp) RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
 	var err error
 
 	//sbuf := prepareStreamRing(5, MBYTE, "AXIS Camera")
@@ -236,7 +259,7 @@ func recvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
 		slot, pos := sbuf.GetSlotIn()
 		//fmt.Println(i, pos, slot)
 
-		err = recvPartToSlot(r, slot)
+		err = ph.RecvPartToSlot(r, slot)
 		if err != nil {
 			log.Println(err)
 			break
@@ -252,7 +275,7 @@ func recvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 //	receive multipart data and decode jpeg
 //---------------------------------------------------------------------------
-func recvMultipartToData(r *multipart.Reader) error {
+func (ph *ProtoHttp) RecvMultipartToData(r *multipart.Reader) error {
 	var err error
 
 	for {
@@ -291,7 +314,7 @@ func recvMultipartToData(r *multipart.Reader) error {
 //---------------------------------------------------------------------------
 // prepare a stream buffer
 //---------------------------------------------------------------------------
-func prepareStreamRing(nb int, size int, desc string) *sr.StreamRing {
+func (ph *ProtoHttp) PrepareRing(nb int, size int, desc string) *sr.StreamRing {
 
 	sbuf := sr.NewStreamRing(nb, size)
 	sbuf.Desc = desc
@@ -303,7 +326,7 @@ func prepareStreamRing(nb int, size int, desc string) *sr.StreamRing {
 //---------------------------------------------------------------------------
 // for http access
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) serveHttp(wg *sync.WaitGroup) {
+func (ph *ProtoHttp) ServeHttp(wg *sync.WaitGroup) {
 	log.Println("Starting HTTP server at http://" + ph.Host + ":" + ph.Port)
 	defer wg.Done()
 
@@ -319,7 +342,7 @@ func (ph *ProtoHttp) serveHttp(wg *sync.WaitGroup) {
 //---------------------------------------------------------------------------
 // for https tls access
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) serveHttps(wg *sync.WaitGroup) {
+func (ph *ProtoHttp) ServeHttps(wg *sync.WaitGroup) {
 	log.Println("Starting HTTPS server at https://" + ph.Host + ":" + ph.PortTls)
 	defer wg.Done()
 
@@ -335,7 +358,7 @@ func (ph *ProtoHttp) serveHttps(wg *sync.WaitGroup) {
 //---------------------------------------------------------------------------
 // for http2 tls access
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) serveHttp2(wg *sync.WaitGroup) {
+func (ph *ProtoHttp) ServeHttp2(wg *sync.WaitGroup) {
 	log.Println("Starting HTTP2 server at https://" + ph.Host + ":" + ph.Port2)
 	defer wg.Done()
 
@@ -352,7 +375,7 @@ func (ph *ProtoHttp) serveHttp2(wg *sync.WaitGroup) {
 //---------------------------------------------------------------------------
 // static file server handler
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) fileServer(path string) http.Handler {
+func (ph *ProtoHttp) FileServer(path string) http.Handler {
 	log.Println("File server for " + path)
 	return http.FileServer(http.Dir(path))
 }
@@ -360,7 +383,7 @@ func (ph *ProtoHttp) fileServer(path string) http.Handler {
 //---------------------------------------------------------------------------
 // send a file
 //---------------------------------------------------------------------------
-func sendFile(w http.ResponseWriter, file string) error {
+func (ph *ProtoHttp) sendFile(w http.ResponseWriter, file string) error {
 	w.Header().Set("Content-Type", "image/icon")
 	w.Header().Set("Server", "Happy Media Server")
 	body, err := ioutil.ReadFile("static/favicon.ico")
@@ -389,7 +412,7 @@ func (ph *ProtoHttp) sendPage(w http.ResponseWriter, page string) error {
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) sendStreamImage(w io.Writer, dtype string, loop bool) error {
+func (ph *ProtoHttp) sendMultipartImage(w io.Writer, dtype string, loop bool) error {
 	var err error
 
 	for {
@@ -412,7 +435,7 @@ func (ph *ProtoHttp) sendStreamImage(w io.Writer, dtype string, loop bool) error
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) sendStreamRing(w io.Writer, sbuf *sr.StreamRing) error {
+func (ph *ProtoHttp) SendRing(w io.Writer, sbuf *sr.StreamRing) error {
 	var err error
 
 	//sbuf := conf.Ring
@@ -596,8 +619,24 @@ func (ph *ProtoHttp) SendResponse(w http.ResponseWriter) error {
 	return nil
 }
 
-func (ph *ProtoHttp) ParseRequest(w http.ResponseWriter, r *http.Request) {
+func (ph *ProtoHttp) GetBoundary(ctype string) error {
+	var err error
 
+	mt, params, err := mime.ParseMediaType(ctype)
+	fmt.Printf("%v %v\n", params, ctype)
+	if err != nil {
+		log.Println("ParseMediaType: %s %v", mt, err)
+		return err
+	}
+
+	boundary := params["boundary"]
+	if !strings.HasPrefix(boundary, "--") {
+		log.Printf("expected boundary to start with --, got %q", boundary)
+	}
+
+	ph.Boundary = boundary
+
+	return err
 }
 
 //---------------------------------------------------------------------------
