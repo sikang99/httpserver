@@ -140,14 +140,15 @@ func (ss *StreamSlot) IsSubType(ctype string) bool {
 //----------------------------------------------------------------------------------
 type StreamRing struct {
 	sync.Mutex
-	Status int
-	Num    int    // number of slots used
-	NumMax int    // number of slots allocated
-	Size   int    // size of the slot content
-	In     int    // input position of buffer to be written
-	Out    int    // output position of buffer to be read
-	Desc   string // description of buffer
-	Slots  []StreamSlot
+	Status   int
+	Num      int    // number of slots used
+	NumMax   int    // number of slots allocated
+	Size     int    // size of the slot content
+	In       int    // input position of buffer to be written
+	Out      int    // output position of buffer to be read
+	Boundary string // description of buffer
+	Desc     string // description of buffer
+	Slots    []StreamSlot
 }
 
 //----------------------------------------------------------------------------------

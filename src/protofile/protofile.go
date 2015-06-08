@@ -122,7 +122,7 @@ func (pf *ProtoFile) WriteRingToFile(sbuf *sr.StreamRing, file string) error {
 func (pf *ProtoFile) ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 	var err error
 
-	// direct pattern matching
+	// ReadDir : read directory
 	files, err := filepath.Glob(pat)
 	if err != nil {
 		log.Println(err)
@@ -138,6 +138,7 @@ func (pf *ProtoFile) ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) e
 		return sr.ErrStatus
 	}
 
+	// ToRing : to ring buffer
 	for {
 		for i := range files {
 			slot, pos := sbuf.GetSlotIn()

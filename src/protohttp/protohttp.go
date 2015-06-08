@@ -1,6 +1,8 @@
 //=========================================================================
 // Author : Stoney Kang, sikang99@gmail.com, 2015
 // for HTTP streaming
+// - http://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
+// - http://stackoverflow.com/questions/30552447/how-to-set-which-ip-to-use-for-a-http-request
 //=========================================================================
 
 package protohttp
@@ -65,7 +67,7 @@ func NewProtoHttp(hname, hport string) *ProtoHttp {
 }
 
 //---------------------------------------------------------------------------
-// config transport with timeout
+// new client config transport with timeout
 //---------------------------------------------------------------------------
 var timeout = time.Duration(3 * time.Second)
 
@@ -73,7 +75,7 @@ func dialTimeout(network, addr string) (net.Conn, error) {
 	return net.DialTimeout(network, addr, timeout)
 }
 
-func (ph *ProtoHttp) GetClientConfig() *http.Client {
+func NewClientConfig() *http.Client {
 	// simple timeout and tls setting
 	tp := &http.Transport{
 		Dial:            dialTimeout,
@@ -86,8 +88,10 @@ func (ph *ProtoHttp) GetClientConfig() *http.Client {
 //---------------------------------------------------------------------------
 // http GET to server
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SummitRequestGet(client *http.Client, url string) error {
-	res, err := client.Get(url)
+func SummitRequestGet(client *http.Client, ph *ProtoHttp) error {
+	var err error
+
+	res, err := client.Get(ph.Url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,7 +102,7 @@ func (ph *ProtoHttp) SummitRequestGet(client *http.Client, url string) error {
 		log.Fatal(err)
 	}
 
-	ph.PrintResponse(res, body)
+	fmt.Println(res, body)
 
 	return err
 }
@@ -106,7 +110,7 @@ func (ph *ProtoHttp) SummitRequestGet(client *http.Client, url string) error {
 //---------------------------------------------------------------------------
 // http POST to server
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SummitRequestPost(client *http.Client, url string) error {
+func SummitRequestPost(client *http.Client, ph *ProtoHttp) error {
 	var err error
 
 	// send multipart data
@@ -130,7 +134,7 @@ func (ph *ProtoHttp) SummitRequestPost(client *http.Client, url string) error {
 	}
 
 	// prepare a connection
-	req, err := http.NewRequest("POST", url, outer)
+	req, err := http.NewRequest("POST", ph.Url, outer)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -143,26 +147,6 @@ func (ph *ProtoHttp) SummitRequestPost(client *http.Client, url string) error {
 	fmt.Println(res.Status)
 
 	return err
-}
-
-//---------------------------------------------------------------------------
-// print response headers and body (text case) for debugging
-//---------------------------------------------------------------------------
-func (ph *ProtoHttp) PrintResponse(res *http.Response, body []byte) {
-	h := res.Header
-	for k, v := range h {
-		fmt.Println("key:", k, "value:", v)
-	}
-
-	ct := res.Header.Get("Content-Type")
-
-	println("")
-	if strings.Contains(ct, "text") == true {
-		fmt.Printf("%s\n", string(body))
-	} else {
-		fmt.Printf("[binary data]\n")
-	}
-	println("")
 }
 
 //---------------------------------------------------------------------------
@@ -205,7 +189,7 @@ func (ph *ProtoHttp) RecvPartToData(r *multipart.Reader) ([]byte, error) {
 //---------------------------------------------------------------------------
 //	receive a part to slot of buffer
 //----------------------------------------s-----------------------------------
-func (ph *ProtoHttp) RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
+func RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
 	var err error
 
 	p, err := r.NextPart()
@@ -220,6 +204,8 @@ func (ph *ProtoHttp) RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) erro
 		log.Printf("%s %s %d\n", p.Header, sl, nl)
 		return err
 	}
+
+	ss.Length = 0
 
 	var tn int
 	for tn < nl {
@@ -241,7 +227,7 @@ func (ph *ProtoHttp) RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) erro
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
+func RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
 	var err error
 
 	//sbuf := prepareStreamRing(5, MBYTE, "AXIS Camera")
@@ -259,7 +245,7 @@ func (ph *ProtoHttp) RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRin
 		slot, pos := sbuf.GetSlotIn()
 		//fmt.Println(i, pos, slot)
 
-		err = ph.RecvPartToSlot(r, slot)
+		err = RecvPartToSlot(r, slot)
 		if err != nil {
 			log.Println(err)
 			break
@@ -314,7 +300,7 @@ func (ph *ProtoHttp) RecvMultipartToData(r *multipart.Reader) error {
 //---------------------------------------------------------------------------
 // prepare a stream buffer
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) PrepareRing(nb int, size int, desc string) *sr.StreamRing {
+func PrepareRing(nb int, size int, desc string) *sr.StreamRing {
 
 	sbuf := sr.NewStreamRing(nb, size)
 	sbuf.Desc = desc
@@ -375,7 +361,7 @@ func (ph *ProtoHttp) ServeHttp2(wg *sync.WaitGroup) {
 //---------------------------------------------------------------------------
 // static file server handler
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) FileServer(path string) http.Handler {
+func FileServer(path string) http.Handler {
 	log.Println("File server for " + path)
 	return http.FileServer(http.Dir(path))
 }
@@ -383,7 +369,7 @@ func (ph *ProtoHttp) FileServer(path string) http.Handler {
 //---------------------------------------------------------------------------
 // send a file
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) sendFile(w http.ResponseWriter, file string) error {
+func SendFile(w http.ResponseWriter, file string) error {
 	w.Header().Set("Content-Type", "image/icon")
 	w.Header().Set("Server", "Happy Media Server")
 	body, err := ioutil.ReadFile("static/favicon.ico")
@@ -397,26 +383,26 @@ func (ph *ProtoHttp) sendFile(w http.ResponseWriter, file string) error {
 }
 
 //---------------------------------------------------------------------------
-// send a page
+// send a template page
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) sendPage(w http.ResponseWriter, page string) error {
+func SendTemplatePage(w http.ResponseWriter, page string, data interface{}) error {
 	t, err := template.New("mjpeg").Parse(page)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	return t.Execute(w, ph)
+	return t.Execute(w, data)
 }
 
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) sendMultipartImage(w io.Writer, dtype string, loop bool) error {
+func SendMultipartImage(w io.Writer, dtype string, loop bool) error {
 	var err error
 
 	for {
-		err = ph.SendPartImage(w, dtype)
+		err = SendPartImage(w, dtype, "myboundary")
 		if err != nil {
 			log.Println(err)
 			break
@@ -435,10 +421,9 @@ func (ph *ProtoHttp) sendMultipartImage(w io.Writer, dtype string, loop bool) er
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SendRing(w io.Writer, sbuf *sr.StreamRing) error {
+func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 	var err error
 
-	//sbuf := conf.Ring
 	if !sbuf.IsUsing() {
 		return sr.ErrStatus
 	}
@@ -451,7 +436,7 @@ func (ph *ProtoHttp) SendRing(w io.Writer, sbuf *sr.StreamRing) error {
 			continue
 		}
 
-		err = ph.SendPartSlot(w, slot)
+		err = SendPartSlot(w, slot, sbuf.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
@@ -466,7 +451,7 @@ func (ph *ProtoHttp) SendRing(w io.Writer, sbuf *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 // send files with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SendDir(w io.Writer, pat string, loop bool) error {
+func SendMultipartDir(w io.Writer, pat string, loop bool) error {
 	var err error
 
 	// direct pattern matching
@@ -482,7 +467,7 @@ func (ph *ProtoHttp) SendDir(w io.Writer, pat string, loop bool) error {
 
 	for {
 		for i := range files {
-			err = ph.SendPartFile(w, files[i])
+			err = SendPartFile(w, files[i], "myboundary")
 			if err != nil {
 				return err
 			}
@@ -500,7 +485,7 @@ func (ph *ProtoHttp) SendDir(w io.Writer, pat string, loop bool) error {
 //---------------------------------------------------------------------------
 // send any file in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SendPartFile(w io.Writer, file string) error {
+func SendPartFile(w io.Writer, file string, boundary string) error {
 	var err error
 
 	data, err := ioutil.ReadFile(file)
@@ -517,7 +502,7 @@ func (ph *ProtoHttp) SendPartFile(w io.Writer, file string) error {
 	}
 
 	mw := multipart.NewWriter(w)
-	mw.SetBoundary("myboundary")
+	mw.SetBoundary(boundary)
 
 	part, err := mw.CreatePart(textproto.MIMEHeader{
 		"Content-Type":   {ctype},
@@ -538,7 +523,7 @@ func (ph *ProtoHttp) SendPartFile(w io.Writer, file string) error {
 //---------------------------------------------------------------------------
 // send image in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SendPartImage(w io.Writer, dtype string) error {
+func SendPartImage(w io.Writer, dtype string, boundary string) error {
 	var err error
 
 	//img := si.GenSpiralImage(1080, 768)
@@ -554,7 +539,7 @@ func (ph *ProtoHttp) SendPartImage(w io.Writer, dtype string) error {
 	ctype := http.DetectContentType(data)
 
 	mw := multipart.NewWriter(w)
-	mw.SetBoundary(ph.Boundary)
+	mw.SetBoundary(boundary)
 	part, err := mw.CreatePart(textproto.MIMEHeader{
 		"Content-Type":   {ctype},
 		"Content-Length": {strconv.Itoa(dsize)},
@@ -574,11 +559,11 @@ func (ph *ProtoHttp) SendPartImage(w io.Writer, dtype string) error {
 //---------------------------------------------------------------------------
 // send slot in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SendPartSlot(w io.Writer, ss *sr.StreamSlot) error {
+func SendPartSlot(w io.Writer, ss *sr.StreamSlot, boundary string) error {
 	var err error
 
 	mw := multipart.NewWriter(w)
-	mw.SetBoundary("myboundary")
+	mw.SetBoundary(boundary)
 	part, err := mw.CreatePart(textproto.MIMEHeader{
 		"Content-Type":   {ss.Type},
 		"Content-Length": {strconv.Itoa(ss.Length)},
@@ -596,37 +581,29 @@ func (ph *ProtoHttp) SendPartSlot(w io.Writer, ss *sr.StreamSlot) error {
 }
 
 //---------------------------------------------------------------------------
-// send response for /stream with multipart format
+// send response for Player
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) SendRequest(w http.ResponseWriter) error {
-	return nil
-}
+func SendResponsePlay(w http.ResponseWriter, boundary string) error {
+	var err error
 
-// for Caster
-func (ph *ProtoHttp) SendResponseOk(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
 	w.Header().Set("Server", "Happy Media Server")
 	w.WriteHeader(http.StatusOK)
 
-	return nil
+	return err
 }
 
-// for Player
-func (ph *ProtoHttp) SendResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+ph.Boundary)
-	w.Header().Set("Server", "Happy Media Server")
-	w.WriteHeader(http.StatusOK)
-
-	return nil
-}
-
-func (ph *ProtoHttp) GetBoundary(ctype string) error {
+//---------------------------------------------------------------------------
+// get boundary string
+//---------------------------------------------------------------------------
+func GetBoundary(ctype string) (string, error) {
 	var err error
 
 	mt, params, err := mime.ParseMediaType(ctype)
 	fmt.Printf("%v %v\n", params, ctype)
 	if err != nil {
 		log.Println("ParseMediaType: %s %v", mt, err)
-		return err
+		return "", err
 	}
 
 	boundary := params["boundary"]
@@ -634,15 +611,23 @@ func (ph *ProtoHttp) GetBoundary(ctype string) error {
 		log.Printf("expected boundary to start with --, got %q", boundary)
 	}
 
-	ph.Boundary = boundary
-
-	return err
+	return boundary, err
 }
 
 //---------------------------------------------------------------------------
-// respond message simply
+// send response for Caster
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
+func SendResponseOk(w http.ResponseWriter) error {
+	w.Header().Set("Server", "Happy Media Server")
+	w.WriteHeader(http.StatusOK)
+
+	return nil
+}
+
+//---------------------------------------------------------------------------
+// send response message simply
+//---------------------------------------------------------------------------
+func SendResponseMessage(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
 	log.Println(message)
 	fmt.Fprintf(w, message)

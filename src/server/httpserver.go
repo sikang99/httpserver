@@ -6,34 +6,23 @@
 package main
 
 import (
-	"bytes"
-	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
-	"image/jpeg"
 	"io"
-	"io/ioutil"
 	"log"
-	"mime"
 	"mime/multipart"
-	"net"
 	"net/http"
-	"net/textproto"
 	"net/url"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
-	"text/template"
-	"time"
 
 	"stoney/httpserver/src/base"
 	pf "stoney/httpserver/src/protofile"
+	ph "stoney/httpserver/src/protohttp"
 	pt "stoney/httpserver/src/prototcp"
 	pw "stoney/httpserver/src/protows"
-	si "stoney/httpserver/src/streamimage"
 	sr "stoney/httpserver/src/streamring"
 
 	"github.com/bradfitz/http2"
@@ -181,7 +170,7 @@ func main() {
 	// determine the working type of the program
 	fmt.Printf("Working mode: %s\n", *fmode)
 
-	conf.Ring = prepareStreamRing(3, MBYTE, "Server stream")
+	conf.Ring = ph.PrepareRing(3, MBYTE, "Server stream")
 
 	// let's do working mode
 	switch *fmode {
@@ -224,30 +213,6 @@ func main() {
 	}
 }
 
-//==================================================================================
-// HTTP
-// - http://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
-// - http://stackoverflow.com/questions/30552447/how-to-set-which-ip-to-use-for-a-http-request
-//==================================================================================
-//---------------------------------------------------------------------------
-// config transport with timeout
-//---------------------------------------------------------------------------
-var timeout = time.Duration(3 * time.Second)
-
-func dialTimeout(network, addr string) (net.Conn, error) {
-	return net.DialTimeout(network, addr, timeout)
-}
-
-func httpClientConfig() *http.Client {
-	// simple timeout and tls setting
-	tp := &http.Transport{
-		Dial:            dialTimeout,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	return &http.Client{Transport: tp, Timeout: timeout}
-}
-
 //---------------------------------------------------------------------------
 // http monitor client
 //---------------------------------------------------------------------------
@@ -265,8 +230,9 @@ func ActHttpMonitor() error {
 func ActHttpPlayer(url string) error {
 	log.Printf("Happy Media Player for %s\n", url)
 
-	client := httpClientConfig()
-	return httpClientGet(client, url)
+	hp := ph.NewProtoHttp("localhost", "8080")
+	client := ph.NewClientConfig()
+	return ph.SummitRequestGet(client, hp)
 }
 
 //---------------------------------------------------------------------------
@@ -275,90 +241,9 @@ func ActHttpPlayer(url string) error {
 func ActHttpCaster(url string) error {
 	log.Printf("Happy Media Caster for %s\n", url)
 
-	client := httpClientConfig()
-	return httpClientPost(client, url)
-}
-
-//---------------------------------------------------------------------------
-// http GET to server
-//---------------------------------------------------------------------------
-func httpClientGet(client *http.Client, url string) error {
-	res, err := client.Get(url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	printHttpResponse(res, body)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// 21 http POST to server
-// http://matt.aimonetti.net/posts/2013/07/01/golang-multipart-file-upload-example/
-// http://www.tagwith.com/question_781711_golang-adding-multiple-files-to-a-http-multipart-request
-//---------------------------------------------------------------------------
-func httpClientPost(client *http.Client, url string) error {
-	// send multipart data
-	outer := new(bytes.Buffer)
-
-	mw := multipart.NewWriter(outer)
-	mw.SetBoundary("myboundary")
-
-	fdata, err := ioutil.ReadFile("static/image/gopher.jpg")
-	fsize := len(fdata)
-
-	for i := 0; i < 3; i++ {
-		part, _ := mw.CreatePart(textproto.MIMEHeader{
-			"Content-Type":   {"image/jpeg"},
-			"Content-Length": {strconv.Itoa(fsize)},
-		})
-
-		b := new(bytes.Buffer)
-		b.Write(fdata)
-		b.WriteTo(part)
-	}
-
-	// prepare a connection
-	req, err := http.NewRequest("POST", url, outer)
-	if err != nil {
-		log.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "multipart/x-mixed-replace; boundary=--myboundary")
-
-	res, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	fmt.Println(res.Status)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// print response headers and body (text case) for debugging
-//---------------------------------------------------------------------------
-func printHttpResponse(res *http.Response, body []byte) {
-	h := res.Header
-	for k, v := range h {
-		fmt.Println("key:", k, "value:", v)
-	}
-
-	ct := res.Header.Get("Content-Type")
-
-	println("")
-	if strings.Contains(ct, "text") == true {
-		fmt.Printf("%s\n", string(body))
-	} else {
-		fmt.Printf("[binary data]\n")
-	}
-	println("")
+	hp := ph.NewProtoHttp("localhost", "8080")
+	client := ph.NewClientConfig()
+	return ph.SummitRequestPost(client, hp)
 }
 
 //---------------------------------------------------------------------------
@@ -374,204 +259,18 @@ func ActHttpReader(url string) {
 	if strings.Contains(url, "axis") {
 		res, err = http.Get(url)
 	} else {
-		client := httpClientConfig()
+		client := ph.NewClientConfig()
 		res, err = client.Get(url)
 	}
 	if err != nil {
 		log.Fatalf("GET of %q: %v", url, err)
 	}
-	log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
+	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
-	mt, params, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	fmt.Printf("%v %v\n", params, res.Header.Get("Content-Type"))
-	if err != nil {
-		log.Fatalf("ParseMediaType: %s %v", mt, err)
-	}
-
-	boundary := params["boundary"]
-	if !strings.HasPrefix(boundary, "--") {
-		log.Printf("expected boundary to start with --, got %q", boundary)
-	}
-
+	boundary, err := ph.GetBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, boundary)
 
-	//recvMultipartToData(mr)
-	recvMultipartToRing(mr)
-}
-
-//---------------------------------------------------------------------------
-//	receive a part to data
-//---------------------------------------------------------------------------
-func recvPartToData(r *multipart.Reader) ([]byte, error) {
-	var err error
-
-	p, err := r.NextPart()
-	if err != nil { // io.EOF
-		log.Println(err)
-		return nil, err
-	}
-
-	sl := p.Header.Get("Content-Length")
-	nl, err := strconv.Atoi(sl)
-	if err != nil {
-		log.Printf("%s %s %d\n", p.Header, sl, nl)
-		return nil, err
-	}
-
-	data := make([]byte, nl)
-
-	// implement like ReadFull() in jpeg.Decode()
-	var tn int
-	for tn < nl {
-		n, err := p.Read(data[tn:])
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		tn += n
-	}
-
-	fmt.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get("Content-Type"), tn, nl, data[:2], data[nl-2:])
-
-	return data[:nl], err
-}
-
-//---------------------------------------------------------------------------
-//	receive a part to slot of buffer
-//----------------------------------------s-----------------------------------
-func recvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
-	var err error
-
-	p, err := r.NextPart()
-	if err != nil { // io.EOF
-		log.Println(err)
-		return err
-	}
-
-	sl := p.Header.Get("Content-Length")
-	nl, err := strconv.Atoi(sl)
-	if err != nil {
-		log.Printf("%s %s %d\n", p.Header, sl, nl)
-		return err
-	}
-
-	var tn int
-	for tn < nl {
-		n, err := p.Read(ss.Content[tn:])
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-		tn += n
-	}
-
-	ss.Length = nl
-	ss.Type = p.Header.Get("Content-Type")
-	//fmt.Println(ss)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-//	receive multipart data into buffer
-//---------------------------------------------------------------------------
-func recvMultipartToRing(r *multipart.Reader) error {
-	var err error
-
-	sbuf := conf.Ring
-	err = sbuf.SetStatusUsing()
-	if err != nil {
-		return sr.ErrStatus
-	}
-
-	// insert slots to the buffer
-	for i := 0; true; i++ {
-		//pre, pos := sbuf.ReadSlotIn()
-		//fmt.Println("P", pos, pre)
-
-		slot, pos := sbuf.GetSlotIn()
-		//fmt.Println(i, pos, slot)
-
-		err = recvPartToSlot(r, slot)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		fmt.Println(i, pos, slot)
-
-		sbuf.SetPosInByPos(pos + 1)
-	}
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-//	receive multipart data and decode jpeg
-//---------------------------------------------------------------------------
-func recvMultipartToData(r *multipart.Reader) error {
-	var err error
-
-	for {
-		p, err := r.NextPart()
-		if err != nil { // io.EOF
-			log.Println(err)
-			return err
-		}
-
-		sl := p.Header.Get("Content-Length")
-		nl, err := strconv.Atoi(sl)
-		if err != nil {
-			log.Printf("%s %s %d\n", p.Header, sl, nl)
-			continue
-		}
-
-		data := make([]byte, nl)
-
-		// implement like ReadFull() in jpeg.Decode()
-		var tn int
-		for tn < nl {
-			n, err := p.Read(data[tn:])
-			if err != nil {
-				log.Println(err)
-				return err
-			}
-			tn += n
-		}
-
-		fmt.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get("Content-Type"), tn, nl, data[:2], data[nl-2:])
-	}
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-//	receive multipart data and decode jpeg
-//---------------------------------------------------------------------------
-func recvMultipartDecodeJpeg(r *multipart.Reader) {
-	for {
-		print(".")
-		p, err := r.NextPart()
-		if err != nil { // io.EOF
-			log.Println(err)
-		}
-
-		_, err = jpeg.Decode(p)
-		if err != nil {
-			log.Println(err)
-		}
-	}
-}
-
-//---------------------------------------------------------------------------
-// prepare a stream buffer
-//---------------------------------------------------------------------------
-func prepareStreamRing(nb int, size int, desc string) *sr.StreamRing {
-
-	sbuf := sr.NewStreamRing(nb, size)
-	sbuf.Desc = desc
-	fmt.Println(sbuf)
-
-	return sbuf
+	ph.RecvMultipartToRing(mr, conf.Ring)
 }
 
 //---------------------------------------------------------------------------
@@ -590,7 +289,7 @@ func ActHttpServer() error {
 	http.Handle("/websocket/", websocket.Handler(websocketHandler))
 
 	// CAUTION: don't use /static not /static/ as the prefix
-	http.Handle("/static/", http.StripPrefix("/static/", fileServer("./static")))
+	http.Handle("/static/", http.StripPrefix("/static/", ph.FileServer("./static")))
 
 	//var wg sync.WaitGroup
 	wg := sync.WaitGroup{}
@@ -713,14 +412,6 @@ func serveWss(wg *sync.WaitGroup) {
 }
 
 //---------------------------------------------------------------------------
-// static file server handler
-//---------------------------------------------------------------------------
-func fileServer(path string) http.Handler {
-	log.Println("File server for " + path)
-	return http.FileServer(http.Dir(path))
-}
-
-//---------------------------------------------------------------------------
 // index file handler
 //---------------------------------------------------------------------------
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -731,7 +422,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendPage(w, index_tmpl)
+	ph.SendTemplatePage(w, index_tmpl, conf)
 }
 
 //---------------------------------------------------------------------------
@@ -751,7 +442,7 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := os.Stat(hello_page)
 	if err != nil {
-		sendPage(w, hello_tmpl)
+		ph.SendTemplatePage(w, hello_tmpl, conf)
 		log.Printf("Hello serve %s\n", "hello_tmpl")
 	} else {
 		http.ServeFile(w, r, hello_page)
@@ -767,9 +458,9 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := os.Stat(r.URL.Path[1:])
 	if err != nil {
-		Responder(w, r, 404, r.URL.Path+" is Not Found")
+		ph.SendResponseMessage(w, 404, r.URL.Path+" is Not Found")
 	} else {
-		Responder(w, r, 200, r.URL.Path)
+		ph.SendResponseMessage(w, 200, r.URL.Path)
 	}
 }
 
@@ -782,337 +473,12 @@ func websocketHandler(ws *websocket.Conn) {
 }
 
 //---------------------------------------------------------------------------
-// send a file
-//---------------------------------------------------------------------------
-func sendFile(w http.ResponseWriter, file string) error {
-	w.Header().Set("Content-Type", "image/icon")
-	w.Header().Set("Server", "Happy Media Server")
-	body, err := ioutil.ReadFile("static/favicon.ico")
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	fmt.Fprint(w, string(body))
-
-	return nil
-}
-
-//---------------------------------------------------------------------------
-// send a page
-//---------------------------------------------------------------------------
-func sendPage(w http.ResponseWriter, page string) error {
-	t, err := template.New("mjpeg").Parse(page)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	return t.Execute(w, conf)
-}
-
-//---------------------------------------------------------------------------
-// send image stream with the given format(extension) in the directory
-//---------------------------------------------------------------------------
-func sendStreamImage(w io.Writer, dtype string, loop bool) error {
-	var err error
-
-	for {
-		err = sendPartImage(w, dtype)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-
-		time.Sleep(time.Second)
-
-		if !loop {
-			break
-		}
-	}
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send image stream with the given format(extension) in the directory
-//---------------------------------------------------------------------------
-func sendStreamRing(w io.Writer) error {
-	var err error
-
-	sbuf := conf.Ring
-	if !sbuf.IsUsing() {
-		return sr.ErrStatus
-	}
-
-	var pos int
-	for {
-		slot, npos, err := sbuf.GetSlotNextByPos(pos)
-		if slot == nil && err == sr.ErrEmpty {
-			time.Sleep(time.Millisecond)
-			continue
-		}
-
-		err = sendPartSlot(w, slot)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-
-		pos = npos
-	}
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send files with the given format(extension) in the directory
-//---------------------------------------------------------------------------
-func sendStreamDir(w io.Writer, pat string, loop bool) error {
-	var err error
-
-	// direct pattern matching
-	files, err := filepath.Glob(pat)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	if files == nil {
-		log.Println("no matched file")
-		return err
-	}
-
-	for {
-		for i := range files {
-			err = sendPartFile(w, files[i])
-			if err != nil {
-				return err
-			}
-			time.Sleep(time.Second)
-		}
-
-		if !loop {
-			break
-		}
-	}
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send any file in multipart format with boundary (standard style)
-//---------------------------------------------------------------------------
-func sendPartFile(w io.Writer, file string) error {
-	var err error
-
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	dsize := len(data)
-
-	// check the extension at first and its content
-	ctype := mime.TypeByExtension(filepath.Ext(file))
-	if ctype == "" {
-		ctype = http.DetectContentType(data)
-	}
-
-	mw := multipart.NewWriter(w)
-	mw.SetBoundary("myboundary")
-
-	part, err := mw.CreatePart(textproto.MIMEHeader{
-		"Content-Type":   {ctype},
-		"Content-Length": {strconv.Itoa(dsize)},
-	})
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	buf.Write(data)   // prepare data in the buffer
-	buf.WriteTo(part) // output the part with buffer in multipart format
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send image in multipart format with boundary (standard style)
-//---------------------------------------------------------------------------
-func sendPartImage(w io.Writer, dtype string) error {
-	var err error
-
-	//img := si.GenSpiralImage(1080, 768)
-	//img := si.GenClockImage(800)
-	img := si.GenRandomImageBlock(1080, 768)
-	data, err := si.PutImageToBuffer(img, dtype, 90)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	dsize := len(data)
-
-	ctype := http.DetectContentType(data)
-
-	mw := multipart.NewWriter(w)
-	mw.SetBoundary("myboundary")
-	part, err := mw.CreatePart(textproto.MIMEHeader{
-		"Content-Type":   {ctype},
-		"Content-Length": {strconv.Itoa(dsize)},
-	})
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	buf.Write(data)
-	buf.WriteTo(part)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send slot in multipart format with boundary (standard style)
-//---------------------------------------------------------------------------
-func sendPartSlot(w io.Writer, ss *sr.StreamSlot) error {
-	var err error
-
-	mw := multipart.NewWriter(w)
-	mw.SetBoundary("myboundary")
-	part, err := mw.CreatePart(textproto.MIMEHeader{
-		"Content-Type":   {ss.Type},
-		"Content-Length": {strconv.Itoa(ss.Length)},
-	})
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	buf.Write(ss.Content[:ss.Length])
-	buf.WriteTo(part)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send an jpeg file in multipart format with boundary (brute force style)
-//---------------------------------------------------------------------------
-const boundary = "myboundary"
-const frameheader = "\r\n" +
-	"--" + boundary + "\r\n" +
-	"Content-Type: video/mjpeg\r\n" +
-	"Content-Length: %d\r\n" +
-	"X-Timestamp: 0.000000\r\n" +
-	"\r\n"
-
-func sendStreamJpeg(w io.Writer, file string) error {
-	var err error
-
-	jpeg, err := ioutil.ReadFile(file)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	//fmt.Printf("%s [%d] : %0x%0x - %0x%0x\n", file, len(jpeg), jpeg[0], jpeg[1], jpeg[len(jpeg)-2], jpeg[len(jpeg)-1])
-
-	header := fmt.Sprintf(frameheader, len(jpeg))
-	frame := make([]byte, (len(header) + len(jpeg)))
-
-	copy(frame, header)
-	copy(frame[len(header):], jpeg)
-
-	_, err = w.Write(frame)
-	//n, err := w.Write(frame)
-	//fmt.Printf("%s [%d=%d] : \n", file, len(header)+len(jpeg), n)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
-// send response for /stream with multipart format
-//---------------------------------------------------------------------------
-func sendStreamRequest(w http.ResponseWriter) error {
-	return nil
-}
-
-// for Caster
-func sendStreamOK(w http.ResponseWriter) error {
-	w.Header().Set("Server", "Happy Media Server")
-	w.WriteHeader(http.StatusOK)
-
-	return nil
-}
-
-// for Player
-func sendStreamResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
-	w.Header().Set("Server", "Happy Media Server")
-	w.WriteHeader(http.StatusOK)
-
-	return nil
-}
-
-//---------------------------------------------------------------------------
-// 22 handle /stream access
-//---------------------------------------------------------------------------
-func streamHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
-
-	switch r.Method {
-	case "POST": // for Caster
-		/*
-			err := sendStreamOK(w)
-			if err != nil {
-				log.Println(err)
-				break
-			}
-		*/
-		mt, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		fmt.Printf("%v %v\n", r.Header.Get("Content-Type"), params)
-		if err != nil {
-			log.Fatalf("ParseMediaType: %s %v", mt, err)
-		}
-
-		boundary := params["boundary"]
-		if !strings.HasPrefix(boundary, "--") {
-			log.Printf("expected boundary to start with --, got %q", boundary)
-		}
-
-		mr := multipart.NewReader(r.Body, boundary)
-
-		recvMultipartToData(mr)
-
-	case "GET": // for Player
-		err := sendStreamResponse(w)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-
-		//err = sendStreamDir(w, "./static/image/*.jpg", true)
-		//err = sendStreamImage(w, "jpg", true)
-		err = sendStreamRing(w)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-
-	default:
-		log.Println("Unknown method: ", r.Method)
-	}
-
-	return
-}
-
-//---------------------------------------------------------------------------
 // handle /search access
 //---------------------------------------------------------------------------
 func searchHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	Responder(w, r, 200, "/search: Not yet implemented")
+	ph.SendResponseMessage(w, 200, "/search: Not yet implemented")
 
 	return
 }
@@ -1123,21 +489,46 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	Responder(w, r, 200, "/status: Not yet implemented")
+	ph.SendResponseMessage(w, 200, "/status: Not yet implemented")
 }
 
 //---------------------------------------------------------------------------
-// respond message simply
+// handle /stream access
 //---------------------------------------------------------------------------
-func Responder(w http.ResponseWriter, r *http.Request, status int, message string) {
-	/*
-		w.Header().Set("Content-Type", mime.TypeByExtension(ext))
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusNotFound)
-	*/
-	w.WriteHeader(status)
-	log.Println(message)
-	fmt.Fprintf(w, message)
+func streamHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+
+	switch r.Method {
+	case "POST": // for Caster
+		err := ph.SendResponseOk(w)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		boundary, err := ph.GetBoundary(r.Header.Get("Content-Type"))
+		mr := multipart.NewReader(r.Body, boundary)
+
+		ph.RecvMultipartToRing(mr, conf.Ring)
+
+	case "GET": // for Player
+		err := ph.SendResponsePlay(w, conf.Ring.Boundary)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		err = ph.SendMultipartRing(w, conf.Ring)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+	default:
+		log.Println("Unknown method: ", r.Method)
+	}
+
+	return
 }
 
 // ---------------------------------E-----N-----D--------------------------------
