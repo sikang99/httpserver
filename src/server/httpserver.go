@@ -470,6 +470,8 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 func websocketHandler(ws *websocket.Conn) {
 	log.Printf("Websocket \n")
 
+	//ws.Message.Send()
+
 }
 
 //---------------------------------------------------------------------------
@@ -498,27 +500,35 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 func streamHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
+	var err error
+	sbuf := conf.Ring
+
 	switch r.Method {
 	case "POST": // for Caster
-		err := ph.SendResponseOk(w)
+		sbuf.Boundary, err = ph.GetBoundary(r.Header.Get("Content-Type"))
+
+		err = ph.SendResponsePost(w, sbuf.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
 		}
 
-		boundary, err := ph.GetBoundary(r.Header.Get("Content-Type"))
-		mr := multipart.NewReader(r.Body, boundary)
+		mr := multipart.NewReader(r.Body, sbuf.Boundary)
 
-		ph.RecvMultipartToRing(mr, conf.Ring)
+		err = ph.RecvMultipartToRing(mr, sbuf)
+		if err != nil {
+			log.Println(err)
+			break
+		}
 
 	case "GET": // for Player
-		err := ph.SendResponsePlay(w, conf.Ring.Boundary)
+		err = ph.SendResponseGet(w, sbuf.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
 		}
 
-		err = ph.SendMultipartRing(w, conf.Ring)
+		err = ph.SendMultipartRing(w, sbuf)
 		if err != nil {
 			log.Println(err)
 			break

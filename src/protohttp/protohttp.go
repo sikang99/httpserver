@@ -581,19 +581,6 @@ func SendPartSlot(w io.Writer, ss *sr.StreamSlot, boundary string) error {
 }
 
 //---------------------------------------------------------------------------
-// send response for Player
-//---------------------------------------------------------------------------
-func SendResponsePlay(w http.ResponseWriter, boundary string) error {
-	var err error
-
-	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
-	w.Header().Set("Server", "Happy Media Server")
-	w.WriteHeader(http.StatusOK)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
 // get boundary string
 //---------------------------------------------------------------------------
 func GetBoundary(ctype string) (string, error) {
@@ -615,13 +602,28 @@ func GetBoundary(ctype string) (string, error) {
 }
 
 //---------------------------------------------------------------------------
-// send response for Caster
+// send response for Player
 //---------------------------------------------------------------------------
-func SendResponseOk(w http.ResponseWriter) error {
+func SendResponseGet(w http.ResponseWriter, boundary string) error {
+	var err error
+
+	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
 	w.Header().Set("Server", "Happy Media Server")
 	w.WriteHeader(http.StatusOK)
 
-	return nil
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send response for Caster
+//---------------------------------------------------------------------------
+func SendResponsePost(w http.ResponseWriter, boundary string) error {
+	var err error
+
+	w.Header().Set("Server", "Happy Media Server")
+	w.WriteHeader(http.StatusOK)
+
+	return err
 }
 
 //---------------------------------------------------------------------------
