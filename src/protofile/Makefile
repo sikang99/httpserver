@@ -22,7 +22,8 @@ buildtest bt:
 	go test -v
 
 view v:
-	shotwell output.jpg
+	#shotwell output.jpg
+	hexer output.mjpg
 
 clobber clean:
 	rm -f output.*

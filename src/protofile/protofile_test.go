@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 
 	sr "stoney/httpserver/src/streamring"
 )
@@ -34,20 +35,14 @@ func TestHandleInfo(t *testing.T) {
 //---------------------------------------------------------------------------
 // test for reader
 //---------------------------------------------------------------------------
-func TestReader(t *testing.T) {
+func TestFileReadWrite(t *testing.T) {
 	sbuf := sr.NewStreamRing(5, MBYTE)
 	fmt.Println(sbuf)
 
 	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
-	fr.ActReader(sbuf)
-}
+	go fr.ActReader(sbuf)
 
-//---------------------------------------------------------------------------
-// test for writer
-//---------------------------------------------------------------------------
-func TestWriter(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, MBYTE)
-	fmt.Println(sbuf)
+	time.Sleep(time.Second)
 
 	fw := NewProtoFile("output.mjpg", "Testing")
 	fw.ActWriter(sbuf)

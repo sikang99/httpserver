@@ -40,6 +40,7 @@ const (
 var (
 	ErrEmpty  = errors.New("empty")
 	ErrFull   = errors.New("full")
+	ErrSize   = errors.New("null size")
 	ErrStatus = errors.New("invalid status")
 )
 

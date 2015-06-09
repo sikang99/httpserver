@@ -143,7 +143,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "refactor protows package"
+	git commit -m "modify protofile to support recording"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

@@ -8,6 +8,7 @@
 package protofile
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -34,6 +35,8 @@ const (
 
 	STR_PGM_READER = "Happy Media File Reader"
 	STR_PGM_WRITER = "Happy Media File Writer"
+
+	TIME_DEF_WAIT = time.Millisecond
 )
 
 //---------------------------------------------------------------------------
@@ -85,7 +88,7 @@ func NewProtoFile(pat, desc string) *ProtoFile {
 func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
 	log.Println(STR_PGM_READER)
 
-	pf.ReadDirToRing(sbuf, pf.Pattern, true)
+	ReadDirToRing(sbuf, pf.Pattern, false)
 	fmt.Println(sbuf)
 
 	return
@@ -97,29 +100,13 @@ func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
 func (pf *ProtoFile) ActWriter(sbuf *sr.StreamRing) {
 	log.Println(STR_PGM_WRITER)
 
-	pf.WriteRingToFile(sbuf, pf.Pattern)
-}
-
-//---------------------------------------------------------------------------
-// write the ring buffer to file
-//---------------------------------------------------------------------------
-func (pf *ProtoFile) WriteRingToFile(sbuf *sr.StreamRing, file string) error {
-	var err error
-
-	out, err := os.Open(file)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	defer out.Close()
-
-	return err
+	WriteRingToFile(sbuf, pf.Pattern)
 }
 
 //---------------------------------------------------------------------------
 // read files with the given pattern in the directory and put them to the ring buffer
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
+func ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 	var err error
 
 	// ReadDir : read directory
@@ -137,21 +124,19 @@ func (pf *ProtoFile) ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) e
 	if err != nil {
 		return sr.ErrStatus
 	}
+	defer sbuf.SetStatusIdle()
 
 	// ToRing : to ring buffer
 	for {
 		for i := range files {
 			slot, pos := sbuf.GetSlotIn()
-			err = pf.ReadFileToSlot(files[i], slot)
-			if err != nil {
-				if err == sr.ErrEmpty {
-					continue
-				}
-				log.Println(err)
-				return err
+			err = ReadFileToSlot(files[i], slot)
+			if err == sr.ErrSize {
+				continue
 			}
-			fmt.Println(slot)
 			sbuf.SetPosInByPos(pos + 1)
+			fmt.Println(slot)
+
 			time.Sleep(time.Second)
 		}
 
@@ -164,9 +149,47 @@ func (pf *ProtoFile) ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) e
 }
 
 //---------------------------------------------------------------------------
+// write the ring buffer to file
+//---------------------------------------------------------------------------
+func WriteRingToFile(sbuf *sr.StreamRing, file string) error {
+	var err error
+
+	f, err := os.Create(file)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer f.Close()
+
+	// write ring buffer to file
+	var pos int
+	for sbuf.IsUsing() {
+		slot, npos, err := sbuf.GetSlotNextByPos(pos)
+		if err != nil {
+			if err == sr.ErrEmpty {
+				time.Sleep(TIME_DEF_WAIT)
+				continue
+			}
+			log.Println(err)
+			break
+		}
+
+		// write slot
+		//err = WriteSlotToFile(out, slot, sbuf.Boundary)
+
+		w := bufio.NewWriter(f)
+		err = WriteSlotToHandle(w, slot, sbuf.Boundary)
+
+		pos = npos
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
 // read a file to slot of ring buffer
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ReadFileToSlot(file string, ss *sr.StreamSlot) error {
+func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	var err error
 
 	data, err := ioutil.ReadFile(file)
@@ -177,8 +200,8 @@ func (pf *ProtoFile) ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	dsize := len(data)
 
 	if dsize == 0 {
-		log.Printf("%s(%d) is empty\n", file, dsize)
-		return sr.ErrEmpty
+		log.Printf("%s(%d) is null.\n", file, dsize)
+		return sr.ErrSize
 	}
 
 	ctype := mime.TypeByExtension(filepath.Ext(file))
@@ -189,6 +212,42 @@ func (pf *ProtoFile) ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	copy(ss.Content, data)
 	ss.Length = dsize
 	ss.Type = ctype
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// write the slot to file
+//---------------------------------------------------------------------------
+func WriteSlotToFile(f *os.File, ss *sr.StreamSlot, boundary string) error {
+	var err error
+
+	str := fmt.Sprintf("\r\n--%s\r\n", boundary)
+	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
+	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
+	str += "\r\n"
+
+	f.WriteString(str)
+	f.Write(ss.Content[:ss.Length])
+	f.Sync()
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// write the slot to handle, bufio.Writer(io.Writer)
+//---------------------------------------------------------------------------
+func WriteSlotToHandle(w *bufio.Writer, ss *sr.StreamSlot, boundary string) error {
+	var err error
+
+	str := fmt.Sprintf("\r\n--%s\r\n", boundary)
+	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
+	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
+	str += "\r\n"
+
+	_, err = w.WriteString(str)
+	_, err = w.Write(ss.Content[:ss.Length])
+	w.Flush()
 
 	return err
 }
