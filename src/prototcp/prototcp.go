@@ -581,7 +581,7 @@ func (pt *ProtoTcp) SendPartData(conn net.Conn, data []byte, ctype string) error
 //---------------------------------------------------------------------------
 // read a part header and parse it
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadMultipartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
+func ReadMultipartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
 	var err error
 
 	p, err := mr.NextPart()

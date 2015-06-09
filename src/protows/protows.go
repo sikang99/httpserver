@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"mime"
@@ -66,7 +67,7 @@ type ProtoWs struct {
 }
 
 //---------------------------------------------------------------------------
-// string information
+// string information of struct
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) String() string {
 	str := fmt.Sprintf("\tHost: %s", pw.Host)
@@ -177,13 +178,13 @@ func (pw *ProtoWs) ActShooter() {
 	}
 	defer ws.Close()
 
-	err = pw.SummitRequest(ws)
+	err = SendRequestPost(ws, pw.Boundary)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = pw.SendMultipartFiles(ws, "../../static/image/*.jpg")
+	err = SendMultipartFiles(ws, "../../static/image/*.jpg", pw.Boundary)
 }
 
 //---------------------------------------------------------------------------
@@ -251,27 +252,31 @@ func (pw *ProtoWs) serveHttps(wg *sync.WaitGroup) {
 func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 	var err error
 
-	// simplest echo function
-	//io.Copy(ws, ws)
+	mode := "change"
 
-	// slightly message change echo
-	for {
-		var reply string
+	switch mode {
+	case "direct":
+		io.Copy(ws, ws)
 
-		err = websocket.Message.Receive(ws, &reply)
-		if err != nil {
-			log.Println(err)
-			break
+	default: // "change"
+		for {
+			var reply string
+
+			err = websocket.Message.Receive(ws, &reply)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			//log.Println("Received from client: " + reply)
+
+			smsg := "Echo " + reply
+			err = websocket.Message.Send(ws, smsg)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			//log.Println("Sending to client: " + smsg)
 		}
-		//log.Println("Received from client: " + reply)
-
-		smsg := "Echo " + reply
-		err = websocket.Message.Send(ws, smsg)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		//log.Println("Sending to client: " + smsg)
 	}
 }
 
@@ -282,7 +287,7 @@ func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
 	log.Printf("in from %s\n", ws.RemoteAddr())
 	defer log.Printf("out %s\n", ws.RemoteAddr())
 
-	err := pw.HandleRequest(ws)
+	err := HandleRequest(ws)
 	if err != nil {
 		log.Println(err)
 		return
@@ -290,8 +295,8 @@ func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
 
 	sbuf := sr.NewStreamRing(2, MBYTE)
 
-	//err = pw.RecvMultipartData(ws)
-	err = pw.RecvMultipartToRing(ws, sbuf)
+	//err = RecvMultipartData(ws, pw.Boundary)
+	err = RecvMultipartToRing(ws, sbuf)
 	if err != nil {
 		log.Println(err)
 		return
@@ -301,12 +306,12 @@ func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
 //---------------------------------------------------------------------------
 // WebSocket summit a request to the server
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) SummitRequest(ws *websocket.Conn) error {
+func SendRequestPost(ws *websocket.Conn, boundary string) error {
 	var err error
 
 	// send POST request
 	smsg := "POST /stream HTTP/1.1\r\n"
-	smsg += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pw.Boundary)
+	smsg += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=--%s\r\n", boundary)
 	smsg += "User-Agent: Happy Media WS Client\r\n"
 	smsg += "\r\n"
 
@@ -333,7 +338,7 @@ func (pw *ProtoWs) SummitRequest(ws *websocket.Conn) error {
 //---------------------------------------------------------------------------
 // WebSocket handle a client request in the server
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) HandleRequest(ws *websocket.Conn) error {
+func HandleRequest(ws *websocket.Conn) error {
 	var err error
 
 	// recv POST request
@@ -347,7 +352,7 @@ func (pw *ProtoWs) HandleRequest(ws *websocket.Conn) error {
 	fmt.Printf("<< Recv(%d):\n%s", n, rmsg[:n])
 
 	// parse request
-	err = pw.GetBoundary(string(rmsg[:n]))
+	err = ParseRequest(string(rmsg[:n]))
 	if err != nil {
 		log.Println(err)
 		return err
@@ -369,30 +374,21 @@ func (pw *ProtoWs) HandleRequest(ws *websocket.Conn) error {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket get boundary string from message
+// WebSocket parse request
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) GetBoundary(msg string) error {
+func ParseRequest(msg string) error {
 	var err error
 
-	req, err := pw.GetRequest(msg)
+	req, err := GetRequest(msg)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-
-	mt, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
-	//fmt.Printf("%v %v\n", params, req.Header.Get("Content-Type"))
+	_, err = GetBoundary(req.Header.Get("Content-Type"))
 	if err != nil {
-		log.Printf("ParseMediaType: %s %v", mt, err)
+		log.Println(err)
 		return err
 	}
-
-	boundary := params["boundary"]
-	if !strings.HasPrefix(boundary, "--") {
-		log.Printf("expected boundary to start with --, got %q", boundary)
-	}
-
-	pw.Boundary = boundary
 
 	return err
 }
@@ -400,7 +396,7 @@ func (pw *ProtoWs) GetBoundary(msg string) error {
 //---------------------------------------------------------------------------
 // WebSocket get http request from message
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) GetRequest(msg string) (*http.Request, error) {
+func GetRequest(msg string) (*http.Request, error) {
 	var err error
 
 	reader := bufio.NewReader(strings.NewReader(msg))
@@ -415,9 +411,30 @@ func (pw *ProtoWs) GetRequest(msg string) (*http.Request, error) {
 }
 
 //---------------------------------------------------------------------------
+// WebSocket get boundary string from request
+//---------------------------------------------------------------------------
+func GetBoundary(ctype string) (string, error) {
+	var err error
+
+	mt, params, err := mime.ParseMediaType(ctype)
+	//fmt.Printf("%v %v\n", params, req.Header.Get("Content-Type"))
+	if err != nil {
+		log.Printf("ParseMediaType: %s %v", mt, err)
+		return "", err
+	}
+
+	boundary := params["boundary"]
+	if !strings.HasPrefix(boundary, "--") {
+		log.Printf("expected boundary to start with --, got %q", boundary)
+	}
+
+	return boundary, err
+}
+
+//---------------------------------------------------------------------------
 // WebSocket get header from message
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) GetHeader(msg string) (http.Header, error) {
+func GetHeader(msg string) (http.Header, error) {
 	var err error
 
 	reader := bufio.NewReader(strings.NewReader(msg))
@@ -438,7 +455,7 @@ func (pw *ProtoWs) GetHeader(msg string) (http.Header, error) {
 //---------------------------------------------------------------------------
 // send files in multipart
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) SendMultipartFiles(ws *websocket.Conn, pattern string) error {
+func SendMultipartFiles(ws *websocket.Conn, pattern string, boundary string) error {
 	var err error
 
 	files, err := filepath.Glob(pattern)
@@ -453,10 +470,10 @@ func (pw *ProtoWs) SendMultipartFiles(ws *websocket.Conn, pattern string) error 
 
 	//mw := multipart.NewWriter(os.Stdout)	// for debug
 	mw := multipart.NewWriter(ws)
-	mw.SetBoundary(pw.Boundary)
+	mw.SetBoundary(boundary)
 
 	for i := range files {
-		err = pw.SendPartFile(ws, mw, files[i])
+		err = SendPartFile(mw, files[i])
 		if err != nil {
 			if err == ErrSize { // ignore file of size error
 				continue
@@ -473,7 +490,7 @@ func (pw *ProtoWs) SendMultipartFiles(ws *websocket.Conn, pattern string) error 
 //---------------------------------------------------------------------------
 // send a file in part
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) SendPartFile(ws *websocket.Conn, mw *multipart.Writer, file string) error {
+func SendPartFile(mw *multipart.Writer, file string) error {
 	var err error
 
 	fmt.Println(file)
@@ -493,7 +510,7 @@ func (pw *ProtoWs) SendPartFile(ws *websocket.Conn, mw *multipart.Writer, file s
 		ctype = http.DetectContentType(fdata)
 	}
 
-	err = pw.SendPartData(mw, fdata, len(fdata), ctype)
+	err = SendPartData(mw, fdata, len(fdata), ctype)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -505,10 +522,10 @@ func (pw *ProtoWs) SendPartFile(ws *websocket.Conn, mw *multipart.Writer, file s
 //---------------------------------------------------------------------------
 // recv multipart (for debugging)
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) RecvMultipartData(ws *websocket.Conn) error {
+func RecvMultipartData(ws *websocket.Conn, boundary string) error {
 	var err error
 
-	mr := multipart.NewReader(ws, pw.Boundary)
+	mr := multipart.NewReader(ws, boundary)
 
 	for {
 		err = RecvPartToData(mr)
@@ -524,10 +541,10 @@ func (pw *ProtoWs) RecvMultipartData(ws *websocket.Conn) error {
 //---------------------------------------------------------------------------
 // recv multipart to ring buffer
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) RecvMultipartToRing(ws *websocket.Conn, sbuf *sr.StreamRing) error {
+func RecvMultipartToRing(ws *websocket.Conn, sbuf *sr.StreamRing) error {
 	var err error
 
-	mr := multipart.NewReader(ws, pw.Boundary)
+	mr := multipart.NewReader(ws, sbuf.Boundary)
 
 	for {
 		slot, pos := sbuf.GetSlotIn()
@@ -547,7 +564,7 @@ func (pw *ProtoWs) RecvMultipartToRing(ws *websocket.Conn, sbuf *sr.StreamRing) 
 //---------------------------------------------------------------------------
 // send a part of multipart
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) SendPartData(mw *multipart.Writer, data []byte, dsize int, dtype string) error {
+func SendPartData(mw *multipart.Writer, data []byte, dsize int, dtype string) error {
 	var err error
 
 	buf := new(bytes.Buffer)
@@ -573,7 +590,7 @@ func (pw *ProtoWs) SendPartData(mw *multipart.Writer, data []byte, dsize int, dt
 func RecvPartToData(mr *multipart.Reader) error {
 	var err error
 
-	p, nl, err := ReadPartHeader(mr)
+	p, nl, err := RecvPartHeader(mr)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -581,7 +598,7 @@ func RecvPartToData(mr *multipart.Reader) error {
 
 	data := make([]byte, nl)
 
-	err = ReadPartBodyToData(p, nl, data)
+	err = RecvPartBodyToData(p, nl, data)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -597,13 +614,13 @@ func RecvPartToData(mr *multipart.Reader) error {
 func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 	var err error
 
-	p, nl, err := ReadPartHeader(mr)
+	p, nl, err := RecvPartHeader(mr)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	err = ReadPartBodyToSlot(p, nl, ss)
+	err = RecvPartBodyToSlot(p, nl, ss)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -616,7 +633,7 @@ func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 //---------------------------------------------------------------------------
 // read a part header and parse it
 //---------------------------------------------------------------------------
-func ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
+func RecvPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
 	var err error
 
 	p, err := mr.NextPart()
@@ -638,7 +655,7 @@ func ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
 //---------------------------------------------------------------------------
 // read a part body to data
 //---------------------------------------------------------------------------
-func ReadPartBodyToData(p *multipart.Part, nl int, data []byte) error {
+func RecvPartBodyToData(p *multipart.Part, nl int, data []byte) error {
 	var err error
 
 	var tn int
@@ -657,7 +674,7 @@ func ReadPartBodyToData(p *multipart.Part, nl int, data []byte) error {
 //---------------------------------------------------------------------------
 // read a part body to slot
 //---------------------------------------------------------------------------
-func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
+func RecvPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
 	var err error
 
 	ss.Length = 0
