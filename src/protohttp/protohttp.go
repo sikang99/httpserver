@@ -633,10 +633,14 @@ func SendResponsePost(w http.ResponseWriter, boundary string) error {
 //---------------------------------------------------------------------------
 // send response message simply
 //---------------------------------------------------------------------------
-func SendResponseMessage(w http.ResponseWriter, status int, message string) {
+func SendResponseMessage(w http.ResponseWriter, status int, message string) error {
+	var err error
+
 	w.WriteHeader(status)
 	log.Println(message)
 	fmt.Fprintf(w, message)
+
+	return err
 }
 
 // ---------------------------------E-----N-----D--------------------------------

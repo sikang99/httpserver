@@ -130,7 +130,7 @@ func (pt *ProtoTcp) ActSender() {
 
 	log.Printf("Connecting to %s\n", addr)
 
-	headers, err := pt.SummitRequest(conn)
+	headers, err := pt.SendRequestPost(conn)
 	if err != nil {
 		log.Println(err)
 		return
@@ -173,7 +173,7 @@ func (pt *ProtoTcp) ActReceiver(sbuf *sr.StreamRing) {
 //---------------------------------------------------------------------------
 // summit a TCP request
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) SummitRequest(conn net.Conn) (map[string]string, error) {
+func (pt *ProtoTcp) SendRequestPost(conn net.Conn) (map[string]string, error) {
 	var err error
 
 	// send POST request

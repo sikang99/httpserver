@@ -183,7 +183,7 @@ func (pw *ProtoWs) ActShooter() {
 		return
 	}
 
-	pw.SendMultipartFiles(ws, "../../static/image/*.jpg")
+	err = pw.SendMultipartFiles(ws, "../../static/image/*.jpg")
 }
 
 //---------------------------------------------------------------------------
@@ -511,7 +511,7 @@ func (pw *ProtoWs) RecvMultipartData(ws *websocket.Conn) error {
 	mr := multipart.NewReader(ws, pw.Boundary)
 
 	for {
-		err = pw.RecvPartToData(mr)
+		err = RecvPartToData(mr)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -532,7 +532,7 @@ func (pw *ProtoWs) RecvMultipartToRing(ws *websocket.Conn, sbuf *sr.StreamRing) 
 	for {
 		slot, pos := sbuf.GetSlotIn()
 
-		err = pw.RecvPartToSlot(mr, slot)
+		err = RecvPartToSlot(mr, slot)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -570,10 +570,10 @@ func (pw *ProtoWs) SendPartData(mw *multipart.Writer, data []byte, dsize int, dt
 //---------------------------------------------------------------------------
 // recv a part of multipart
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) RecvPartToData(mr *multipart.Reader) error {
+func RecvPartToData(mr *multipart.Reader) error {
 	var err error
 
-	p, nl, err := pw.ReadPartHeader(mr)
+	p, nl, err := ReadPartHeader(mr)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -581,7 +581,7 @@ func (pw *ProtoWs) RecvPartToData(mr *multipart.Reader) error {
 
 	data := make([]byte, nl)
 
-	err = pw.ReadPartBodyToData(p, nl, data)
+	err = ReadPartBodyToData(p, nl, data)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -594,16 +594,16 @@ func (pw *ProtoWs) RecvPartToData(mr *multipart.Reader) error {
 //---------------------------------------------------------------------------
 // recv a part to slot of ring
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
+func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 	var err error
 
-	p, nl, err := pw.ReadPartHeader(mr)
+	p, nl, err := ReadPartHeader(mr)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	err = pw.ReadPartBodyToSlot(p, nl, ss)
+	err = ReadPartBodyToSlot(p, nl, ss)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -616,7 +616,7 @@ func (pw *ProtoWs) RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error
 //---------------------------------------------------------------------------
 // read a part header and parse it
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
+func ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
 	var err error
 
 	p, err := mr.NextPart()
@@ -638,7 +638,7 @@ func (pw *ProtoWs) ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, e
 //---------------------------------------------------------------------------
 // read a part body to data
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadPartBodyToData(p *multipart.Part, nl int, data []byte) error {
+func ReadPartBodyToData(p *multipart.Part, nl int, data []byte) error {
 	var err error
 
 	var tn int
@@ -657,7 +657,7 @@ func (pw *ProtoWs) ReadPartBodyToData(p *multipart.Part, nl int, data []byte) er
 //---------------------------------------------------------------------------
 // read a part body to slot
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
+func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
 	var err error
 
 	ss.Length = 0

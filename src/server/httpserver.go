@@ -316,10 +316,10 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
+	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
 
-	//tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-	//go tr.ActReceiver(conf.Ring)
+	tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+	go tr.ActReceiver(conf.Ring)
 
 	//fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rx")
 	//go fr.ActReader(conf.Ring)
@@ -470,8 +470,10 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 func websocketHandler(ws *websocket.Conn) {
 	log.Printf("Websocket \n")
 
-	//ws.Message.Send()
-
+	err := websocket.Message.Send(ws, "Not yet implemented")
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 //---------------------------------------------------------------------------
@@ -480,7 +482,10 @@ func websocketHandler(ws *websocket.Conn) {
 func searchHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	ph.SendResponseMessage(w, 200, "/search: Not yet implemented")
+	err := ph.SendResponseMessage(w, 200, "/search: Not yet implemented")
+	if err != nil {
+		log.Println(err)
+	}
 
 	return
 }
@@ -491,7 +496,10 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	ph.SendResponseMessage(w, 200, "/status: Not yet implemented")
+	err := ph.SendResponseMessage(w, 200, "/status: Not yet implemented")
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 //---------------------------------------------------------------------------

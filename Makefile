@@ -143,7 +143,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "fix the bug of missing boundary string in the ring buffer"
+	git commit -m "refactor protows package"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:
