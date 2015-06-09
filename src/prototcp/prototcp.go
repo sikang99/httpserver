@@ -433,7 +433,7 @@ func (pt *ProtoTcp) ReadMessageHeader(reader *bufio.Reader) (map[string]string, 
 		}
 	}
 
-	fmt.Println(result)
+	//fmt.Println(result)
 	return result, err
 }
 

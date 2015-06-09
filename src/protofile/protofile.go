@@ -13,9 +13,11 @@ import (
 	"io/ioutil"
 	"log"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	sr "stoney/httpserver/src/streamring"
@@ -100,7 +102,7 @@ func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
 func (pf *ProtoFile) ActWriter(sbuf *sr.StreamRing) {
 	log.Println(STR_PGM_WRITER)
 
-	WriteRingToFile(sbuf, pf.Pattern)
+	WriteRingToMultipartFile(sbuf, pf.Pattern)
 }
 
 //---------------------------------------------------------------------------
@@ -149,9 +151,84 @@ func ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 }
 
 //---------------------------------------------------------------------------
+// read multipart file to the ring buffer
+//---------------------------------------------------------------------------
+func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
+	var err error
+
+	p, err := mr.NextPart()
+	if err != nil { // io.EOF
+		log.Println(err)
+		return err
+	}
+
+	sl := p.Header.Get("Content-Length")
+	nl, err := strconv.Atoi(sl)
+	if err != nil {
+		log.Printf("%s %s %d\n", p.Header, sl, nl)
+		return err
+	}
+
+	ss.Length = 0
+
+	var tn int
+	for tn < nl {
+		n, err := p.Read(ss.Content[tn:])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		tn += n
+	}
+
+	ss.Length = nl
+	ss.Type = p.Header.Get("Content-Type")
+	//fmt.Println(ss)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// read multipart file to the ring buffer
+//---------------------------------------------------------------------------
+func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
+	var err error
+
+	f, err := os.Open(file)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer f.Close()
+
+	err = sbuf.SetStatusUsing()
+	if err != nil {
+		return sr.ErrStatus
+	}
+	defer sbuf.SetStatusIdle()
+
+	mr := multipart.NewReader(f, sbuf.Boundary)
+
+	for {
+		slot, pos := sbuf.GetSlotIn()
+
+		err = ReadPartToSlot(mr, slot)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		fmt.Println(slot)
+
+		sbuf.SetPosInByPos(pos + 1)
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
 // write the ring buffer to file
 //---------------------------------------------------------------------------
-func WriteRingToFile(sbuf *sr.StreamRing, file string) error {
+func WriteRingToMultipartFile(sbuf *sr.StreamRing, file string) error {
 	var err error
 
 	f, err := os.Create(file)

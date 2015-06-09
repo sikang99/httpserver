@@ -21,6 +21,10 @@ buildtest bt:
 	go build
 	go test -v
 
+btf:
+	go build
+	go test -run TestReadMultipartFile
+
 view v:
 	#shotwell output.jpg
 	hexer output.mjpg

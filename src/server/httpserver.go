@@ -316,10 +316,10 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
+	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
 
-	tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-	go tr.ActReceiver(conf.Ring)
+	//tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+	//go tr.ActReceiver(conf.Ring)
 
 	//fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rx")
 	//go fr.ActReader(conf.Ring)
