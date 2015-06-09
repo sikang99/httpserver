@@ -40,7 +40,8 @@ const (
 var (
 	ErrEmpty  = errors.New("empty")
 	ErrFull   = errors.New("full")
-	ErrSize   = errors.New("null size")
+	ErrSize   = errors.New("size")
+	ErrNull   = errors.New("null")
 	ErrStatus = errors.New("invalid status")
 )
 
@@ -50,14 +51,16 @@ type StreamSlot struct {
 	Length    int
 	LengthMax int
 	Content   []byte
+	Timestamp int64
 }
 
 //----------------------------------------------------------------------------------
 // string information for the single slot
 //----------------------------------------------------------------------------------
 func (ss *StreamSlot) String() string {
-	str := fmt.Sprintf("\tType: %s", ss.Type)
-	str += fmt.Sprintf("\tLength: %d/%d(%d)", ss.Length, ss.LengthMax, len(ss.Content))
+	str := fmt.Sprintf("\tTimestamp: %v", ss.Timestamp)
+	str += fmt.Sprintf("\tType: %v", ss.Type)
+	str += fmt.Sprintf("\tLength: %v/%v(%v)", ss.Length, ss.LengthMax, len(ss.Content))
 	str += fmt.Sprintf("\tContent: ")
 	if ss.Length > 1 {
 		if strings.Contains(ss.Type, "text/") {

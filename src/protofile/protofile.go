@@ -3,6 +3,7 @@
 // Package for File operation
 //  - http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
 //  - https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
+//  - https://medium.com/coding-and-deploying-in-the-cloud/time-stamps-in-golang-abcaf581b72f
 //==================================================================================
 
 package protofile
@@ -46,15 +47,18 @@ type ProtoFile struct {
 	Pattern  string
 	Desc     string
 	Boundary string
+	//CreatedAt time.Time `bson:"created_at,omitempty json:"created_at,omitempty"`
+	CreatedAt int64
 }
 
 //---------------------------------------------------------------------------
 // string ProtoTcp information
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) String() string {
-	str := fmt.Sprintf("\tPattern: %s", pf.Pattern)
-	str += fmt.Sprintf("\tBoundary: %s", pf.Boundary)
-	str += fmt.Sprintf("\tDesc: %s", pf.Desc)
+	str := fmt.Sprintf("\tPattern: %v", pf.Pattern)
+	str += fmt.Sprintf("\tBoundary: %v", pf.Boundary)
+	str += fmt.Sprintf("\tDesc: %v", pf.Desc)
+	str += fmt.Sprintf("\tCreatedAt: %v", pf.CreatedAt)
 	return str
 }
 
@@ -74,13 +78,27 @@ func (pf *ProtoFile) Clear() {
 }
 
 //---------------------------------------------------------------------------
+// make timestamp in sec, msec, nsec
+//---------------------------------------------------------------------------
+func MakeTimestampNanosecond() int64 {
+	return time.Now().UnixNano()
+}
+func MakeTimestampMillisecond() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+func MakeTimestampSecond() int64 {
+	return time.Now().Unix()
+}
+
+//---------------------------------------------------------------------------
 // new ProtoTcp struct
 //---------------------------------------------------------------------------
 func NewProtoFile(pat, desc string) *ProtoFile {
 	return &ProtoFile{
-		Pattern:  pat,
-		Desc:     desc,
-		Boundary: STR_DEF_BDRY,
+		Pattern:   pat,
+		Desc:      desc,
+		Boundary:  STR_DEF_BDRY,
+		CreatedAt: time.Now().Unix(),
 	}
 }
 
@@ -132,10 +150,12 @@ func ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 	for {
 		for i := range files {
 			slot, pos := sbuf.GetSlotIn()
+
 			err = ReadFileToSlot(files[i], slot)
-			if err == sr.ErrSize {
+			if err == sr.ErrNull {
 				continue
 			}
+
 			sbuf.SetPosInByPos(pos + 1)
 			fmt.Println(slot)
 
@@ -183,6 +203,7 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 
 	ss.Length = nl
 	ss.Type = p.Header.Get("Content-Type")
+	ss.Timestamp = MakeTimestampMillisecond()
 	//fmt.Println(ss)
 
 	return err
@@ -278,7 +299,7 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 
 	if dsize == 0 {
 		log.Printf("%s(%d) is null.\n", file, dsize)
-		return sr.ErrSize
+		return sr.ErrNull
 	}
 
 	ctype := mime.TypeByExtension(filepath.Ext(file))
@@ -289,6 +310,7 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	copy(ss.Content, data)
 	ss.Length = dsize
 	ss.Type = ctype
+	ss.Timestamp = MakeTimestampMillisecond()
 
 	return err
 }
@@ -299,13 +321,14 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 func WriteSlotToFile(f *os.File, ss *sr.StreamSlot, boundary string) error {
 	var err error
 
-	str := fmt.Sprintf("\r\n--%s\r\n", boundary)
+	str := fmt.Sprintf("--%s\r\n", boundary)
 	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
 	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
 	str += "\r\n"
 
 	f.WriteString(str)
 	f.Write(ss.Content[:ss.Length])
+	f.WriteString("\r\n")
 	f.Sync()
 
 	return err
@@ -317,13 +340,14 @@ func WriteSlotToFile(f *os.File, ss *sr.StreamSlot, boundary string) error {
 func WriteSlotToHandle(w *bufio.Writer, ss *sr.StreamSlot, boundary string) error {
 	var err error
 
-	str := fmt.Sprintf("\r\n--%s\r\n", boundary)
+	str := fmt.Sprintf("--%s\r\n", boundary)
 	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
 	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
 	str += "\r\n"
 
 	_, err = w.WriteString(str)
 	_, err = w.Write(ss.Content[:ss.Length])
+	_, err = w.WriteString("\r\n")
 	w.Flush()
 
 	return err
