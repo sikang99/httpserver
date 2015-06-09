@@ -176,7 +176,7 @@ func main() {
 	switch *fmode {
 	// package protohttp
 	case "reader":
-		ActHttpReader(*furl)
+		ActHttpReader(*furl, conf.Ring)
 	case "player":
 		ActHttpPlayer(*furl)
 	case "caster":
@@ -232,7 +232,7 @@ func ActHttpPlayer(url string) error {
 
 	hp := ph.NewProtoHttp("localhost", "8080")
 	client := ph.NewClientConfig()
-	return ph.SummitRequestGet(client, hp)
+	return ph.SendRequestGet(client, hp)
 }
 
 //---------------------------------------------------------------------------
@@ -243,13 +243,13 @@ func ActHttpCaster(url string) error {
 
 	hp := ph.NewProtoHttp("localhost", "8080")
 	client := ph.NewClientConfig()
-	return ph.SummitRequestPost(client, hp)
+	return ph.SendRequestPost(client, hp)
 }
 
 //---------------------------------------------------------------------------
 //	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
-func ActHttpReader(url string) {
+func ActHttpReader(url string, sbuf *sr.StreamRing) {
 	log.Printf("Happy Media Reader for %s\n", url)
 
 	var err error
@@ -267,10 +267,10 @@ func ActHttpReader(url string) {
 	}
 	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
-	boundary, err := ph.GetBoundary(res.Header.Get("Content-Type"))
-	mr := multipart.NewReader(res.Body, boundary)
+	sbuf.Boundary, err = ph.GetBoundary(res.Header.Get("Content-Type"))
+	mr := multipart.NewReader(res.Body, sbuf.Boundary)
 
-	ph.RecvMultipartToRing(mr, conf.Ring)
+	err = ph.RecvMultipartToRing(mr, sbuf)
 }
 
 //---------------------------------------------------------------------------
@@ -316,13 +316,13 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
+	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
 
 	//tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
 	//go tr.ActReceiver(conf.Ring)
 
-	fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rx")
-	go fr.ActReader(conf.Ring)
+	//fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rx")
+	//go fr.ActReader(conf.Ring)
 
 	wg.Wait()
 

@@ -1,6 +1,6 @@
 //=========================================================================
 // Author : Stoney Kang, sikang99@gmail.com, 2015
-// for HTTP streaming
+// Protocol for HTTP streaming
 // - http://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
 // - http://stackoverflow.com/questions/30552447/how-to-set-which-ip-to-use-for-a-http-request
 //=========================================================================
@@ -88,7 +88,7 @@ func NewClientConfig() *http.Client {
 //---------------------------------------------------------------------------
 // http GET to server
 //---------------------------------------------------------------------------
-func SummitRequestGet(client *http.Client, ph *ProtoHttp) error {
+func SendRequestGet(client *http.Client, ph *ProtoHttp) error {
 	var err error
 
 	res, err := client.Get(ph.Url)
@@ -110,7 +110,7 @@ func SummitRequestGet(client *http.Client, ph *ProtoHttp) error {
 //---------------------------------------------------------------------------
 // http POST to server
 //---------------------------------------------------------------------------
-func SummitRequestPost(client *http.Client, ph *ProtoHttp) error {
+func SendRequestPost(client *http.Client, ph *ProtoHttp) error {
 	var err error
 
 	// send multipart data
@@ -230,8 +230,6 @@ func RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
 func RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
 	var err error
 
-	//sbuf := prepareStreamRing(5, MBYTE, "AXIS Camera")
-	//sbuf := conf.Ring
 	err = sbuf.SetStatusUsing()
 	if err != nil {
 		return sr.ErrStatus
@@ -261,7 +259,7 @@ func RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 //	receive multipart data and decode jpeg
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) RecvMultipartToData(r *multipart.Reader) error {
+func RecvMultipartToData(r *multipart.Reader) error {
 	var err error
 
 	for {
@@ -367,9 +365,9 @@ func FileServer(path string) http.Handler {
 }
 
 //---------------------------------------------------------------------------
-// send a file
+// send a favicon
 //---------------------------------------------------------------------------
-func SendFile(w http.ResponseWriter, file string) error {
+func SendFavicon(w http.ResponseWriter, file string) error {
 	w.Header().Set("Content-Type", "image/icon")
 	w.Header().Set("Server", "Happy Media Server")
 	body, err := ioutil.ReadFile("static/favicon.ico")
@@ -446,7 +444,7 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 			log.Println(err)
 			break
 		}
-		fmt.Println(slot)
+		//fmt.Println(slot)
 
 		pos = npos
 	}
