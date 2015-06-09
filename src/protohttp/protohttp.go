@@ -427,13 +427,18 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 	if !sbuf.IsUsing() {
 		return sr.ErrStatus
 	}
+	fmt.Println(sbuf)
 
 	var pos int
 	for {
 		slot, npos, err := sbuf.GetSlotNextByPos(pos)
-		if slot == nil && err == sr.ErrEmpty {
-			time.Sleep(time.Millisecond)
-			continue
+		if err != nil {
+			if err == sr.ErrEmpty {
+				time.Sleep(time.Millisecond)
+				continue
+			}
+			log.Println(err)
+			break
 		}
 
 		err = SendPartSlot(w, slot, sbuf.Boundary)
@@ -441,6 +446,7 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 			log.Println(err)
 			break
 		}
+		fmt.Println(slot)
 
 		pos = npos
 	}
@@ -574,8 +580,8 @@ func SendPartSlot(w io.Writer, ss *sr.StreamSlot, boundary string) error {
 	}
 
 	buf := new(bytes.Buffer)
-	buf.Write(ss.Content[:ss.Length])
-	buf.WriteTo(part)
+	_, err = buf.Write(ss.Content[:ss.Length])
+	_, err = buf.WriteTo(part)
 
 	return err
 }

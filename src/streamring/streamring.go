@@ -33,6 +33,8 @@ const (
 const (
 	STATUS_IDLE = iota
 	STATUS_USING
+
+	STR_DEF_BDRY = "myboundary"
 )
 
 var (
@@ -159,6 +161,7 @@ func (sr *StreamRing) String() string {
 	str += fmt.Sprintf("\tStatus: %d", sr.Status)
 	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
 	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/KBYTE)
+	str += fmt.Sprintf("\tBoundary: %s", sr.Boundary)
 	str += fmt.Sprintf("\tDesc: %s\n", sr.Desc)
 
 	for i := 0; i < sr.Num; i++ {
@@ -199,7 +202,8 @@ func NewStreamRing(num int, size int) *StreamRing {
 		Num:    num, NumMax: num,
 		Size: size,
 		In:   0, Out: 0,
-		Desc: "New empty buffer",
+		Boundary: STR_DEF_BDRY,
+		Desc:     "New empty buffer",
 	}
 }
 
