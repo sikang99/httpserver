@@ -9,7 +9,6 @@ package prototcp
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -22,27 +21,14 @@ import (
 	"strings"
 	"time"
 
+	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
 
 //---------------------------------------------------------------------------
 const (
-	KBYTE = 1024
-	MBYTE = 1024 * KBYTE
-
-	LEN_MAX_LINE = 128
-
-	STR_DEF_HOST = "localhost"
-	STR_DEF_PORT = "8080"
-	STR_DEF_BDRY = "myboundary"
-
 	STR_PGM_SENDER = "Happy Media TCP Sender"
 	STR_PGM_RECVER = "Happy Media TCP Receiver"
-)
-
-var (
-	ErrSize = errors.New("Invalid size")
-	ErrNone = errors.New("Nothing to do")
 )
 
 //---------------------------------------------------------------------------
@@ -76,9 +62,9 @@ func (pt *ProtoTcp) SetAddr(hname, hport, desc string) {
 }
 
 func (pt *ProtoTcp) Reset() {
-	pt.Host = STR_DEF_HOST
-	pt.Port = STR_DEF_PORT
-	pt.Boundary = STR_DEF_BDRY
+	pt.Host = sb.STR_DEF_HOST
+	pt.Port = sb.STR_DEF_PORT
+	pt.Boundary = sb.STR_DEF_BDRY
 	pt.Desc = "reset"
 	if pt.Conn != nil {
 		pt.Conn.Close()
@@ -104,7 +90,7 @@ func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
 		Host:     hname,
 		Port:     hport,
 		Desc:     desc,
-		Boundary: STR_DEF_BDRY,
+		Boundary: sb.STR_DEF_BDRY,
 	}
 }
 
@@ -224,7 +210,7 @@ func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 
 	err = sbuf.SetStatusUsing()
 	if err != nil {
-		return sr.ErrStatus
+		return sb.ErrStatus
 	}
 	defer sbuf.Reset()
 
@@ -386,13 +372,14 @@ func (pt *ProtoTcp) ReadPartHeader(reader *bufio.Reader) (map[string]string, err
 			}
 		}
 		if !fstart {
+			// for compatibility with agilecam shooter
 			if strings.Contains(string(line), pt.Boundary) || strings.Contains(string(line), "POST") {
 				fstart = true
 			}
 		}
 
 		// if maybe invalid header data, TODO: stop or ignore?
-		if len(line) > LEN_MAX_LINE {
+		if len(line) > sb.LEN_MAX_LINE {
 			break
 		}
 		//fmt.Println(string(line))
@@ -497,13 +484,13 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 	}
 	if files == nil {
 		log.Printf("no file for '%s'\n", pattern)
-		return ErrNone
+		return sb.ErrNull
 	}
 
 	for i := range files {
 		err = pt.SendPartFile(conn, files[i])
 		if err != nil {
-			if err == ErrSize {
+			if err == sb.ErrSize {
 				continue
 			}
 			log.Println(err)
@@ -530,7 +517,7 @@ func (pt *ProtoTcp) SendPartFile(conn net.Conn, file string) error {
 
 	if len(fdata) == 0 {
 		fmt.Printf(">> ignore '%s' of zero size\n", file)
-		return ErrSize
+		return sb.ErrSize
 	}
 
 	ctype := mime.TypeByExtension(file)

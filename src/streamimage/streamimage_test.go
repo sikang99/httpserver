@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/nfnt/resize"
+
+	sb "stoney/httpserver/src/streambase"
 )
 
 //----------------------------------------------------------------------------------
@@ -62,15 +64,13 @@ func TestMakeImageFiles(t *testing.T) {
 func TestStreamImage(t *testing.T) {
 	var err error
 
-	const KBYTE = 1024
-
 	image := GenFractalImage(800, 800, 100000)
 	data, err := PutImageToBuffer(image, "jpg", 80)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	fmt.Printf("%d KB\n", len(data)/KBYTE)
+	fmt.Printf("%d KB\n", len(data)/sb.KBYTE)
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

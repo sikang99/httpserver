@@ -4,6 +4,7 @@
 // - https://godoc.org/golang.org/x/net/websocket
 // - https://github.com/golang-samples/websocket
 // - http://www.ajanicij.info/content/websocket-tutorial-go
+// - http://www.jonathan-petitcolas.com/2015/01/27/playing-with-websockets-in-go.html
 //==================================================================================
 
 package protows
@@ -11,7 +12,6 @@ package protows
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,37 +26,13 @@ import (
 	"sync"
 	"time"
 
+	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 
 	"golang.org/x/net/websocket"
 )
 
 //---------------------------------------------------------------------------
-const (
-	KBYTE = 1024
-	MBYTE = 1024 * KBYTE
-
-	LEN_MAX_LINE = 128
-
-	STR_DEF_HOST = "localhost"
-	STR_DEF_PORT = "8080"
-	STR_DEF_PTLS = "8443"
-	STR_DEF_BDRY = "myboundary"
-)
-
-var (
-	ErrSize = errors.New("Invalid size")
-	ErrNone = errors.New("Nothing to do")
-)
-
-//---------------------------------------------------------------------------
-type WsConfig struct {
-	Ws       *websocket.Conn
-	Boundary string
-	Mr       *multipart.Reader
-	Mw       *multipart.Writer
-}
-
 type ProtoWs struct {
 	Host     string
 	Port     string
@@ -89,10 +65,10 @@ func (pw *ProtoWs) SetAddr(hname, hport, hptls, desc string) {
 }
 
 func (pw *ProtoWs) Reset() {
-	pw.Host = STR_DEF_HOST
-	pw.Port = STR_DEF_PORT
-	pw.PortTls = STR_DEF_PTLS
-	pw.Boundary = STR_DEF_BDRY
+	pw.Host = sb.STR_DEF_HOST
+	pw.Port = sb.STR_DEF_PORT
+	pw.PortTls = sb.STR_DEF_PTLS
+	pw.Boundary = sb.STR_DEF_BDRY
 	pw.Desc = "reset"
 	if pw.Conn != nil {
 		pw.Conn.Close()
@@ -119,7 +95,7 @@ func NewProtoWs(hname, hport, hptls, desc string) *ProtoWs {
 		Port:     hport,
 		PortTls:  hptls,
 		Desc:     desc,
-		Boundary: STR_DEF_BDRY,
+		Boundary: sb.STR_DEF_BDRY,
 	}
 }
 
@@ -293,7 +269,7 @@ func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
 		return
 	}
 
-	sbuf := sr.NewStreamRing(2, MBYTE)
+	sbuf := sr.NewStreamRing(2, sb.MBYTE)
 
 	//err = RecvMultipartData(ws, pw.Boundary)
 	err = RecvMultipartToRing(ws, sbuf)
@@ -465,7 +441,7 @@ func SendMultipartFiles(ws *websocket.Conn, pattern string, boundary string) err
 	}
 	if files == nil {
 		log.Printf("no file for '%s'\n", pattern)
-		return ErrNone
+		return sb.ErrNull
 	}
 
 	//mw := multipart.NewWriter(os.Stdout)	// for debug
@@ -475,7 +451,7 @@ func SendMultipartFiles(ws *websocket.Conn, pattern string, boundary string) err
 	for i := range files {
 		err = SendPartFile(mw, files[i])
 		if err != nil {
-			if err == ErrSize { // ignore file of size error
+			if err == sb.ErrSize { // ignore file of size error
 				continue
 			}
 			log.Println(err)
@@ -502,7 +478,7 @@ func SendPartFile(mw *multipart.Writer, file string) error {
 
 	if len(fdata) == 0 {
 		fmt.Printf(">> ignore '%s'\n", file)
-		return ErrSize
+		return sb.ErrSize
 	}
 
 	ctype := mime.TypeByExtension(file)

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
 
@@ -39,7 +40,7 @@ func TestHandleInfo(t *testing.T) {
 // test for single send and receive
 //---------------------------------------------------------------------------
 func TestSingleSendReceive(t *testing.T) {
-	sbuf := sr.NewStreamRing(2, MBYTE)
+	sbuf := sr.NewStreamRing(2, sb.MBYTE)
 
 	rx := NewProtoTcp("localhost", "8087", "Rx")
 	go rx.ActReceiver(sbuf)

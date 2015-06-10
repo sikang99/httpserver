@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	sb "stoney/httpserver/src/streambase"
 )
 
 func init() {
@@ -104,7 +106,7 @@ func TestStreamRing(t *testing.T) {
 	var err error
 
 	nb := 3
-	sr := NewStreamRing(nb, KBYTE)
+	sr := NewStreamRing(nb, sb.KBYTE)
 	fmt.Println(sr)
 
 	sr.Resize(2)
@@ -117,7 +119,7 @@ func TestStreamRing(t *testing.T) {
 	fmt.Println(sr)
 
 	data := make([]byte, 3)
-	in := NewStreamSlotByData(KBYTE, "image/jpeg", 3, data)
+	in := NewStreamSlotByData(sb.KBYTE, "image/jpeg", 3, data)
 
 	out, err := sr.PutSlotInNext(in)
 	if err != nil {
@@ -162,10 +164,10 @@ func TestStreamRing(t *testing.T) {
 func TestStreamRead(t *testing.T) {
 	// prepare a buffer
 	nb := 5
-	sr := NewStreamRing(nb, MBYTE)
+	sr := NewStreamRing(nb, sb.MBYTE)
 
 	data := make([]byte, 128)
-	in := NewStreamSlotByData(KBYTE, "image/jpeg", len(data), data)
+	in := NewStreamSlotByData(sb.KBYTE, "image/jpeg", len(data), data)
 	sr.PutSlotInNext(in)
 
 	in.Type = "text/html"
@@ -197,7 +199,7 @@ func TestStreamWrite(t *testing.T) {
 	var err error
 
 	ns := 5
-	sr := NewStreamRing(ns, MBYTE)
+	sr := NewStreamRing(ns, sb.MBYTE)
 	fmt.Println(sr)
 
 	err = sr.SetStatusUsing()
@@ -208,7 +210,7 @@ func TestStreamWrite(t *testing.T) {
 
 	for i := 1; i < 50; i++ {
 		data := []byte(fmt.Sprintf("count %d", i))
-		in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
+		in := NewStreamSlotByData(sb.KBYTE, "text/plain", len(data), data)
 		sr.PutSlotInNext(in)
 	}
 	fmt.Println(sr)
@@ -220,7 +222,7 @@ func TestStreamWrite(t *testing.T) {
 	sr.Reset()
 	fmt.Println(sr)
 
-	if sr.GetStatus() != STATUS_IDLE {
+	if sr.GetStatus() != sb.STATUS_IDLE {
 		log.Fatalln(err)
 	}
 }
@@ -231,7 +233,7 @@ func TestStreamWrite(t *testing.T) {
 func TestStreamReadWrite(t *testing.T) {
 	// prepare a buffer
 	nb := 5
-	sr := NewStreamRing(nb, MBYTE)
+	sr := NewStreamRing(nb, sb.MBYTE)
 	sr.Desc = "Test buffer"
 
 	var fend bool = false
@@ -241,7 +243,7 @@ func TestStreamReadWrite(t *testing.T) {
 		var pos int
 		for fend == false {
 			out, npos, err := sr.GetSlotNextByPos(pos)
-			if out == nil && err == ErrEmpty {
+			if out == nil && err == sb.ErrEmpty {
 				time.Sleep(time.Millisecond)
 				continue
 			}
@@ -255,7 +257,7 @@ func TestStreamReadWrite(t *testing.T) {
 		for i := 0; i < n; i++ {
 			tn := 100 * i * i * i
 			data := []byte(fmt.Sprintf("saved %d-th data", tn))
-			in := NewStreamSlotByData(KBYTE, "text/plain", len(data), data)
+			in := NewStreamSlotByData(sb.KBYTE, "text/plain", len(data), data)
 			ss, _ := sr.PutSlotInNext(in)
 			/*
 				ss, pos := sr.GetSlotIn()

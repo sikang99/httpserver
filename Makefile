@@ -143,7 +143,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "modify streambase package to support timestamp"
+	git commit -m "modify http monitor"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

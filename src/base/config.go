@@ -17,24 +17,6 @@ type Config struct {
 	Desciption string `json:"description"`
 }
 
-func ShowNetInterfaces() {
-	list, err := net.Interfaces()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for i, iface := range list {
-		fmt.Printf("%d %s %v\n", i, iface.Name, iface)
-		addrs, err := iface.Addrs()
-		if err != nil {
-			log.Fatal(err)
-		}
-		for j, addr := range addrs {
-			fmt.Printf("\t%d %v\n", j, addr)
-		}
-	}
-}
-
 func openLogFile(logfile string) {
 	if logfile != "" {
 		lf, err := os.OpenFile(logfile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0640)

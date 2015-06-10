@@ -11,29 +11,13 @@ import (
 	"testing"
 	"time"
 
+	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
 
 //---------------------------------------------------------------------------------
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
-
-//---------------------------------------------------------------------------------
-// test for timestamp
-//---------------------------------------------------------------------------------
-func TestTimestamp(t *testing.T) {
-	//tstamp, _ := time.Parse(time.RFC3339, strconv.Itoa(file.CreatedAt))
-	//println(tstamp)
-
-	CreatedAt := time.Now().Unix()
-	tstring := time.Unix(CreatedAt, 0).Format(time.RFC3339)
-	fmt.Printf("\tCurrent Timestamp: %v, %v\n", CreatedAt, tstring)
-
-	sec := MakeTimestampSecond()
-	msec := MakeTimestampMillisecond()
-	nsec := MakeTimestampNanosecond()
-	fmt.Printf("%v\n%v\n%v\n", sec, msec, nsec)
 }
 
 //---------------------------------------------------------------------------------
@@ -54,7 +38,7 @@ func TestHandleInfo(t *testing.T) {
 // test for read files and write to a file in multipart
 //---------------------------------------------------------------------------------
 func TestFileReadWrite(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, MBYTE)
+	sbuf := sr.NewStreamRing(5, sb.MBYTE)
 	fmt.Println(sbuf)
 
 	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
@@ -70,7 +54,7 @@ func TestFileReadWrite(t *testing.T) {
 // test for reading multipart file
 //---------------------------------------------------------------------------------
 func TestReadMultipartFile(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, MBYTE)
+	sbuf := sr.NewStreamRing(5, sb.MBYTE)
 	fmt.Println(sbuf)
 
 	ReadMultipartFileToRing(sbuf, "output.mjpg")

@@ -26,8 +26,8 @@ import (
 
 //---------------------------------------------------------------------------
 const (
-	STR_PGM_READER = "Happy Media File Reader"
-	STR_PGM_WRITER = "Happy Media File Writer"
+	STR_FILE_READER = "Happy Media File Reader"
+	STR_FILE_WRITER = "Happy Media File Writer"
 )
 
 //---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ func NewProtoFile(pat, desc string) *ProtoFile {
 // act file reader
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
-	log.Println(STR_PGM_READER)
+	log.Println(STR_FILE_READER)
 
 	ReadDirToRing(sbuf, pf.Pattern, false)
 	fmt.Println(sbuf)
@@ -93,9 +93,11 @@ func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
 // act file writer
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) ActWriter(sbuf *sr.StreamRing) {
-	log.Println(STR_PGM_WRITER)
+	log.Println(STR_FILE_WRITER)
 
 	WriteRingToMultipartFile(sbuf, pf.Pattern)
+
+	return
 }
 
 //---------------------------------------------------------------------------
@@ -117,7 +119,7 @@ func ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 
 	err = sbuf.SetStatusUsing()
 	if err != nil {
-		return sr.ErrStatus
+		return sb.ErrStatus
 	}
 	defer sbuf.SetStatusIdle()
 
@@ -127,7 +129,7 @@ func ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 			slot, pos := sbuf.GetSlotIn()
 
 			err = ReadFileToSlot(files[i], slot)
-			if err == sr.ErrNull {
+			if err == sb.ErrNull {
 				continue
 			}
 
@@ -199,7 +201,7 @@ func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
 
 	err = sbuf.SetStatusUsing()
 	if err != nil {
-		return sr.ErrStatus
+		return sb.ErrStatus
 	}
 	defer sbuf.SetStatusIdle()
 
@@ -239,7 +241,7 @@ func WriteRingToMultipartFile(sbuf *sr.StreamRing, file string) error {
 	for sbuf.IsUsing() {
 		slot, npos, err := sbuf.GetSlotNextByPos(pos)
 		if err != nil {
-			if err == sr.ErrEmpty {
+			if err == sb.ErrEmpty {
 				time.Sleep(sb.TIME_DEF_WAIT)
 				continue
 			}
@@ -274,7 +276,7 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 
 	if dsize == 0 {
 		log.Printf("%s(%d) is null.\n", file, dsize)
-		return sr.ErrNull
+		return sb.ErrNull
 	}
 
 	ctype := mime.TypeByExtension(filepath.Ext(file))
@@ -291,7 +293,7 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 }
 
 //---------------------------------------------------------------------------
-// write the slot to file
+// write the slot to file in a part
 //---------------------------------------------------------------------------
 func WriteSlotToFile(f *os.File, ss *sr.StreamSlot, boundary string) error {
 	var err error

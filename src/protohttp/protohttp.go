@@ -28,6 +28,7 @@ import (
 
 	"github.com/bradfitz/http2"
 
+	sb "stoney/httpserver/src/streambase"
 	si "stoney/httpserver/src/streamimage"
 	sr "stoney/httpserver/src/streamring"
 )
@@ -152,10 +153,10 @@ func SendRequestPost(client *http.Client, ph *ProtoHttp) error {
 //---------------------------------------------------------------------------
 //	receive a part to data
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) RecvPartToData(r *multipart.Reader) ([]byte, error) {
+func RecvPartToData(mr *multipart.Reader) ([]byte, error) {
 	var err error
 
-	p, err := r.NextPart()
+	p, err := mr.NextPart()
 	if err != nil { // io.EOF
 		log.Println(err)
 		return nil, err
@@ -189,10 +190,10 @@ func (ph *ProtoHttp) RecvPartToData(r *multipart.Reader) ([]byte, error) {
 //---------------------------------------------------------------------------
 //	receive a part to slot of buffer
 //----------------------------------------s-----------------------------------
-func RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
+func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 	var err error
 
-	p, err := r.NextPart()
+	p, err := mr.NextPart()
 	if err != nil { // io.EOF
 		log.Println(err)
 		return err
@@ -227,12 +228,12 @@ func RecvPartToSlot(r *multipart.Reader, ss *sr.StreamSlot) error {
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
 //---------------------------------------------------------------------------
-func RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
+func RecvMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
 	var err error
 
 	err = sbuf.SetStatusUsing()
 	if err != nil {
-		return sr.ErrStatus
+		return sb.ErrStatus
 	}
 
 	// insert slots to the buffer
@@ -243,7 +244,7 @@ func RecvMultipartToRing(r *multipart.Reader, sbuf *sr.StreamRing) error {
 		slot, pos := sbuf.GetSlotIn()
 		//fmt.Println(i, pos, slot)
 
-		err = RecvPartToSlot(r, slot)
+		err = RecvPartToSlot(mr, slot)
 		if err != nil {
 			log.Println(err)
 			break
@@ -423,7 +424,7 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 	var err error
 
 	if !sbuf.IsUsing() {
-		return sr.ErrStatus
+		return sb.ErrStatus
 	}
 	fmt.Println(sbuf)
 
@@ -431,8 +432,8 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 	for {
 		slot, npos, err := sbuf.GetSlotNextByPos(pos)
 		if err != nil {
-			if err == sr.ErrEmpty {
-				time.Sleep(time.Millisecond)
+			if err == sb.ErrEmpty {
+				time.Sleep(sb.TIME_DEF_WAIT)
 				continue
 			}
 			log.Println(err)

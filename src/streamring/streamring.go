@@ -9,42 +9,23 @@
 package streamring
 
 import (
-	"errors"
 	"fmt"
 	"mime"
 	"strings"
 	"sync"
+
+	sb "stoney/httpserver/src/streambase"
 )
 
 //----------------------------------------------------------------------------------
 const (
-	KBYTE = 1024
-	MBYTE = 1024 * KBYTE // Kilo
-	GBYTE = 1024 * MBYTE // Giga
-	TBYTE = 1024 * GBYTE // Tera
-	HBYTE = 1024 * TBYTE // Hexa
-
-	LEN_DEF_SLOT  = MBYTE
-	LEN_MAX_SLOT  = GBYTE
+	LEN_DEF_SLOT  = sb.MBYTE
+	LEN_MAX_SLOT  = sb.GBYTE
 	NUM_DEF_SLOTS = 30 // 30fps
 	NUM_MAX_SLOTS = 1024
 )
 
-const (
-	STATUS_IDLE = iota
-	STATUS_USING
-
-	STR_DEF_BDRY = "myboundary"
-)
-
-var (
-	ErrEmpty  = errors.New("empty")
-	ErrFull   = errors.New("full")
-	ErrSize   = errors.New("size")
-	ErrNull   = errors.New("null")
-	ErrStatus = errors.New("invalid status")
-)
-
+//----------------------------------------------------------------------------------
 type StreamSlot struct {
 	sync.Mutex
 	Type      string
@@ -164,7 +145,7 @@ func (sr *StreamRing) String() string {
 	str := fmt.Sprintf("[StreamRing]")
 	str += fmt.Sprintf("\tStatus: %d", sr.Status)
 	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
-	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/KBYTE)
+	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/sb.KBYTE)
 	str += fmt.Sprintf("\tBoundary: %s", sr.Boundary)
 	str += fmt.Sprintf("\tDesc: %s\n", sr.Desc)
 
@@ -202,11 +183,11 @@ func NewStreamRing(num int, size int) *StreamRing {
 
 	return &StreamRing{
 		Slots:  slots,
-		Status: STATUS_IDLE,
+		Status: sb.STATUS_IDLE,
 		Num:    num, NumMax: num,
 		Size: size,
 		In:   0, Out: 0,
-		Boundary: STR_DEF_BDRY,
+		Boundary: sb.STR_DEF_BDRY,
 		Desc:     "New empty buffer",
 	}
 }
@@ -232,19 +213,19 @@ func (sr *StreamRing) SetStatus(status int) int {
 
 func (sr *StreamRing) SetStatusUsing() error {
 	var err error
-	if sr.Status != STATUS_IDLE {
-		return ErrStatus
+	if sr.Status != sb.STATUS_IDLE {
+		return sb.ErrStatus
 	}
-	sr.Status = STATUS_USING
+	sr.Status = sb.STATUS_USING
 	return err
 }
 
 func (sr *StreamRing) SetStatusIdle() error {
 	var err error
-	if sr.Status != STATUS_USING {
-		return ErrStatus
+	if sr.Status != sb.STATUS_USING {
+		return sb.ErrStatus
 	}
-	sr.Status = STATUS_IDLE
+	sr.Status = sb.STATUS_IDLE
 	return err
 }
 
@@ -253,11 +234,11 @@ func (sr *StreamRing) GetStatus() int {
 }
 
 func (sr *StreamRing) IsUsing() bool {
-	return sr.Status == STATUS_USING
+	return sr.Status == sb.STATUS_USING
 }
 
 func (sr *StreamRing) IsIdle() bool {
-	return sr.Status == STATUS_IDLE
+	return sr.Status == sb.STATUS_IDLE
 }
 
 //----------------------------------------------------------------------------------
@@ -317,7 +298,7 @@ func (sr *StreamRing) GetSlotOutNext() (*StreamSlot, error) {
 
 	// no data to read
 	if sr.In == sr.Out {
-		return nil, ErrEmpty
+		return nil, sb.ErrEmpty
 	}
 
 	slot := &sr.Slots[sr.Out]
@@ -336,7 +317,7 @@ func (sr *StreamRing) GetSlotNextByPos(pos int) (*StreamSlot, int, error) {
 
 	// no data to read
 	if sr.In == pos {
-		return nil, pos, ErrEmpty
+		return nil, pos, sb.ErrEmpty
 	}
 
 	slot := &sr.Slots[pos]
@@ -403,7 +384,7 @@ func (sr *StreamRing) Reset() {
 	sr.In = 0
 	sr.Out = 0
 	sr.Num = sr.NumMax
-	sr.Status = STATUS_IDLE
+	sr.Status = sb.STATUS_IDLE
 	sr.Desc = "Buffer is reset"
 }
 

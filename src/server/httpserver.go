@@ -6,7 +6,7 @@
 package main
 
 import (
-	"errors"
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -18,11 +18,11 @@ import (
 	"strings"
 	"sync"
 
-	"stoney/httpserver/src/base"
 	pf "stoney/httpserver/src/protofile"
 	ph "stoney/httpserver/src/protohttp"
 	pt "stoney/httpserver/src/prototcp"
 	pw "stoney/httpserver/src/protows"
+	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 
 	"github.com/bradfitz/http2"
@@ -75,22 +75,17 @@ var hello_tmpl = `<!DOCTYPE html>
 
 //---------------------------------------------------------------------------
 const (
-	Version   = "0.5.7"
-	TCPClient = "Happy Media TCP Server"
-	TCPServer = "Happy Media TCP Server"
-	WSClient  = "Happy Media WS Server"
-	WSServer  = "Happy Media WS Server"
+	Version = "0.8.7"
 
-	KBYTE = 1024
-	MBYTE = 1024 * KBYTE
-
-	LEN_MAX_LINE = 128
+	STR_MEDIA_SYSTEM = "Happy Media System"
+	STR_TCP_CLIENT   = "Happy Media TCP client"
+	STR_TCP_SERVER   = "Happy Media TCP Server"
+	STR_WS_CLIENT    = "Happy Media WS Server"
+	STR_WS_SERVER    = "Happy Media WS Server"
 )
 
 //---------------------------------------------------------------------------
 var (
-	NotSupportError = errors.New("Not supported protocol")
-
 	fmode  = flag.String("m", "player", "Working mode of program [caster|server|player|reader|sender|receiver|shooter|catcher]")
 	fhost  = flag.String("host", "localhost", "server host address")
 	fport  = flag.String("port", "8000", "TCP port to be used for http")
@@ -101,6 +96,7 @@ var (
 	vflag  = flag.Bool("verbose", false, "Verbose display")
 )
 
+//---------------------------------------------------------------------------
 func init() {
 	//log.SetOutput(os.Stdout)
 	//log.SetPrefix("TRACE: ")
@@ -117,6 +113,7 @@ func init() {
 	flag.Parse()
 }
 
+//---------------------------------------------------------------------------
 type ServerConfig struct {
 	Title        string
 	Image        string
@@ -164,15 +161,14 @@ func main() {
 		log.Println(err)
 		return
 	}
+
 	fmt.Printf("Happy Media System, v.%s\n", Version)
 	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
-
-	// determine the working type of the program
 	fmt.Printf("Working mode: %s\n", *fmode)
 
-	conf.Ring = ph.PrepareRing(3, MBYTE, "Server stream")
+	conf.Ring = ph.PrepareRing(3, sb.MBYTE, "Server ring buffer")
 
-	// let's do working mode
+	// let's do by the working mode
 	switch *fmode {
 	// package protohttp
 	case "reader":
@@ -182,14 +178,15 @@ func main() {
 	case "caster":
 		ActHttpCaster(*furl)
 	case "monitor":
-		ActHttpMonitor()
+		ActHttpMonitor(*furl)
 	case "server":
 		ActHttpServer()
 
 	// package prototcp
 	case "sender":
-		ts := pt.NewProtoTcp("localhost", "8087", "T-Tx")
-		ts.ActSender()
+		//ts := pt.NewProtoTcp("localhost", "8087", "T-Tx")
+		//ts.ActSender()
+		pt.NewProtoTcp("localhost", "8087", "T-Tx").ActSender()
 	case "receiver":
 		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
 		tr.ActReceiver(conf.Ring)
@@ -214,14 +211,79 @@ func main() {
 }
 
 //---------------------------------------------------------------------------
+// parse command
+//---------------------------------------------------------------------------
+func ParseCommand(cmdstr string) error {
+	var err error
+
+	fmt.Println(cmdstr)
+	/*
+		r := bufio.NewReader(cmdstr)
+		var s scanner.Scanner
+		s.Init(cmdstr)
+		tok := s.Scan()
+		for tok != scanner.EOF {
+			fmt.Print(tok)
+			tok = s.Scan()
+		}
+	*/
+
+	res := strings.Fields(cmdstr)
+	if len(res) < 1 {
+		return err
+	}
+	//fmt.Println(res)
+
+	switch res[0] {
+	case "show":
+		sb.ShowNetInterfaces()
+	case "help":
+		if len(res) < 2 {
+			break
+		}
+		switch res[1] {
+		case "usage":
+			println("help usage")
+		}
+	default:
+		println("what?")
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
 // http monitor client
 //---------------------------------------------------------------------------
-func ActHttpMonitor() error {
-	log.Printf("Happy Media Monitor\n")
+func ActHttpMonitor(url string) error {
+	log.Printf("Happy Media HTTP Monitor\n")
 
-	base.ShowNetInterfaces()
+	var err error
 
-	return nil
+	r := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("> ")
+
+		line, _, err := r.ReadLine()
+		if err != nil {
+			continue
+		}
+
+		cmdstr := strings.Replace(string(line), "\r", "", -1)
+
+		if strings.EqualFold(cmdstr, "quit") {
+			fmt.Println("Bye bye.")
+			return err
+		}
+
+		err = ParseCommand(cmdstr)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+	}
+
+	return err
 }
 
 //---------------------------------------------------------------------------
@@ -543,7 +605,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		log.Println("Unknown method: ", r.Method)
+		log.Println("Unknown request method: ", r.Method)
 	}
 
 	return

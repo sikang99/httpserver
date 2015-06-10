@@ -8,6 +8,9 @@ package streambase
 
 import (
 	"errors"
+	"fmt"
+	"log"
+	"net"
 	"time"
 )
 
@@ -21,28 +24,36 @@ const (
 )
 
 const (
-	LEN_MAX_LINE = 128
+	STR_DEF_HOST = "localhost"
+	STR_DEF_PORT = "8080"
+	STR_DEF_PTLS = "8443"
+	STR_DEF_BDRY = "myboundary"
+	STR_DEF_PATN = "*.jpg"
+)
 
+const (
 	STATUS_IDLE = iota
 	STATUS_USING
 
-	STR_DEF_HOST = "localhost"
-	STR_DEF_PORT = "8080"
-	STR_DEF_BDRY = "myboundary"
-	STR_DEF_PATN = "*.jpg"
+	LEN_MAX_LINE = 128
 
-	TIME_DEF_WAIT = time.Millisecond
+	TIME_DEF_WAIT      = 100 * time.Nanosecond
+	TIME_DEF_PRECISION = time.Millisecond
 )
 
 var (
-	ErrEmpty  = errors.New("empty")
-	ErrFull   = errors.New("full")
-	ErrStatus = errors.New("invalid status")
+	ErrEmpty   = errors.New("empty")
+	ErrFull    = errors.New("full")
+	ErrNull    = errors.New("null")
+	ErrSize    = errors.New("size")
+	ErrStatus  = errors.New("invalid status")
+	ErrSupport = errors.New("not supported")
 )
 
 //---------------------------------------------------------------------------
 // make timestamp in sec, msec, nsec
-//  - https://medium.com/coding-and-deploying-in-the-cloud/time-stamps-in-golang-abcaf581b72f
+// - https://blog.cloudflare.com/its-go-time-on-linux/
+// - https://medium.com/coding-and-deploying-in-the-cloud/time-stamps-in-golang-abcaf581b72f
 //---------------------------------------------------------------------------
 func MakeTimestampNanosecond() int64 {
 	return time.Now().UnixNano()
@@ -54,6 +65,49 @@ func MakeTimestampMillisecond() int64 {
 
 func MakeTimestampSecond() int64 {
 	return time.Now().Unix()
+}
+
+func MakeTimestamp() int64 {
+	switch TIME_DEF_PRECISION {
+	case time.Second:
+		return MakeTimestampSecond()
+	case time.Millisecond:
+		return MakeTimestampMillisecond()
+	case time.Nanosecond:
+		return MakeTimestampNanosecond()
+	default:
+		return 0
+	}
+}
+
+//---------------------------------------------------------------------------
+// show network interfaces
+//---------------------------------------------------------------------------
+func ShowNetInterfaces() {
+	list, err := net.Interfaces()
+	if err != nil {
+		log.Println(err)
+	}
+
+	for i, iface := range list {
+		fmt.Printf("%d %s %v\n", i, iface.Name, iface)
+		addrs, err := iface.Addrs()
+		if err != nil {
+			log.Println(err)
+		}
+		for j, addr := range addrs {
+			fmt.Printf("\t%d %v\n", j, addr)
+		}
+	}
+}
+
+//---------------------------------------------------------------------------
+//
+//---------------------------------------------------------------------------
+func malfunction() error {
+	var err error
+
+	return err
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

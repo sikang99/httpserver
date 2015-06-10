@@ -25,7 +25,7 @@ view v:
 	shotwell output.jpg
 
 clobber clean:
-	rm -f output.*
+	rm -f output.* *.png
 
 make m:
 	vi Makefile
