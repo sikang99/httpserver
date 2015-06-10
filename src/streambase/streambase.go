@@ -6,7 +6,10 @@
 
 package streambase
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 //----------------------------------------------------------------------------------
 const (
@@ -18,8 +21,17 @@ const (
 )
 
 const (
+	LEN_MAX_LINE = 128
+
 	STATUS_IDLE = iota
 	STATUS_USING
+
+	STR_DEF_HOST = "localhost"
+	STR_DEF_PORT = "8080"
+	STR_DEF_BDRY = "myboundary"
+	STR_DEF_PATN = "*.jpg"
+
+	TIME_DEF_WAIT = time.Millisecond
 )
 
 var (
@@ -27,5 +39,21 @@ var (
 	ErrFull   = errors.New("full")
 	ErrStatus = errors.New("invalid status")
 )
+
+//---------------------------------------------------------------------------
+// make timestamp in sec, msec, nsec
+//  - https://medium.com/coding-and-deploying-in-the-cloud/time-stamps-in-golang-abcaf581b72f
+//---------------------------------------------------------------------------
+func MakeTimestampNanosecond() int64 {
+	return time.Now().UnixNano()
+}
+
+func MakeTimestampMillisecond() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+func MakeTimestampSecond() int64 {
+	return time.Now().Unix()
+}
 
 // ---------------------------------E-----N-----D-----------------------------------

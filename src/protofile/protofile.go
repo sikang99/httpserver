@@ -3,7 +3,6 @@
 // Package for File operation
 //  - http://stackoverflow.com/questions/25090690/how-to-write-a-proxy-in-go-golang-using-tcp-connections
 //  - https://github.com/nf/gohttptun - A tool to tunnel TCP over HTTP, written in Go
-//  - https://medium.com/coding-and-deploying-in-the-cloud/time-stamps-in-golang-abcaf581b72f
 //==================================================================================
 
 package protofile
@@ -21,25 +20,14 @@ import (
 	"strconv"
 	"time"
 
+	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
 
 //---------------------------------------------------------------------------
 const (
-	KBYTE = 1024
-	MBYTE = 1024 * KBYTE
-
-	LEN_MAX_LINE = 128
-
-	STR_DEF_HOST = "localhost"
-	STR_DEF_PORT = "8080"
-	STR_DEF_BDRY = "myboundary"
-	STR_DEF_PATN = "*.jpg"
-
 	STR_PGM_READER = "Happy Media File Reader"
 	STR_PGM_WRITER = "Happy Media File Writer"
-
-	TIME_DEF_WAIT = time.Millisecond
 )
 
 //---------------------------------------------------------------------------
@@ -66,8 +54,8 @@ func (pf *ProtoFile) String() string {
 // info handling
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) Reset() {
-	pf.Pattern = STR_DEF_PATN
-	pf.Boundary = STR_DEF_BDRY
+	pf.Pattern = sb.STR_DEF_PATN
+	pf.Boundary = sb.STR_DEF_BDRY
 	pf.Desc = "reset"
 }
 
@@ -78,26 +66,13 @@ func (pf *ProtoFile) Clear() {
 }
 
 //---------------------------------------------------------------------------
-// make timestamp in sec, msec, nsec
-//---------------------------------------------------------------------------
-func MakeTimestampNanosecond() int64 {
-	return time.Now().UnixNano()
-}
-func MakeTimestampMillisecond() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
-}
-func MakeTimestampSecond() int64 {
-	return time.Now().Unix()
-}
-
-//---------------------------------------------------------------------------
 // new ProtoTcp struct
 //---------------------------------------------------------------------------
 func NewProtoFile(pat, desc string) *ProtoFile {
 	return &ProtoFile{
 		Pattern:   pat,
 		Desc:      desc,
-		Boundary:  STR_DEF_BDRY,
+		Boundary:  sb.STR_DEF_BDRY,
 		CreatedAt: time.Now().Unix(),
 	}
 }
@@ -203,7 +178,7 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 
 	ss.Length = nl
 	ss.Type = p.Header.Get("Content-Type")
-	ss.Timestamp = MakeTimestampMillisecond()
+	ss.Timestamp = sb.MakeTimestampMillisecond()
 	//fmt.Println(ss)
 
 	return err
@@ -265,7 +240,7 @@ func WriteRingToMultipartFile(sbuf *sr.StreamRing, file string) error {
 		slot, npos, err := sbuf.GetSlotNextByPos(pos)
 		if err != nil {
 			if err == sr.ErrEmpty {
-				time.Sleep(TIME_DEF_WAIT)
+				time.Sleep(sb.TIME_DEF_WAIT)
 				continue
 			}
 			log.Println(err)
@@ -310,7 +285,7 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	copy(ss.Content, data)
 	ss.Length = dsize
 	ss.Type = ctype
-	ss.Timestamp = MakeTimestampMillisecond()
+	ss.Timestamp = sb.MakeTimestampMillisecond()
 
 	return err
 }
