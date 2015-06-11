@@ -216,7 +216,7 @@ func main() {
 func ParseCommand(cmdstr string) error {
 	var err error
 
-	fmt.Println(cmdstr)
+	//fmt.Println(cmdstr)
 	/*
 		r := bufio.NewReader(cmdstr)
 		var s scanner.Scanner
@@ -236,17 +236,35 @@ func ParseCommand(cmdstr string) error {
 
 	switch res[0] {
 	case "show":
-		sb.ShowNetInterfaces()
-	case "help":
 		if len(res) < 2 {
+			fmt.Printf("usage: show [network|channel|ring]\n")
 			break
 		}
 		switch res[1] {
-		case "usage":
-			println("help usage")
+		case "network":
+			sb.ShowNetInterfaces()
+		case "channel":
+			fallthrough
+		case "ring":
+			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
+		default:
+			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+		}
+	case "help":
+		if len(res) < 2 {
+			fmt.Printf("usage: help [show|act]\n")
+			break
+		}
+		switch res[1] {
+		case "act":
+			fallthrough
+		case "show":
+			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
+		default:
+			fmt.Printf("I can't %s for %s\n", res[0], res[1])
 		}
 	default:
-		println("what?")
+		fmt.Printf("usage: [show|help|quit]\n")
 	}
 
 	return err
@@ -378,13 +396,9 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
-
-	//tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-	//go tr.ActReceiver(conf.Ring)
-
-	//fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rx")
-	//go fr.ActReader(conf.Ring)
+	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
+	go pt.NewProtoTcp("localhost", "8087", "T-Rx").ActReceiver(conf.Ring)
+	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").ActReader(conf.Ring)
 
 	wg.Wait()
 

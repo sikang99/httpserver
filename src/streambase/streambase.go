@@ -55,29 +55,49 @@ var (
 // - https://blog.cloudflare.com/its-go-time-on-linux/
 // - https://medium.com/coding-and-deploying-in-the-cloud/time-stamps-in-golang-abcaf581b72f
 //---------------------------------------------------------------------------
-func MakeTimestampNanosecond() int64 {
+func GetTimestampNanosecond() int64 {
 	return time.Now().UnixNano()
 }
 
-func MakeTimestampMillisecond() int64 {
+func GetTimestampMicrosecond() int64 {
+	return time.Now().UnixNano() / int64(time.Microsecond)
+}
+
+func GetTimestampMillisecond() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
-func MakeTimestampSecond() int64 {
+func GetTimestampSecond() int64 {
 	return time.Now().Unix()
 }
 
-func MakeTimestamp() int64 {
+func GetTimestamp() int64 {
 	switch TIME_DEF_PRECISION {
 	case time.Second:
-		return MakeTimestampSecond()
+		return GetTimestampSecond()
 	case time.Millisecond:
-		return MakeTimestampMillisecond()
+		return GetTimestampMillisecond()
+	case time.Microsecond:
+		return GetTimestampMicrosecond()
 	case time.Nanosecond:
-		return MakeTimestampNanosecond()
+		return GetTimestampNanosecond()
 	default:
 		return 0
 	}
+}
+
+func GetDuration(value int64) time.Duration {
+	switch TIME_DEF_PRECISION {
+	case time.Second:
+		value = value * 1000 * 1000 * 1000
+	case time.Millisecond:
+		value = value * 1000 * 1000
+	case time.Microsecond:
+		value = value * 1000
+	case time.Nanosecond:
+	}
+
+	return time.Duration(value)
 }
 
 //---------------------------------------------------------------------------

@@ -180,8 +180,11 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 
 	ss.Length = nl
 	ss.Type = p.Header.Get("Content-Type")
-	ss.Timestamp = sb.MakeTimestampMillisecond()
+	ss.Timestamp = sb.GetTimestamp()
 	//fmt.Println(ss)
+
+	ts := p.Header.Get("x-Timestamp")
+	ss.Timestamp, err = strconv.ParseInt(ts, 10, 64)
 
 	return err
 }
@@ -201,12 +204,14 @@ func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
 
 	err = sbuf.SetStatusUsing()
 	if err != nil {
-		return sb.ErrStatus
+		log.Println(err)
+		return err
 	}
 	defer sbuf.SetStatusIdle()
 
 	mr := multipart.NewReader(f, sbuf.Boundary)
 
+	var clockstamp int64 = 0
 	for {
 		slot, pos := sbuf.GetSlotIn()
 
@@ -218,6 +223,14 @@ func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
 		fmt.Println(slot)
 
 		sbuf.SetPosInByPos(pos + 1)
+
+		// read to ring buffer by timestamp
+		if clockstamp > 0 {
+			diff := slot.Timestamp - clockstamp
+			println(diff)
+			time.Sleep(sb.GetDuration(diff - 1))
+		}
+		clockstamp = slot.Timestamp
 	}
 
 	return err
@@ -287,7 +300,7 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	copy(ss.Content, data)
 	ss.Length = dsize
 	ss.Type = ctype
-	ss.Timestamp = sb.MakeTimestampMillisecond()
+	ss.Timestamp = sb.GetTimestamp()
 
 	return err
 }
@@ -301,6 +314,7 @@ func WriteSlotToFile(f *os.File, ss *sr.StreamSlot, boundary string) error {
 	str := fmt.Sprintf("--%s\r\n", boundary)
 	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
 	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
+	str += fmt.Sprintf("x-Timestamp: %v; scale=millisecond\r\n", ss.Timestamp)
 	str += "\r\n"
 
 	f.WriteString(str)
@@ -320,6 +334,7 @@ func WriteSlotToHandle(w *bufio.Writer, ss *sr.StreamSlot, boundary string) erro
 	str := fmt.Sprintf("--%s\r\n", boundary)
 	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
 	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
+	str += fmt.Sprintf("x-Timestamp: %v\r\n", ss.Timestamp)
 	str += "\r\n"
 
 	_, err = w.WriteString(str)
