@@ -44,7 +44,7 @@ func TestFileReadWrite(t *testing.T) {
 	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
 	go fr.ActReader(sbuf)
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 
 	fw := NewProtoFile("output.mjpg", "Testing")
 	fw.ActWriter(sbuf)

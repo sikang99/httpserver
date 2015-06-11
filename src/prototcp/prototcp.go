@@ -27,8 +27,9 @@ import (
 
 //---------------------------------------------------------------------------
 const (
-	STR_PGM_SENDER = "Happy Media TCP Sender"
-	STR_PGM_RECVER = "Happy Media TCP Receiver"
+	STR_TCP_CASTER = "Happy Media TCP Caster"
+	STR_TCP_SERVER = "Happy Media TCP Server"
+	STR_TCP_PLAYER = "Happy Media TCP Player"
 )
 
 //---------------------------------------------------------------------------
@@ -97,8 +98,8 @@ func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
 //---------------------------------------------------------------------------
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActSender() {
-	log.Printf("Happy Media TCP Sender\n")
+func (pt *ProtoTcp) ActCaster() {
+	log.Printf("%s\n", STR_TCP_CASTER)
 
 	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
 	conn, err := net.DialTCP("tcp", nil, addr)
@@ -132,8 +133,8 @@ func (pt *ProtoTcp) ActSender() {
 //---------------------------------------------------------------------------
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActReceiver(sbuf *sr.StreamRing) {
-	log.Printf("Happy Media TCP Receiver\n")
+func (pt *ProtoTcp) ActServer(sbuf *sr.StreamRing) {
+	log.Printf("%s\n", STR_TCP_SERVER)
 
 	l, err := net.Listen("tcp", ":"+pt.Port)
 	if err != nil {
@@ -142,7 +143,7 @@ func (pt *ProtoTcp) ActReceiver(sbuf *sr.StreamRing) {
 	}
 	defer l.Close()
 
-	log.Printf("TCP Server on :%s\n", pt.Port)
+	log.Printf("%s on :%s\n", STR_TCP_SERVER, pt.Port)
 
 	for {
 		// Listen for an incoming connection.
@@ -157,7 +158,70 @@ func (pt *ProtoTcp) ActReceiver(sbuf *sr.StreamRing) {
 }
 
 //---------------------------------------------------------------------------
-// summit a TCP request
+// TCP receiver for debugging
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) ActPlayer(sbuf *sr.StreamRing) {
+	log.Printf("%s\n", STR_TCP_PLAYER)
+
+	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
+
+	err = conn.SetNoDelay(true)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Printf("Connecting to %s\n", addr)
+
+	headers, err := pt.SendRequestGet(conn)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Println(headers)
+
+	// send multipart stream of files
+	err = pt.RecvMultipartToData(conn)
+
+	return
+}
+
+//---------------------------------------------------------------------------
+// summit a TCP GET request
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) SendRequestGet(conn net.Conn) (map[string]string, error) {
+	var err error
+
+	// send GET request
+	req := "GET /stream HTTP/1.1\r\n"
+	req += "User-Agent: Happy Media TCP Player\r\n"
+	req += "\r\n"
+
+	fmt.Printf("SEND [%d]\n%s", len(req), req)
+
+	_, err = conn.Write([]byte(req))
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	_, err = pt.ReadMessage(conn)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	return nil, err
+}
+
+//---------------------------------------------------------------------------
+// summit a TCP POST request
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) SendRequestPost(conn net.Conn) (map[string]string, error) {
 	var err error
@@ -165,7 +229,7 @@ func (pt *ProtoTcp) SendRequestPost(conn net.Conn) (map[string]string, error) {
 	// send POST request
 	req := "POST /stream HTTP/1.1\r\n"
 	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pt.Boundary)
-	req += "User-Agent: Happy Media TCP Client\r\n"
+	req += "User-Agent: Happy Media TCP Caster\r\n"
 	req += "\r\n"
 
 	fmt.Printf("SEND [%d]\n%s", len(req), req)
@@ -585,6 +649,15 @@ func ReadMultipartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
 	}
 
 	return p, nl, err
+}
+
+//---------------------------------------------------------------------------
+// read a part header and parse it
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) RecvMultipartToData(conn net.Conn) error {
+	var err error
+
+	return err
 }
 
 // ---------------------------------E-----N-----D--------------------------------

@@ -34,6 +34,12 @@ import (
 )
 
 //---------------------------------------------------------------------------
+const (
+	STR_HTTP_CASTER = "Happy Media HTTP Caster"
+	STR_HTTP_SERVER = "Happy Media HTTP Server"
+	STR_HTTP_PLAYER = "Happy Media HTTP Player"
+)
+
 type ProtoHttp struct {
 	Url      string
 	Host     string
@@ -95,6 +101,7 @@ func SendRequestGet(client *http.Client, ph *ProtoHttp) error {
 	res, err := client.Get(ph.Url)
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 	defer res.Body.Close()
 
@@ -102,7 +109,6 @@ func SendRequestGet(client *http.Client, ph *ProtoHttp) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	fmt.Println(res, body)
 
 	return err
@@ -249,7 +255,7 @@ func RecvMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
 			log.Println(err)
 			break
 		}
-		fmt.Println(i, pos, slot)
+		//fmt.Println(i, pos, slot)
 
 		sbuf.SetPosInByPos(pos + 1)
 	}
@@ -260,11 +266,11 @@ func RecvMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 //	receive multipart data and decode jpeg
 //---------------------------------------------------------------------------
-func RecvMultipartToData(r *multipart.Reader) error {
+func RecvMultipartToData(mr *multipart.Reader) error {
 	var err error
 
 	for {
-		p, err := r.NextPart()
+		p, err := mr.NextPart()
 		if err != nil { // io.EOF
 			log.Println(err)
 			return err
@@ -445,7 +451,7 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 			log.Println(err)
 			break
 		}
-		//fmt.Println(slot)
+		fmt.Println(slot)
 
 		pos = npos
 	}

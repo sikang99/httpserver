@@ -46,6 +46,9 @@ rh2:
 	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
 
 rp:
+	./$(PROGRAM) -m=player -url http://localhost:8080/stream
+
+rp1:
 	./$(PROGRAM) -m=player -url http://localhost:8080/hello
 	./$(PROGRAM) -m=player -url http://localhost:8080/media/gopher.jpeg
 	./$(PROGRAM) -m=player -url http://localhost:8080/static/image/gopher.jpg

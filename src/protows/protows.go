@@ -33,6 +33,15 @@ import (
 )
 
 //---------------------------------------------------------------------------
+const (
+	STR_ECHO_CLIENT = "Echo WS Client"
+	STR_ECHO_SERVER = "Echo WS Server"
+
+	STR_WS_CASTER = "Happy Media WS Caster"
+	STR_WS_SERVER = "Happy Media WS Server"
+	STR_WS_PLAYER = "Happy Media WS Player"
+)
+
 type ProtoWs struct {
 	Host     string
 	Port     string
@@ -103,7 +112,7 @@ func NewProtoWs(hname, hport, hptls, desc string) *ProtoWs {
 // Echo client
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) EchoClient(smsg string) {
-	log.Printf("Happy Media WS Echo Client\n")
+	log.Printf("%s\n", STR_ECHO_CLIENT)
 
 	origin := fmt.Sprintf("http://%s/", pw.Host)
 	url := fmt.Sprintf("ws://%s:%s/echo", pw.Host, pw.Port)
@@ -133,16 +142,16 @@ func (pw *ProtoWs) EchoClient(smsg string) {
 // Echo server
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) EchoServer() {
-	log.Printf("Happy Media WS Echo Server\n")
+	log.Printf("%s\n", STR_ECHO_SERVER)
 
 	fmt.Println("TODO")
 }
 
 //---------------------------------------------------------------------------
-// shooter for test and debugging
+// caster for test and debugging
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActShooter() {
-	log.Printf("Happy Media WS Shooter\n")
+func (pw *ProtoWs) ActCaster() {
+	log.Printf("%s\n", STR_WS_CASTER)
 
 	origin := fmt.Sprintf("http://%s/", pw.Host)
 	url := fmt.Sprintf("ws://%s:%s/stream", pw.Host, pw.Port)
@@ -164,10 +173,10 @@ func (pw *ProtoWs) ActShooter() {
 }
 
 //---------------------------------------------------------------------------
-// catcher server
+// server
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActCatcher() {
-	log.Printf("Happy Media WS Catcher on ws:%s and wss:%s\n", pw.Port, pw.PortTls)
+func (pw *ProtoWs) ActServer() {
+	log.Printf("%s on ws:%s and wss:%s\n", STR_WS_SERVER, pw.Port, pw.PortTls)
 
 	http.Handle("/echo", websocket.Handler(pw.EchoHandler))
 	http.Handle("/stream", websocket.Handler(pw.StreamHandler))
@@ -186,6 +195,13 @@ func (pw *ProtoWs) ActCatcher() {
 	go pw.serveHttps(&wg)
 
 	wg.Wait()
+}
+
+//---------------------------------------------------------------------------
+// player
+//---------------------------------------------------------------------------
+func (pw *ProtoWs) ActPlayer() {
+	log.Printf("%s\n", STR_WS_PLAYER)
 }
 
 //---------------------------------------------------------------------------

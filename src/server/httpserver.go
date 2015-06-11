@@ -9,7 +9,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -75,13 +74,8 @@ var hello_tmpl = `<!DOCTYPE html>
 
 //---------------------------------------------------------------------------
 const (
-	Version = "0.8.7"
-
-	STR_MEDIA_SYSTEM = "Happy Media System"
-	STR_TCP_CLIENT   = "Happy Media TCP client"
-	STR_TCP_SERVER   = "Happy Media TCP Server"
-	STR_WS_CLIENT    = "Happy Media WS Server"
-	STR_WS_SERVER    = "Happy Media WS Server"
+	STR_MEDIA_VERSION = "0.8.7"
+	STR_MEDIA_SYSTEM  = "Happy Media System"
 )
 
 //---------------------------------------------------------------------------
@@ -104,7 +98,7 @@ func init() {
 
 	// flag setting and parsing
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "\nUsage: %v [flags], v.%s\n\n", os.Args[0], Version)
+		fmt.Fprintf(os.Stderr, "\nUsage: %v [flags], v.%s\n\n", os.Args[0], STR_MEDIA_VERSION)
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
 		os.Exit(1)
@@ -124,7 +118,6 @@ type ServerConfig struct {
 	Port2        string
 	Mode         string
 	ImageChannel chan []byte
-	Player       io.Writer
 	Ring         *sr.StreamRing
 }
 
@@ -162,7 +155,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Happy Media System, v.%s\n", Version)
+	fmt.Printf("%s, v.%s\n", STR_MEDIA_SYSTEM, STR_MEDIA_VERSION)
 	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
 	fmt.Printf("Working mode: %s\n", *fmode)
 
@@ -171,38 +164,45 @@ func main() {
 	// let's do by the working mode
 	switch *fmode {
 	// package protohttp
-	case "reader":
+	case "http_reader":
 		ActHttpReader(*furl, conf.Ring)
-	case "player":
-		ActHttpPlayer(*furl)
-	case "caster":
+	case "http_player":
+		ActHttpPlayer(*furl, conf.Ring)
+	case "http_caster":
 		ActHttpCaster(*furl)
-	case "monitor":
+	case "http_monitor":
 		ActHttpMonitor(*furl)
-	case "server":
+	case "http_server":
 		ActHttpServer()
 
 	// package prototcp
 	case "sender":
-		//ts := pt.NewProtoTcp("localhost", "8087", "T-Tx")
-		//ts.ActSender()
-		pt.NewProtoTcp("localhost", "8087", "T-Tx").ActSender()
-	case "receiver":
+		pt.NewProtoTcp("localhost", "8087", "T-Tx").ActCaster()
+	case "tcp_server":
 		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
-		tr.ActReceiver(conf.Ring)
+		tr.ActServer(conf.Ring)
+	case "tcp_player":
+		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+		tr.ActPlayer(conf.Ring)
 
 	// package protows
-	case "shooter":
+	case "ws_caster":
 		ws := pw.NewProtoWs("localhost", "8087", "8443", "W-Tx")
-		ws.ActShooter()
-	case "catcher":
+		ws.ActCaster()
+	case "ws_server":
 		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		wr.ActCatcher()
+		wr.ActServer()
+	case "ws_player":
+		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
+		wr.ActPlayer()
 
 	// package protofile
-	case "filer":
-		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Tx")
+	case "file_reader":
+		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rr")
 		fr.ActReader(conf.Ring)
+	case "file_writer":
+		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Wr")
+		fr.ActWriter(conf.Ring)
 
 	default:
 		fmt.Println("Unknown working mode")
@@ -307,12 +307,30 @@ func ActHttpMonitor(url string) error {
 //---------------------------------------------------------------------------
 // http player client
 //---------------------------------------------------------------------------
-func ActHttpPlayer(url string) error {
+func ActHttpPlayer(url string, sbuf *sr.StreamRing) error {
 	log.Printf("Happy Media Player for %s\n", url)
 
-	hp := ph.NewProtoHttp("localhost", "8080")
-	client := ph.NewClientConfig()
-	return ph.SendRequestGet(client, hp)
+	var err error
+	var res *http.Response
+
+	// WHY: different behavior?
+	if strings.Contains(url, "axis") {
+		res, err = http.Get(url)
+	} else {
+		client := ph.NewClientConfig()
+		res, err = client.Get(url)
+	}
+	if err != nil {
+		log.Fatalf("GET of %q: %v", url, err)
+	}
+	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
+
+	sbuf.Boundary, err = ph.GetBoundary(res.Header.Get("Content-Type"))
+	mr := multipart.NewReader(res.Body, sbuf.Boundary)
+
+	err = ph.RecvMultipartToRing(mr, sbuf)
+
+	return err
 }
 
 //---------------------------------------------------------------------------
@@ -396,9 +414,9 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
-	go pt.NewProtoTcp("localhost", "8087", "T-Rx").ActReceiver(conf.Ring)
-	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").ActReader(conf.Ring)
+	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
+	go pt.NewProtoTcp("localhost", "8087", "T-Rx").ActServer(conf.Ring)
+	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").ActCaster(conf.Ring)
 
 	wg.Wait()
 

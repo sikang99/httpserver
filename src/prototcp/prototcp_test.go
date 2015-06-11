@@ -43,12 +43,12 @@ func TestSingleSendReceive(t *testing.T) {
 	sbuf := sr.NewStreamRing(2, sb.MBYTE)
 
 	rx := NewProtoTcp("localhost", "8087", "Rx")
-	go rx.ActReceiver(sbuf)
+	go rx.ActServer(sbuf)
 
 	time.Sleep(time.Millisecond)
 
 	tx := NewProtoTcp("localhost", "8087", "Tx")
-	tx.ActSender()
+	tx.ActCaster()
 }
 
 //---------------------------------------------------------------------------
