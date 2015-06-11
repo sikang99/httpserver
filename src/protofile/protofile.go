@@ -227,7 +227,7 @@ func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
 		// read to ring buffer by timestamp
 		if clockstamp > 0 {
 			diff := slot.Timestamp - clockstamp
-			println(diff)
+			//println(diff)
 			time.Sleep(sb.GetDuration(diff - 1))
 		}
 		clockstamp = slot.Timestamp

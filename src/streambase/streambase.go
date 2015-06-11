@@ -51,6 +51,12 @@ var (
 )
 
 //---------------------------------------------------------------------------
+type Timestamp struct {
+	Scale time.Time
+	Value int64
+}
+
+//---------------------------------------------------------------------------
 // make timestamp in sec, msec, nsec
 // - https://blog.cloudflare.com/its-go-time-on-linux/
 // - https://medium.com/coding-and-deploying-in-the-cloud/time-stamps-in-golang-abcaf581b72f
@@ -71,6 +77,9 @@ func GetTimestampSecond() int64 {
 	return time.Now().Unix()
 }
 
+//---------------------------------------------------------------------------
+// get current timestamp
+//---------------------------------------------------------------------------
 func GetTimestamp() int64 {
 	switch TIME_DEF_PRECISION {
 	case time.Second:
@@ -86,6 +95,9 @@ func GetTimestamp() int64 {
 	}
 }
 
+//---------------------------------------------------------------------------
+// get wait time from timestamp difference
+//---------------------------------------------------------------------------
 func GetDuration(value int64) time.Duration {
 	switch TIME_DEF_PRECISION {
 	case time.Second:
@@ -122,7 +134,7 @@ func ShowNetInterfaces() {
 }
 
 //---------------------------------------------------------------------------
-//
+// function template
 //---------------------------------------------------------------------------
 func malfunction() error {
 	var err error
