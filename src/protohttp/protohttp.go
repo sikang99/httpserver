@@ -3,6 +3,7 @@
 // Protocol for HTTP streaming
 // - http://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
 // - http://stackoverflow.com/questions/30552447/how-to-set-which-ip-to-use-for-a-http-request
+// - http://giantmachines.tumblr.com/post/52184842286/golang-http-client-with-timeouts
 //=========================================================================
 
 package protohttp
@@ -35,9 +36,12 @@ import (
 
 //---------------------------------------------------------------------------
 const (
-	STR_HTTP_CASTER = "Happy Media HTTP Caster"
-	STR_HTTP_SERVER = "Happy Media HTTP Server"
-	STR_HTTP_PLAYER = "Happy Media HTTP Player"
+	STR_HTTP_CASTER  = "Happy Media HTTP Caster"
+	STR_HTTP_SERVER  = "Happy Media HTTP Server"
+	STR_HTTP_PLAYER  = "Happy Media HTTP Player"
+	STR_HTTP_MONITOR = "Happy Media HTTP Monitor"
+	STR_HTTP_READER  = "Happy Media HTTP Reader"
+	STR_HTTP_WRITER  = "Happy Media HTTP Writer"
 )
 
 type ProtoHttp struct {

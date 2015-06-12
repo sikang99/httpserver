@@ -35,48 +35,48 @@ run r:
 
 rh:
 	@chromium-browser http://localhost:8080/hello
-	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=http_server -port=8080 -ports=8081 -port2=8082
 
 rhs:
 	@chromium-browser --allow-running-insecure-content https://localhost:8081/hello
-	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=http_server -port=8080 -ports=8081 -port2=8082
 
 rh2:
 	@chromium-browser --allow-running-insecure-content https://localhost:8082/hello
-	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=http_server -port=8080 -ports=8081 -port2=8082
 
 rp:
-	./$(PROGRAM) -m=player -url http://localhost:8080/stream
+	./$(PROGRAM) -m=http_player -url http://localhost:8080/stream
 
 rp1:
-	./$(PROGRAM) -m=player -url http://localhost:8080/hello
-	./$(PROGRAM) -m=player -url http://localhost:8080/media/gopher.jpeg
-	./$(PROGRAM) -m=player -url http://localhost:8080/static/image/gopher.jpg
-	./$(PROGRAM) -m=player -url http://localhost:8080/index.html
+	./$(PROGRAM) -m=http_player -url http://localhost:8080/hello
+	./$(PROGRAM) -m=http_player -url http://localhost:8080/media/gopher.jpeg
+	./$(PROGRAM) -m=http_player -url http://localhost:8080/static/image/gopher.jpg
+	./$(PROGRAM) -m=http_player -url http://localhost:8080/index.html
 
 rp2:
-	./$(PROGRAM) -m=player -url https://localhost:8082/hello
-	./$(PROGRAM) -m=player -url https://localhost:8082/media/gopher.jpeg
-	./$(PROGRAM) -m=player -url https://localhost:8082/static/image/gopher.jpg
-	./$(PROGRAM) -m=player -url https://localhost:8082/index.html
+	./$(PROGRAM) -m=http_player -url https://localhost:8082/hello
+	./$(PROGRAM) -m=http_player -url https://localhost:8082/media/gopher.jpeg
+	./$(PROGRAM) -m=http_player -url https://localhost:8082/static/image/gopher.jpg
+	./$(PROGRAM) -m=http_player -url https://localhost:8082/index.html
 
 rc:
-	./$(PROGRAM) -m=caster -url http://localhost:8080/stream
+	./$(PROGRAM) -m=http_caster -url http://localhost:8080/stream
 
 rr:
-	./$(PROGRAM) -m=reader -url http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi
+	./$(PROGRAM) -m=http_reader -url http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi
 
 rra:
-	./$(PROGRAM) -m=reader -url http://localhost:8050/agilecam\?action=stream\&channel=100\&source=1
+	./$(PROGRAM) -m=http_reader -url http://localhost:8050/agilecam\?action=stream\&channel=100\&source=1
 
 rm:
-	./$(PROGRAM) -m=monitor -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=http_monitor -port=8080 -ports=8081 -port2=8082
 
 rs:
-	./$(PROGRAM) -m=server -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=http_server -port=8080 -ports=8081 -port2=8082
 
 rf:
-	./$(PROGRAM) -m=filer -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=file_reader -port=8080 -ports=8081 -port2=8082
 
 rcam:
 	/home/stoney/coding/imt-cam/imt-shot -s localhost:8087
@@ -84,17 +84,17 @@ rcam:
 
 # --- TCP
 rts:
-	./$(PROGRAM) -m=sender -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=tcp_caster -port=8080 -ports=8081 -port2=8082
 
 rtr:
-	./$(PROGRAM) -m=receiver -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=tcp_server -port=8080 -ports=8081 -port2=8082
 
 # --- WebSocket
 rws:
-	./$(PROGRAM) -m=shooter -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=ws_caster -port=8080 -ports=8081 -port2=8082
 
 rwr:
-	./$(PROGRAM) -m=catcher -port=8080 -ports=8081 -port2=8082
+	./$(PROGRAM) -m=ws_server -port=8080 -ports=8081 -port2=8082
 
 rdt:
 	echo -n "test out the server" | nc localhost 8080

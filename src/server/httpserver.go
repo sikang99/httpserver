@@ -16,11 +16,13 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	pf "stoney/httpserver/src/protofile"
 	ph "stoney/httpserver/src/protohttp"
 	pt "stoney/httpserver/src/prototcp"
 	pw "stoney/httpserver/src/protows"
+
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 
@@ -117,8 +119,11 @@ type ServerConfig struct {
 	PortS        string
 	Port2        string
 	Mode         string
-	ImageChannel chan []byte
 	Ring         *sr.StreamRing
+	ImageChannel chan []byte
+	// http://giantmachines.tumblr.com/post/52184842286/golang-http-client-with-timeouts
+	ConnectTimeout   time.Duration
+	ReadWriteTimeout time.Duration
 }
 
 func NewServerConfig() *ServerConfig {
@@ -176,7 +181,7 @@ func main() {
 		ActHttpServer()
 
 	// package prototcp
-	case "sender":
+	case "tcp_caste":
 		pt.NewProtoTcp("localhost", "8087", "T-Tx").ActCaster()
 	case "tcp_server":
 		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
@@ -274,7 +279,7 @@ func ParseCommand(cmdstr string) error {
 // http monitor client
 //---------------------------------------------------------------------------
 func ActHttpMonitor(url string) error {
-	log.Printf("Happy Media HTTP Monitor\n")
+	log.Printf("%s for %s\n", ph.STR_HTTP_MONITOR, url)
 
 	var err error
 
@@ -308,7 +313,7 @@ func ActHttpMonitor(url string) error {
 // http player client
 //---------------------------------------------------------------------------
 func ActHttpPlayer(url string, sbuf *sr.StreamRing) error {
-	log.Printf("Happy Media Player for %s\n", url)
+	log.Printf("%s for %s\n", ph.STR_HTTP_PLAYER, url)
 
 	var err error
 	var res *http.Response
@@ -337,7 +342,7 @@ func ActHttpPlayer(url string, sbuf *sr.StreamRing) error {
 // http caster client
 //---------------------------------------------------------------------------
 func ActHttpCaster(url string) error {
-	log.Printf("Happy Media Caster for %s\n", url)
+	log.Printf("%s for %s\n", ph.STR_HTTP_CASTER, url)
 
 	hp := ph.NewProtoHttp("localhost", "8080")
 	client := ph.NewClientConfig()
@@ -348,7 +353,7 @@ func ActHttpCaster(url string) error {
 //	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
 func ActHttpReader(url string, sbuf *sr.StreamRing) {
-	log.Printf("Happy Media Reader for %s\n", url)
+	log.Printf("%s for %s\n", ph.STR_HTTP_READER, url)
 
 	var err error
 	var res *http.Response
@@ -414,7 +419,7 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
+	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
 	go pt.NewProtoTcp("localhost", "8087", "T-Rx").ActServer(conf.Ring)
 	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").ActCaster(conf.Ring)
 

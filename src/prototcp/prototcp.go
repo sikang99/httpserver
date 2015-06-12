@@ -37,6 +37,7 @@ type ProtoTcp struct {
 	Host     string
 	Port     string
 	Desc     string
+	Method   string // POST or GET
 	Boundary string
 	Conn     net.Conn
 }
@@ -99,7 +100,7 @@ func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ActCaster() {
-	log.Printf("%s\n", STR_TCP_CASTER)
+	log.Printf("%s to %s:%s\n", STR_TCP_CASTER, pt.Host, pt.Port)
 
 	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
 	conn, err := net.DialTCP("tcp", nil, addr)
@@ -117,15 +118,14 @@ func (pt *ProtoTcp) ActCaster() {
 
 	log.Printf("Connecting to %s\n", addr)
 
-	headers, err := pt.SendRequestPost(conn)
+	_, err = pt.SendRequestPost(conn)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	fmt.Println(headers)
 
 	// send multipart stream of files
-	err = pt.SendMultipartFiles(conn, "../../static/image/*")
+	err = pt.SendMultipartFiles(conn, "../../static/image/*", true)
 
 	return
 }
@@ -134,7 +134,7 @@ func (pt *ProtoTcp) ActCaster() {
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ActServer(sbuf *sr.StreamRing) {
-	log.Printf("%s\n", STR_TCP_SERVER)
+	log.Printf("%s on :%s\n", STR_TCP_SERVER, pt.Port)
 
 	l, err := net.Listen("tcp", ":"+pt.Port)
 	if err != nil {
@@ -142,8 +142,6 @@ func (pt *ProtoTcp) ActServer(sbuf *sr.StreamRing) {
 		return
 	}
 	defer l.Close()
-
-	log.Printf("%s on :%s\n", STR_TCP_SERVER, pt.Port)
 
 	for {
 		// Listen for an incoming connection.
@@ -200,10 +198,10 @@ func (pt *ProtoTcp) SendRequestGet(conn net.Conn) (map[string]string, error) {
 
 	// send GET request
 	req := "GET /stream HTTP/1.1\r\n"
-	req += "User-Agent: Happy Media TCP Player\r\n"
+	req += fmt.Sprintf("User-Agent: %s\r\n", STR_TCP_PLAYER)
 	req += "\r\n"
 
-	fmt.Printf("SEND [%d]\n%s", len(req), req)
+	log.Printf("SEND [%d]\n%s", len(req), req)
 
 	_, err = conn.Write([]byte(req))
 	if err != nil {
@@ -229,10 +227,10 @@ func (pt *ProtoTcp) SendRequestPost(conn net.Conn) (map[string]string, error) {
 	// send POST request
 	req := "POST /stream HTTP/1.1\r\n"
 	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pt.Boundary)
-	req += "User-Agent: Happy Media TCP Caster\r\n"
+	req += fmt.Sprintf("User-Agent: %s\r\n", STR_TCP_CASTER)
 	req += "\r\n"
 
-	fmt.Printf("SEND [%d]\n%s", len(req), req)
+	log.Printf("SEND [%d]\n%s", len(req), req)
 
 	_, err = conn.Write([]byte(req))
 	if err != nil {
@@ -255,22 +253,72 @@ func (pt *ProtoTcp) SendRequestPost(conn net.Conn) (map[string]string, error) {
 func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 	var err error
 
-	log.Printf("in from client at %s\n", conn.RemoteAddr())
+	log.Printf("from client at %s\n", conn.RemoteAddr())
 	defer log.Printf("out %s\n", conn.RemoteAddr())
 	defer conn.Close()
 
-	// recv POST request
+	// recv request and parse
 	_, err = pt.ReadMessage(conn)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	err = pt.SendResponse(conn)
+	if pt.Method == "POST" {
+		err = pt.SendResponsePost(conn)
+		err = pt.RecvMultipartToRing(conn, sbuf)
+	} else {
+		err = pt.SendResponseGet(conn)
+		err = pt.SendRingToMultipart(conn, sbuf)
+	}
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send ring buffer to client in multipart
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) SendRingToMultipart(conn net.Conn, sbuf *sr.StreamRing) error {
+	var err error
+
+	if !sbuf.IsUsing() {
+		return sb.ErrStatus
+	}
+
+	var pos int
+	for {
+		slot, npos, err := sbuf.GetSlotNextByPos(pos)
+		if err != nil {
+			if err == sb.ErrEmpty {
+				time.Sleep(sb.TIME_DEF_WAIT)
+				continue
+			}
+			log.Println(err)
+			break
+		}
+
+		err = pt.SendPartSlot(conn, slot)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		fmt.Println(slot)
+
+		pos = npos
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// recv multipart to ring buffer
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) RecvMultipartToRing(conn net.Conn, sbuf *sr.StreamRing) error {
+	var err error
 
 	err = sbuf.SetStatusUsing()
 	if err != nil {
@@ -298,16 +346,49 @@ func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 }
 
 //---------------------------------------------------------------------------
-// send TCP response
+// recv multipart to data
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) SendResponse(conn net.Conn) error {
+func (pt *ProtoTcp) RecvMultipartToData(conn net.Conn) error {
+	var err error
+
+	fmt.Println("TODO")
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send TCP response for POST request
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) SendResponsePost(conn net.Conn) error {
 	var err error
 
 	res := "HTTP/1.1 200 Ok\r\n"
-	res += "Server: Happy Media TCP Server\r\n"
+	res += fmt.Sprintf("Server: %s\r\n", STR_TCP_SERVER)
 	res += "\r\n"
 
-	fmt.Printf("SEND [%d]\n%s", len(res), res)
+	defer log.Printf("SEND [%d]\n%s", len(res), res)
+
+	_, err = conn.Write([]byte(res))
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send TCP response for GET request
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) SendResponseGet(conn net.Conn) error {
+	var err error
+
+	res := "HTTP/1.1 200 Ok\r\n"
+	res += fmt.Sprintf("Server: %s\r\n", STR_TCP_SERVER)
+	res += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pt.Boundary)
+	res += "\r\n"
+
+	defer log.Printf("SEND [%d]\n%s", len(res), res)
 
 	_, err = conn.Write([]byte(res))
 	if err != nil {
@@ -366,11 +447,20 @@ func (pt *ProtoTcp) GetBoundary(str string) error {
 
 	boundary := params["boundary"]
 	if !strings.HasPrefix(boundary, "--") {
-		log.Printf("expected boundary to start with --, got %q", boundary)
+		log.Printf("expected with --, got %q", boundary)
 	}
 
 	pt.Boundary = boundary
-	fmt.Println(pt)
+	//fmt.Println(pt)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// peek a message
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) PeekMessage(conn net.Conn) error {
+	var err error
 
 	return err
 }
@@ -408,6 +498,7 @@ func (pt *ProtoTcp) ReadMessage(conn net.Conn) (map[string]string, error) {
 		}
 	}
 
+	//fmt.Println(headers)
 	return headers, err
 }
 
@@ -466,17 +557,28 @@ func (pt *ProtoTcp) ReadMessageHeader(reader *bufio.Reader) (map[string]string, 
 
 	result := make(map[string]string)
 
+	// parse request line
+	line, _, err := reader.ReadLine()
+	if err != nil {
+		log.Println(err)
+		return result, err
+	}
+
+	res := strings.Fields(string(line))
+	pt.Method = res[0]
+
+	// parse header line
 	for {
 		line, _, err := reader.ReadLine()
 		if err != nil {
 			log.Println(err)
 			return result, err
 		}
+		//fmt.Println(string(line))
+
 		if string(line) == "" {
 			break
 		}
-
-		fmt.Println(string(line))
 
 		keyvalue := strings.SplitN(string(line), ":", 2)
 		if len(keyvalue) > 1 {
@@ -538,7 +640,7 @@ func (pt *ProtoTcp) ReadMessageBodyToSlot(reader *bufio.Reader, clen int, ss *sr
 //---------------------------------------------------------------------------
 // send files in multipart
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
+func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string, loop bool) error {
 	var err error
 
 	files, err := filepath.Glob(pattern)
@@ -551,17 +653,24 @@ func (pt *ProtoTcp) SendMultipartFiles(conn net.Conn, pattern string) error {
 		return sb.ErrNull
 	}
 
-	for i := range files {
-		err = pt.SendPartFile(conn, files[i])
-		if err != nil {
-			if err == sb.ErrSize {
-				continue
+	for {
+		for i := range files {
+			err = pt.SendPartFile(conn, files[i])
+			if err != nil {
+				if err == sb.ErrSize {
+					continue
+				}
+				log.Println(err)
+				return err
 			}
-			log.Println(err)
-			return err
+
+			//time.Sleep(time.Millisecond)
+			time.Sleep(time.Second)
 		}
 
-		time.Sleep(time.Millisecond)
+		if !loop {
+			break
+		}
 	}
 
 	return err
@@ -625,7 +734,35 @@ func (pt *ProtoTcp) SendPartData(conn net.Conn, data []byte, ctype string) error
 		}
 	}
 
-	fmt.Printf("SEND [%d,%d]\n%s", len(req), clen, req)
+	//fmt.Printf("SEND [%d,%d]\n%s", len(req), clen, req)
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send a part slot of ring buffer
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) SendPartSlot(conn net.Conn, ss *sr.StreamSlot) error {
+	var err error
+
+	req := fmt.Sprintf("--%s\r\n", pt.Boundary)
+	req += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
+	req += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
+	req += "\r\n"
+
+	_, err = conn.Write([]byte(req))
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	if ss.Length > 0 {
+		_, err = conn.Write(ss.Content[:ss.Length])
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+	}
+
 	return err
 }
 
@@ -649,15 +786,6 @@ func ReadMultipartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
 	}
 
 	return p, nl, err
-}
-
-//---------------------------------------------------------------------------
-// read a part header and parse it
-//---------------------------------------------------------------------------
-func (pt *ProtoTcp) RecvMultipartToData(conn net.Conn) error {
-	var err error
-
-	return err
 }
 
 // ---------------------------------E-----N-----D--------------------------------

@@ -39,23 +39,38 @@ func TestHandleInfo(t *testing.T) {
 //---------------------------------------------------------------------------
 // test for single send and receive
 //---------------------------------------------------------------------------
-func TestSingleSendReceive(t *testing.T) {
+func TestCastServePlay(t *testing.T) {
 	sbuf := sr.NewStreamRing(2, sb.MBYTE)
 
-	rx := NewProtoTcp("localhost", "8087", "Rx")
-	go rx.ActServer(sbuf)
+	sx := NewProtoTcp("localhost", "8087", "Rx")
+	go sx.ActServer(sbuf)
 
 	time.Sleep(time.Millisecond)
 
-	tx := NewProtoTcp("localhost", "8087", "Tx")
-	tx.ActCaster()
+	cx := NewProtoTcp("localhost", "8087", "Tx")
+	go cx.ActCaster()
+
+	time.Sleep(time.Millisecond)
+
+	rbuf := sr.NewStreamRing(2, sb.MBYTE)
+
+	px := NewProtoTcp("localhost", "8087", "Tx")
+	px.ActPlayer(rbuf)
 }
 
 //---------------------------------------------------------------------------
 // test for multiple send and receive
 //---------------------------------------------------------------------------
-func TestMultiSendReceive(t *testing.T) {
-	//var wg sync.WaitGroup
+func TestSendReceive(t *testing.T) {
+	sbuf := sr.NewStreamRing(2, sb.MBYTE)
+
+	sx := NewProtoTcp("localhost", "8087", "Rx")
+	go sx.ActServer(sbuf)
+
+	time.Sleep(time.Millisecond)
+
+	cx := NewProtoTcp("localhost", "8087", "Tx")
+	cx.ActCaster()
 }
 
 // ---------------------------------E-----N-----D--------------------------------
