@@ -17,17 +17,17 @@ build b:
 test t:
 	go test -v
 
+buildtest bt:
+	@go build
+	go test -v
+
 btf1:
-	go build
+	@go build
 	go test -run TestSendReceive -timeout 60m
 
 btf2:
-	go build
+	@go build
 	go test -run TestCastServePlay
-
-buildtest bt:
-	go build
-	go test -v
 
 view v:
 	shotwell output.jpg

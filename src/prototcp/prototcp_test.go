@@ -37,40 +37,40 @@ func TestHandleInfo(t *testing.T) {
 }
 
 //---------------------------------------------------------------------------
-// test for single send and receive
+// test for send and receive
 //---------------------------------------------------------------------------
-func TestCastServePlay(t *testing.T) {
-	sbuf := sr.NewStreamRing(2, sb.MBYTE)
+func TestSendReceive(t *testing.T) {
+	sbuf := sr.NewStreamRing(5, sb.MBYTE)
 
-	sx := NewProtoTcp("localhost", "8087", "Rx")
+	sx := NewProtoTcp("localhost", "8087", "Cx")
 	go sx.ActServer(sbuf)
 
 	time.Sleep(time.Millisecond)
 
-	cx := NewProtoTcp("localhost", "8087", "Tx")
-	go cx.ActCaster()
-
-	time.Sleep(time.Millisecond)
-
-	rbuf := sr.NewStreamRing(2, sb.MBYTE)
-
-	px := NewProtoTcp("localhost", "8087", "Tx")
-	px.ActPlayer(rbuf)
+	cx := NewProtoTcp("localhost", "8087", "Sx")
+	cx.ActCaster()
 }
 
 //---------------------------------------------------------------------------
-// test for multiple send and receive
+// test for cast, serve, play
 //---------------------------------------------------------------------------
-func TestSendReceive(t *testing.T) {
-	sbuf := sr.NewStreamRing(2, sb.MBYTE)
+func TestCastServePlay(t *testing.T) {
+	sbuf := sr.NewStreamRing(5, sb.MBYTE)
 
-	sx := NewProtoTcp("localhost", "8087", "Rx")
+	sx := NewProtoTcp("localhost", "8087", "Cx")
 	go sx.ActServer(sbuf)
 
 	time.Sleep(time.Millisecond)
 
-	cx := NewProtoTcp("localhost", "8087", "Tx")
-	cx.ActCaster()
+	cx := NewProtoTcp("localhost", "8087", "Sx")
+	go cx.ActCaster()
+
+	time.Sleep(time.Second)
+
+	rbuf := sr.NewStreamRing(5, sb.MBYTE)
+
+	px := NewProtoTcp("localhost", "8087", "Px")
+	px.ActPlayer(rbuf)
 }
 
 // ---------------------------------E-----N-----D--------------------------------

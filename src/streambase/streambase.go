@@ -37,7 +37,7 @@ const (
 
 	LEN_MAX_LINE = 128
 
-	TIME_DEF_WAIT      = 100 * time.Nanosecond
+	TIME_DEF_WAIT      = 100 * time.Microsecond
 	TIME_DEF_PRECISION = time.Millisecond
 )
 

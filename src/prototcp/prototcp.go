@@ -156,7 +156,7 @@ func (pt *ProtoTcp) ActServer(sbuf *sr.StreamRing) {
 }
 
 //---------------------------------------------------------------------------
-// TCP receiver for debugging
+// TCP Player to receive data in multipart
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ActPlayer(sbuf *sr.StreamRing) {
 	log.Printf("%s\n", STR_TCP_PLAYER)
@@ -177,15 +177,19 @@ func (pt *ProtoTcp) ActPlayer(sbuf *sr.StreamRing) {
 
 	log.Printf("Connecting to %s\n", addr)
 
-	headers, err := pt.SendRequestGet(conn)
+	_, err = pt.SendRequestGet(conn)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	fmt.Println(headers)
+	//fmt.Println(headers)
 
-	// send multipart stream of files
+	// recv multipart stream from server
 	err = pt.RecvMultipartToData(conn)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	return
 }
@@ -209,7 +213,8 @@ func (pt *ProtoTcp) SendRequestGet(conn net.Conn) (map[string]string, error) {
 		return nil, err
 	}
 
-	_, err = pt.ReadMessage(conn)
+	// recv response
+	_, err = pt.RecvMessage(conn)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -238,7 +243,8 @@ func (pt *ProtoTcp) SendRequestPost(conn net.Conn) (map[string]string, error) {
 		return nil, err
 	}
 
-	_, err = pt.ReadMessage(conn)
+	// recv response
+	_, err = pt.RecvMessage(conn)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -258,7 +264,7 @@ func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 	defer conn.Close()
 
 	// recv request and parse
-	_, err = pt.ReadMessage(conn)
+	_, err = pt.RecvMessage(conn)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -267,9 +273,11 @@ func (pt *ProtoTcp) HandleRequest(conn net.Conn, sbuf *sr.StreamRing) error {
 	if pt.Method == "POST" {
 		err = pt.SendResponsePost(conn)
 		err = pt.RecvMultipartToRing(conn, sbuf)
-	} else {
+	} else if pt.Method == "GET" {
 		err = pt.SendResponseGet(conn)
 		err = pt.SendRingToMultipart(conn, sbuf)
+	} else {
+		err = sb.ErrSupport
 	}
 	if err != nil {
 		log.Println(err)
@@ -327,15 +335,16 @@ func (pt *ProtoTcp) RecvMultipartToRing(conn net.Conn, sbuf *sr.StreamRing) erro
 	defer sbuf.Reset()
 
 	//  recv multipart stream
-	//for i := 0; i < 20; i++ {
 	for {
 		slot, pos := sbuf.GetSlotIn()
-		_, err = pt.ReadPart(conn, slot)
+		_, err = pt.ReadPartToSlot(conn, slot)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
+		//fmt.Println(slot)
 		if slot.IsMajorType("multipart") {
+			log.Println(slot)
 			continue
 		}
 		sbuf.SetPosInByPos(pos + 1)
@@ -351,7 +360,16 @@ func (pt *ProtoTcp) RecvMultipartToRing(conn net.Conn, sbuf *sr.StreamRing) erro
 func (pt *ProtoTcp) RecvMultipartToData(conn net.Conn) error {
 	var err error
 
-	fmt.Println("TODO")
+	slot := sr.NewStreamSlot()
+
+	for i := 0; ; i++ {
+		_, err = pt.ReadPartToSlot(conn, slot)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		fmt.Println(i, slot)
+	}
 
 	return err
 }
@@ -402,7 +420,7 @@ func (pt *ProtoTcp) SendResponseGet(conn net.Conn) error {
 //---------------------------------------------------------------------------
 // read a message in http header style
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadPart(conn net.Conn, ss *sr.StreamSlot) (map[string]string, error) {
+func (pt *ProtoTcp) ReadPartToSlot(conn net.Conn, ss *sr.StreamSlot) (map[string]string, error) {
 	var err error
 
 	reader := bufio.NewReader(conn)
@@ -430,6 +448,17 @@ func (pt *ProtoTcp) ReadPart(conn net.Conn, ss *sr.StreamSlot) (map[string]strin
 	}
 
 	return headers, err
+}
+
+//---------------------------------------------------------------------------
+// read part data
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) ReadPartData(conn net.Conn) error {
+	var err error
+
+	fmt.Println("TODO")
+
+	return err
 }
 
 //---------------------------------------------------------------------------
@@ -468,7 +497,7 @@ func (pt *ProtoTcp) PeekMessage(conn net.Conn) error {
 //---------------------------------------------------------------------------
 // read a message in http header style
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadMessage(conn net.Conn) (map[string]string, error) {
+func (pt *ProtoTcp) RecvMessage(conn net.Conn) (map[string]string, error) {
 	var err error
 
 	reader := bufio.NewReader(conn)
@@ -511,13 +540,17 @@ func (pt *ProtoTcp) ReadPartHeader(reader *bufio.Reader) (map[string]string, err
 	result := make(map[string]string)
 
 	fstart := false
-	for {
+	for i := 0; ; i++ {
 		line, _, err := reader.ReadLine()
 		if err != nil {
 			log.Println(err)
 			return result, err
 		}
-
+		/*
+			if i == 0 {
+				log.Printf("%x\n", line[:4])
+			}
+		*/
 		// find header start of part
 		if string(line) == "" {
 			if fstart {
@@ -557,7 +590,7 @@ func (pt *ProtoTcp) ReadMessageHeader(reader *bufio.Reader) (map[string]string, 
 
 	result := make(map[string]string)
 
-	// parse request line
+	// parse a request line
 	line, _, err := reader.ReadLine()
 	if err != nil {
 		log.Println(err)
@@ -567,7 +600,7 @@ func (pt *ProtoTcp) ReadMessageHeader(reader *bufio.Reader) (map[string]string, 
 	res := strings.Fields(string(line))
 	pt.Method = res[0]
 
-	// parse header line
+	// parse header lines
 	for {
 		line, _, err := reader.ReadLine()
 		if err != nil {
@@ -718,6 +751,7 @@ func (pt *ProtoTcp) SendPartData(conn net.Conn, data []byte, ctype string) error
 	req := fmt.Sprintf("--%s\r\n", pt.Boundary)
 	req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
 	req += fmt.Sprintf("Content-Length: %d\r\n", clen)
+	req += fmt.Sprintf("x-Timestamp: %v\r\n", sb.GetTimestamp())
 	req += "\r\n"
 
 	_, err = conn.Write([]byte(req))
@@ -747,6 +781,7 @@ func (pt *ProtoTcp) SendPartSlot(conn net.Conn, ss *sr.StreamSlot) error {
 	req := fmt.Sprintf("--%s\r\n", pt.Boundary)
 	req += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
 	req += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
+	req += fmt.Sprintf("x-Timestamp: %v\r\n", ss.Timestamp)
 	req += "\r\n"
 
 	_, err = conn.Write([]byte(req))

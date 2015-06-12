@@ -58,7 +58,7 @@ func (ss *StreamSlot) String() string {
 //----------------------------------------------------------------------------------
 func NewStreamSlot() *StreamSlot {
 	return &StreamSlot{
-		Length:    LEN_DEF_SLOT,
+		Length:    0,
 		LengthMax: LEN_DEF_SLOT,
 		Content:   make([]byte, LEN_DEF_SLOT),
 	}
