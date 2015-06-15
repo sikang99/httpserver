@@ -23,9 +23,13 @@ buildtest bt:
 
 btf1:
 	@go build
-	go test -run TestSendReceive -timeout 60m
+	go test -run TestCastServe -timeout 60m
 
 btf2:
+	@go build
+	go test -run TestServePlay -timeout 60m
+
+btf3:
 	@go build
 	go test -run TestCastServePlay
 

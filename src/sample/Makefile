@@ -13,9 +13,10 @@ PROGRAMS= \
 	url-parse \
 	mixed-write \
 	camrecord \
+	tcp-chat \
 
 
-PROGRAM=camrecord
+PROGRAM=tcp-chat
 
 all: usage
 

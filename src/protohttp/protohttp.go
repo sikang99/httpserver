@@ -282,25 +282,31 @@ func RecvMultipartToData(mr *multipart.Reader) error {
 
 		sl := p.Header.Get("Content-Length")
 		nl, err := strconv.Atoi(sl)
-		if err != nil {
+		if sl == "" || nl == 0 {
 			log.Printf("%s %s %d\n", p.Header, sl, nl)
 			continue
 		}
-
-		data := make([]byte, nl)
-
-		// implement like ReadFull() in jpeg.Decode()
-		var tn int
-		for tn < nl {
-			n, err := p.Read(data[tn:])
-			if err != nil {
-				log.Println(err)
-				return err
-			}
-			tn += n
+		if err != nil {
+			log.Println(err)
+			return err
 		}
 
-		fmt.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get("Content-Type"), tn, nl, data[:2], data[nl-2:])
+		if nl > 0 {
+			data := make([]byte, nl)
+
+			// implement like ReadFull() in jpeg.Decode()
+			var tn int
+			for tn < nl {
+				n, err := p.Read(data[tn:])
+				if err != nil {
+					log.Println(err)
+					return err
+				}
+				tn += n
+			}
+
+			log.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get(sb.STR_HDR_LENGTH), tn, nl, data[:2], data[nl-2:])
+		}
 	}
 
 	return err

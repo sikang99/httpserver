@@ -41,6 +41,13 @@ const (
 	TIME_DEF_PRECISION = time.Millisecond
 )
 
+// multipart headers
+const (
+	STR_HDR_TYPE   = "Content-Type"
+	STR_HDR_LENGTH = "Content-Length"
+	STR_HDR_TSTAMP = "x-Timestamp"
+)
+
 var (
 	ErrEmpty   = errors.New("empty")
 	ErrFull    = errors.New("full")

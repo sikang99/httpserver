@@ -39,7 +39,7 @@ func TestHandleInfo(t *testing.T) {
 //---------------------------------------------------------------------------
 // test for send and receive
 //---------------------------------------------------------------------------
-func TestSendReceive(t *testing.T) {
+func TestCastServe(t *testing.T) {
 	sbuf := sr.NewStreamRing(5, sb.MBYTE)
 
 	sx := NewProtoTcp("localhost", "8087", "Cx")
@@ -52,10 +52,27 @@ func TestSendReceive(t *testing.T) {
 }
 
 //---------------------------------------------------------------------------
+// test for send and receive
+//---------------------------------------------------------------------------
+func TestServePlay(t *testing.T) {
+	sbuf := sr.NewStreamRing(5, sb.MBYTE)
+
+	sx := NewProtoTcp("localhost", "8087", "Cx")
+	go sx.ActServer(sbuf)
+
+	time.Sleep(time.Millisecond)
+
+	rbuf := sr.NewStreamRing(5, sb.MBYTE)
+
+	px := NewProtoTcp("localhost", "8087", "Px")
+	px.ActPlayer(rbuf)
+}
+
+//---------------------------------------------------------------------------
 // test for cast, serve, play
 //---------------------------------------------------------------------------
 func TestCastServePlay(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, sb.MBYTE)
+	sbuf := sr.NewStreamRing(4, sb.MBYTE)
 
 	sx := NewProtoTcp("localhost", "8087", "Cx")
 	go sx.ActServer(sbuf)
@@ -67,7 +84,7 @@ func TestCastServePlay(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	rbuf := sr.NewStreamRing(5, sb.MBYTE)
+	rbuf := sr.NewStreamRing(3, sb.MBYTE)
 
 	px := NewProtoTcp("localhost", "8087", "Px")
 	px.ActPlayer(rbuf)
