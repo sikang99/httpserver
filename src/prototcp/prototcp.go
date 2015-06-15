@@ -120,6 +120,7 @@ func (pt *ProtoTcp) ActCaster() {
 		return
 	}
 
+	// CAUTION: set reader/writer before use
 	r := bufio.NewReader(conn)
 	w := bufio.NewWriter(conn)
 
@@ -189,7 +190,6 @@ func (pt *ProtoTcp) ActPlayer(ring *sr.StreamRing) {
 		log.Println(err)
 		return
 	}
-	//fmt.Println(headers)
 
 	// recv multipart stream from server
 	err = pt.ReadStreamToData(r)
@@ -218,6 +218,7 @@ func (pt *ProtoTcp) RequestGet(r *bufio.Reader, w *bufio.Writer) error {
 		log.Println(err)
 		return err
 	}
+	w.Flush()
 
 	log.Printf("SEND [%d]\n%s", len(req), req)
 
@@ -248,6 +249,7 @@ func (pt *ProtoTcp) RequestPost(r *bufio.Reader, w *bufio.Writer) error {
 		log.Println(err)
 		return err
 	}
+	w.Flush()
 
 	log.Printf("SEND [%d]\n%s", len(req), req)
 
@@ -301,8 +303,8 @@ func (pt *ProtoTcp) HandleRequest(conn net.Conn, ring *sr.StreamRing) error {
 			log.Println(err)
 			return err
 		}
-		//err = pt.WriteRingToStream(w, ring)
-		err = pt.WriteDataToStream(w, ring)
+		err = pt.WriteRingToStream(w, ring)
+		//err = pt.WriteDataToStream(w, ring)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -329,7 +331,7 @@ func (pt *ProtoTcp) WriteDataToStream(w *bufio.Writer, ring *sr.StreamRing) erro
 			log.Println(err)
 			break
 		}
-		log.Println(">", slot)
+		fmt.Println(">>", slot)
 
 		time.Sleep(time.Second)
 	}
@@ -365,7 +367,7 @@ func (pt *ProtoTcp) WriteRingToStream(w *bufio.Writer, ring *sr.StreamRing) erro
 			log.Println(err)
 			break
 		}
-		log.Println(slot)
+		fmt.Println(">>", slot)
 
 		pos = npos
 	}
@@ -385,7 +387,7 @@ func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error
 	}
 	defer ring.Reset()
 
-	//  recv multipart stream
+	//  recv multipart stream to ring
 	for {
 		slot, pos := ring.GetSlotIn()
 		err = pt.ReadFrameToSlot(r, slot)
@@ -393,7 +395,7 @@ func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error
 			log.Println(err)
 			return err
 		}
-		//fmt.Println(slot)
+		fmt.Println(">|", slot)
 		if slot.IsMajorType("multipart") {
 			log.Println(slot)
 			continue
@@ -401,7 +403,7 @@ func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error
 		ring.SetPosInByPos(pos + 1)
 	}
 
-	fmt.Println(ring)
+	//fmt.Println(ring)
 	return err
 }
 
@@ -418,7 +420,7 @@ func (pt *ProtoTcp) ReadStreamToData(r *bufio.Reader) error {
 }
 
 //---------------------------------------------------------------------------
-// send TCP response for POST request
+// send response for POST request
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ResponsePost(w *bufio.Writer) error {
 	var err error
@@ -434,12 +436,13 @@ func (pt *ProtoTcp) ResponsePost(w *bufio.Writer) error {
 		log.Println(err)
 		return err
 	}
+	w.Flush()
 
 	return err
 }
 
 //---------------------------------------------------------------------------
-// send TCP response for GET request
+// send response for GET request
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ResponseGet(w *bufio.Writer) error {
 	var err error
@@ -456,6 +459,7 @@ func (pt *ProtoTcp) ResponseGet(w *bufio.Writer) error {
 		log.Println(err)
 		return err
 	}
+	w.Flush()
 
 	return err
 }
@@ -509,8 +513,8 @@ func (pt *ProtoTcp) GetTypeBoundary(str string) error {
 	}
 
 	pt.Boundary = boundary
-	//fmt.Println(pt)
 
+	//fmt.Println(pt)
 	return err
 }
 
@@ -571,7 +575,7 @@ func (pt *ProtoTcp) ReadMessageHeader(r *bufio.Reader) (map[string]string, error
 		line, _, err := r.ReadLine()
 		if err != nil {
 			log.Println(err)
-			return result, err
+			break
 		}
 		//fmt.Println(string(line))
 
@@ -638,7 +642,7 @@ func (pt *ProtoTcp) ReadMessageBodyToSlot(r *bufio.Reader, clen int, ss *sr.Stre
 }
 
 //---------------------------------------------------------------------------
-// send files in multipart
+// write files in multipart
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) WriteStreamFiles(w *bufio.Writer, pattern string, loop bool) error {
 	var err error
@@ -664,7 +668,6 @@ func (pt *ProtoTcp) WriteStreamFiles(w *bufio.Writer, pattern string, loop bool)
 				return err
 			}
 
-			//time.Sleep(time.Millisecond)
 			time.Sleep(time.Second)
 		}
 
@@ -727,6 +730,8 @@ func (pt *ProtoTcp) WriteFrameData(w *bufio.Writer, data []byte, ctype string) e
 		return err
 	}
 
+	//defer fmt.Println("->", req)
+
 	if clen > 0 {
 		_, err = w.Write(data)
 		if err != nil {
@@ -734,6 +739,7 @@ func (pt *ProtoTcp) WriteFrameData(w *bufio.Writer, data []byte, ctype string) e
 			return err
 		}
 	}
+	w.Flush()
 
 	return err
 }
@@ -751,14 +757,16 @@ func (pt *ProtoTcp) WriteFrameSlot(w *bufio.Writer, ss *sr.StreamSlot) error {
 	req += fmt.Sprintf("x-Timestamp: %v\r\n", ss.Timestamp)
 	req += "\r\n"
 
-	// send frame header
+	// write frame header
 	_, err = w.Write([]byte(req))
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	// send frame body
+	//defer fmt.Println("->", req)
+
+	// write frame body
 	if ss.Length > 0 {
 		_, err = w.Write(ss.Content[:ss.Length])
 		if err != nil {
@@ -766,9 +774,14 @@ func (pt *ProtoTcp) WriteFrameSlot(w *bufio.Writer, ss *sr.StreamSlot) error {
 			return err
 		}
 	}
+	w.Flush()
 
 	return err
 }
+
+//===========================================================================
+// functions using direct socket io
+//===========================================================================
 
 //---------------------------------------------------------------------------
 // recv http message
@@ -779,9 +792,7 @@ func RecvMessage(conn net.Conn) error {
 	return err
 }
 
-//===========================================================================
-// functions using direct socket io
-//===========================================================================
+//---------------------------------------------------------------------------
 // stream = [frame][frame]...
 // frame  = [header][body]
 // header = [(text)\r\n\r\n]
@@ -981,7 +992,6 @@ func ParseFrameHeader(reader *bufio.Reader) (map[string]string, error) {
 
 		keyvalue := strings.SplitN(string(line), ":", 2)
 		if len(keyvalue) > 1 {
-			//result[strings.ToUpper(keyvalue[0])] = strings.TrimSpace(keyvalue[1])
 			result[keyvalue[0]] = strings.TrimSpace(keyvalue[1])
 		}
 	}

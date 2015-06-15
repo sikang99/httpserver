@@ -172,7 +172,7 @@ func RecvPartToData(mr *multipart.Reader) ([]byte, error) {
 		return nil, err
 	}
 
-	sl := p.Header.Get("Content-Length")
+	sl := p.Header.Get(sb.STR_HDR_LENGTH)
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s %d\n", p.Header, sl, nl)
@@ -192,8 +192,7 @@ func RecvPartToData(mr *multipart.Reader) ([]byte, error) {
 		tn += n
 	}
 
-	fmt.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get("Content-Type"), tn, nl, data[:2], data[nl-2:])
-
+	//fmt.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get("Content-Type"), tn, nl, data[:2], data[nl-2:])
 	return data[:nl], err
 }
 
@@ -209,7 +208,7 @@ func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 		return err
 	}
 
-	sl := p.Header.Get("Content-Length")
+	sl := p.Header.Get(sb.STR_HDR_LENGTH)
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s %d\n", p.Header, sl, nl)
@@ -229,7 +228,7 @@ func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 	}
 
 	ss.Length = nl
-	ss.Type = p.Header.Get("Content-Type")
+	ss.Type = p.Header.Get(sb.STR_HDR_TYPE)
 	//fmt.Println(ss)
 
 	return err
@@ -280,7 +279,7 @@ func RecvMultipartToData(mr *multipart.Reader) error {
 			return err
 		}
 
-		sl := p.Header.Get("Content-Length")
+		sl := p.Header.Get(sb.STR_HDR_LENGTH)
 		nl, err := strconv.Atoi(sl)
 		if sl == "" || nl == 0 {
 			log.Printf("%s %s %d\n", p.Header, sl, nl)
@@ -305,7 +304,7 @@ func RecvMultipartToData(mr *multipart.Reader) error {
 				tn += n
 			}
 
-			log.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get(sb.STR_HDR_LENGTH), tn, nl, data[:2], data[nl-2:])
+			//log.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get(sb.STR_HDR_LENGTH), tn, nl, data[:2], data[nl-2:])
 		}
 	}
 
@@ -386,7 +385,7 @@ func FileServer(path string) http.Handler {
 //---------------------------------------------------------------------------
 func SendFavicon(w http.ResponseWriter, file string) error {
 	w.Header().Set("Content-Type", "image/icon")
-	w.Header().Set("Server", "Happy Media Server")
+	w.Header().Set("Server", STR_HTTP_SERVER)
 	body, err := ioutil.ReadFile("static/favicon.ico")
 	if err != nil {
 		log.Println(err)
@@ -604,7 +603,7 @@ func SendPartSlot(w io.Writer, ss *sr.StreamSlot, boundary string) error {
 //---------------------------------------------------------------------------
 // get boundary string
 //---------------------------------------------------------------------------
-func GetBoundary(ctype string) (string, error) {
+func GetTypeBoundary(ctype string) (string, error) {
 	var err error
 
 	mt, params, err := mime.ParseMediaType(ctype)
@@ -616,7 +615,7 @@ func GetBoundary(ctype string) (string, error) {
 
 	boundary := params["boundary"]
 	if !strings.HasPrefix(boundary, "--") {
-		log.Printf("expected boundary to start with --, got %q", boundary)
+		log.Printf("expected to start with --, got %q", boundary)
 	}
 
 	return boundary, err
@@ -629,7 +628,7 @@ func SendResponseGet(w http.ResponseWriter, boundary string) error {
 	var err error
 
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
-	w.Header().Set("Server", "Happy Media Server")
+	w.Header().Set("Server", STR_HTTP_SERVER)
 	w.WriteHeader(http.StatusOK)
 
 	return err
@@ -641,7 +640,7 @@ func SendResponseGet(w http.ResponseWriter, boundary string) error {
 func SendResponsePost(w http.ResponseWriter, boundary string) error {
 	var err error
 
-	w.Header().Set("Server", "Happy Media Server")
+	w.Header().Set("Server", STR_HTTP_SERVER)
 	w.WriteHeader(http.StatusOK)
 
 	return err
