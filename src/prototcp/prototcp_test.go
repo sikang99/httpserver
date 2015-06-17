@@ -15,6 +15,9 @@ import (
 	sr "stoney/httpserver/src/streamring"
 )
 
+//---------------------------------------------------------------------------
+// for debugging
+//---------------------------------------------------------------------------
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
@@ -55,7 +58,27 @@ func TestCastServe(t *testing.T) {
 // test for send and receive
 //---------------------------------------------------------------------------
 func TestServePlay(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, sb.MBYTE)
+	sbuf := sr.NewStreamRing(3, 2*sb.MBYTE)
+	sbuf.SetStatusUsing()
+
+	// generate slot data
+	go func() {
+		num := time.Tick(1 * time.Second)
+
+		for i := 0; ; {
+			select {
+			case <-num:
+				slot, _ := sbuf.GetSlotIn()
+				slot.Type = "test/data"
+				slot.Length = i * 100 * sb.KBYTE
+				slot.Timestamp = sb.GetTimestamp()
+				sbuf.SetPosInByPos(i)
+				i++
+			default:
+				time.Sleep(time.Millisecond)
+			}
+		}
+	}()
 
 	sx := NewProtoTcp("localhost", "8087", "Cx")
 	go sx.ActServer(sbuf)

@@ -67,7 +67,7 @@ func NewStreamSlot() *StreamSlot {
 
 func NewStreamSlotBySize(cmax int) *StreamSlot {
 	return &StreamSlot{
-		Length:    cmax,
+		Length:    0,
 		LengthMax: cmax,
 		Content:   make([]byte, cmax),
 	}

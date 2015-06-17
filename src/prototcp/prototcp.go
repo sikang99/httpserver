@@ -103,6 +103,8 @@ func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
 }
 
 //---------------------------------------------------------------------------
+// action points : Caster (1)-> [NET] ->(2) Server (3)-> [NET] ->(4) Player
+//---------------------------------------------------------------------------
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ActCaster() error {
@@ -135,7 +137,7 @@ func (pt *ProtoTcp) ActCaster() error {
 	}
 
 	// send multipart stream of files
-	err = pt.WriteStreamFiles(w, "../../static/image/*", true)
+	err = pt.WriteFilesInStream(w, "../../static/image/*", true)
 
 	return err
 }
@@ -340,12 +342,12 @@ func (pt *ProtoTcp) WriteDataToStream(w *bufio.Writer, ring *sr.StreamRing) erro
 		slot, _ := ring.GetSlotByPos(pos)
 		slot.Timestamp = sb.GetTimestamp()
 
-		err = pt.WriteFrameSlot(w, slot)
+		err = pt.WriteSlotInFrame(w, slot)
 		if err != nil {
 			log.Println(err)
 			break
 		}
-		fmt.Println(">>", slot)
+		fmt.Println("3>", slot)
 
 		time.Sleep(time.Second)
 	}
@@ -376,12 +378,12 @@ func (pt *ProtoTcp) WriteRingToStream(w *bufio.Writer, ring *sr.StreamRing) erro
 			break
 		}
 
-		err = pt.WriteFrameSlot(w, slot)
+		err = pt.WriteSlotInFrame(w, slot)
 		if err != nil {
 			log.Println(err)
 			break
 		}
-		fmt.Println(">>", slot)
+		fmt.Println("3>", slot)
 
 		pos = npos
 	}
@@ -390,7 +392,7 @@ func (pt *ProtoTcp) WriteRingToStream(w *bufio.Writer, ring *sr.StreamRing) erro
 }
 
 //---------------------------------------------------------------------------
-// recv multipart to ring buffer
+// recv stream to ring buffer
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error {
 	var err error
@@ -409,7 +411,9 @@ func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error
 			log.Println(err)
 			return err
 		}
-		fmt.Println(">|", slot)
+		fmt.Println(">2", slot)
+
+		// ignore control frame from cam
 		if slot.IsMajorType("multipart") {
 			log.Println(slot)
 			continue
@@ -422,10 +426,32 @@ func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error
 }
 
 //---------------------------------------------------------------------------
-// recv multipart to data for debugging
-// - check compatiblity with multipart package
+// recv stream to data (slot)
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ReadStreamToData(r *bufio.Reader) error {
+	var err error
+
+	// alloc temp slot
+	slot := sr.NewStreamSlot()
+
+	for {
+		err = pt.ReadFrameToSlot(r, slot)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		fmt.Println(">4", slot)
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// recv multipart to data for debugging
+// - same function with ReadStreamToData() above
+// - check compatiblity with multipart package
+//---------------------------------------------------------------------------
+func (pt *ProtoTcp) ReadMultipartToData(r *bufio.Reader) error {
 	var err error
 
 	mr := multipart.NewReader(r, pt.Boundary)
@@ -637,6 +663,11 @@ func (pt *ProtoTcp) ReadBodyToData(r *bufio.Reader, clen int) ([]byte, error) {
 func (pt *ProtoTcp) ReadBodyToSlot(r *bufio.Reader, clen int, ss *sr.StreamSlot) error {
 	var err error
 
+	if clen > ss.LengthMax {
+		log.Printf("%d is too big than %d\n", clen, ss.LengthMax)
+		return sb.ErrSize
+	}
+
 	ss.Length = 0
 
 	tn := 0
@@ -659,7 +690,7 @@ func (pt *ProtoTcp) ReadBodyToSlot(r *bufio.Reader, clen int, ss *sr.StreamSlot)
 //---------------------------------------------------------------------------
 // write files in multipart
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) WriteStreamFiles(w *bufio.Writer, pattern string, loop bool) error {
+func (pt *ProtoTcp) WriteFilesInStream(w *bufio.Writer, pattern string, loop bool) error {
 	var err error
 
 	files, err := filepath.Glob(pattern)
@@ -674,7 +705,7 @@ func (pt *ProtoTcp) WriteStreamFiles(w *bufio.Writer, pattern string, loop bool)
 
 	for {
 		for i := range files {
-			err = pt.WriteFrameFile(w, files[i])
+			err = pt.WriteFileInFrame(w, files[i])
 			if err != nil {
 				if err == sb.ErrSize {
 					continue
@@ -697,7 +728,7 @@ func (pt *ProtoTcp) WriteStreamFiles(w *bufio.Writer, pattern string, loop bool)
 //---------------------------------------------------------------------------
 // write a part file
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) WriteFrameFile(w *bufio.Writer, file string) error {
+func (pt *ProtoTcp) WriteFileInFrame(w *bufio.Writer, file string) error {
 	var err error
 
 	fdata, err := ioutil.ReadFile(file)
@@ -717,7 +748,7 @@ func (pt *ProtoTcp) WriteFrameFile(w *bufio.Writer, file string) error {
 		ctype = http.DetectContentType(fdata)
 	}
 
-	err = pt.WriteFrameData(w, fdata, ctype)
+	err = pt.WriteDataInFrame(w, fdata, ctype)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -729,62 +760,39 @@ func (pt *ProtoTcp) WriteFrameFile(w *bufio.Writer, file string) error {
 //---------------------------------------------------------------------------
 // write a part data
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) WriteFrameData(w *bufio.Writer, data []byte, ctype string) error {
+func (pt *ProtoTcp) WriteDataInFrame(w *bufio.Writer, data []byte, ctype string) error {
 	var err error
 
-	slot := sr.NewStreamSlot()
+	clen := len(data)
+	// prepare a slot and its data
+	slot := sr.NewStreamSlotBySize(clen)
+	defer fmt.Println("1>", slot)
 
 	slot.Type = ctype
-	slot.Length = len(data)
+	slot.Length = clen
 	slot.Timestamp = sb.GetTimestamp()
-	if slot.Length > slot.LengthMax {
-		return sb.ErrSize
-	}
 	copy(slot.Content, data)
 
-	err = pt.WriteFrameSlot(w, slot)
+	// send the slot
+	err = pt.WriteSlotInFrame(w, slot)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	fmt.Println("->", slot)
-
-	/*
-		clen := len(data)
-
-		req := fmt.Sprintf("\r\n--%s\r\n", pt.Boundary)
-		req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
-		req += fmt.Sprintf("Content-Length: %d\r\n", clen)
-		req += fmt.Sprintf("x-Timestamp: %v\r\n", sb.GetTimestamp())
-		req += "\r\n"
-
-		_, err = w.Write([]byte(req))
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-
-		//defer fmt.Println("->", req)
-
-		if clen > 0 {
-			_, err = w.Write(data)
-			if err != nil {
-				log.Println(err)
-				return err
-			}
-		}
-		w.Flush()
-	*/
-
 	return err
 }
 
 //---------------------------------------------------------------------------
-// send a part slot of ring buffer
+// send a frame of slot data
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) WriteFrameSlot(w *bufio.Writer, ss *sr.StreamSlot) error {
+func (pt *ProtoTcp) WriteSlotInFrame(w *bufio.Writer, ss *sr.StreamSlot) error {
 	var err error
+
+	if ss.Length > ss.LengthMax {
+		log.Printf("%d is too big than %d\n", ss.Length, ss.LengthMax)
+		return sb.ErrSize
+	}
 
 	// make frame header
 	req := fmt.Sprintf("\r\n--%s\r\n", pt.Boundary)
@@ -793,14 +801,14 @@ func (pt *ProtoTcp) WriteFrameSlot(w *bufio.Writer, ss *sr.StreamSlot) error {
 	req += fmt.Sprintf("x-Timestamp: %v\r\n", ss.Timestamp)
 	req += "\r\n"
 
+	//defer fmt.Println("->", req)
+
 	// write frame header
 	_, err = w.Write([]byte(req))
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-
-	//defer fmt.Println("->", req)
 
 	// write frame body
 	if ss.Length > 0 {

@@ -55,12 +55,12 @@ const (
 )
 
 var (
-	ErrEmpty   = errors.New("empty")
-	ErrFull    = errors.New("full")
-	ErrNull    = errors.New("null")
-	ErrSize    = errors.New("size")
-	ErrStatus  = errors.New("invalid status")
-	ErrSupport = errors.New("not supported")
+	ErrEmpty   = errors.New("error empty")
+	ErrFull    = errors.New("error full")
+	ErrNull    = errors.New("error null")
+	ErrSize    = errors.New("error size")
+	ErrStatus  = errors.New("error invalid status")
+	ErrSupport = errors.New("error not supported")
 )
 
 //---------------------------------------------------------------------------

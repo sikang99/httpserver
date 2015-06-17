@@ -44,5 +44,7 @@ make m:
 
 usage:
 	@echo ""
-	@echo "usage: make [edit|build|test|view]"
+	@echo "usage: make [edit|build|test|view|clean]"
+	@echo " - (edit) [e|et]"
+	@echo " - (test) [bt|btf1|btf2|btf3]"
 	@echo ""
