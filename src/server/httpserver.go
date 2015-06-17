@@ -330,7 +330,7 @@ func ActHttpPlayer(url string, sbuf *sr.StreamRing) error {
 	}
 	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
-	sbuf.Boundary, err = ph.GetBoundary(res.Header.Get("Content-Type"))
+	sbuf.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, sbuf.Boundary)
 
 	err = ph.RecvMultipartToRing(mr, sbuf)
@@ -370,7 +370,7 @@ func ActHttpReader(url string, sbuf *sr.StreamRing) {
 	}
 	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
-	sbuf.Boundary, err = ph.GetBoundary(res.Header.Get("Content-Type"))
+	sbuf.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, sbuf.Boundary)
 
 	err = ph.RecvMultipartToRing(mr, sbuf)
@@ -419,8 +419,8 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	//go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
-	go pt.NewProtoTcp("localhost", "8087", "T-Rx").ActServer(conf.Ring)
+	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
+	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").ActServer(conf.Ring)
 	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").ActCaster(conf.Ring)
 
 	wg.Wait()
@@ -612,7 +612,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "POST": // for Caster
-		sbuf.Boundary, err = ph.GetBoundary(r.Header.Get("Content-Type"))
+		sbuf.Boundary, err = ph.GetTypeBoundary(r.Header.Get("Content-Type"))
 
 		err = ph.SendResponsePost(w, sbuf.Boundary)
 		if err != nil {

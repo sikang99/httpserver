@@ -19,8 +19,9 @@ import (
 
 //----------------------------------------------------------------------------------
 const (
-	LEN_DEF_SLOT  = sb.MBYTE
-	LEN_MAX_SLOT  = sb.GBYTE
+	LEN_DEF_SLOT = sb.MBYTE
+	LEN_MAX_SLOT = sb.GBYTE
+
 	NUM_DEF_SLOTS = 30 // 30fps
 	NUM_MAX_SLOTS = 1024
 )

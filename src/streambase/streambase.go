@@ -7,6 +7,7 @@
 package streambase
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -16,11 +17,13 @@ import (
 
 //----------------------------------------------------------------------------------
 const (
-	KBYTE = 1024
-	MBYTE = 1024 * KBYTE // Kilo
-	GBYTE = 1024 * MBYTE // Giga
-	TBYTE = 1024 * GBYTE // Tera
-	HBYTE = 1024 * TBYTE // Hexa
+	_     = iota
+	KBYTE = 1024             // Kilo
+	MBYTE = 1 << (10 * iota) // Mega
+	GBYTE                    // Giga
+	TBYTE                    // Tera
+	PBYTE                    // Peta
+	EBYTE                    // Exa byte
 )
 
 const (
@@ -36,6 +39,7 @@ const (
 	STATUS_USING
 
 	LEN_MAX_LINE = 128
+	LEN_MAX_MSG  = 1024
 
 	TIME_DEF_WAIT      = 100 * time.Microsecond
 	TIME_DEF_PRECISION = time.Millisecond
@@ -43,9 +47,11 @@ const (
 
 // multipart headers
 const (
-	STR_HDR_TYPE   = "Content-Type"
-	STR_HDR_LENGTH = "Content-Length"
-	STR_HDR_TSTAMP = "x-Timestamp"
+	STR_HDR_CONTENT_TYPE   = "Content-Type"
+	STR_HDR_CONTENT_LENGTH = "Content-Length"
+	STR_HDR_TIMESTAMP      = "x-Timestamp"
+	STR_HDR_AUDIO_FORMAT   = "x-Audio-Format"
+	STR_HDR_VIDEO_FORMAT   = "x-Video-Format"
 )
 
 var (
@@ -138,6 +144,14 @@ func ShowNetInterfaces() {
 			fmt.Printf("\t%d %v\n", j, addr)
 		}
 	}
+}
+
+//---------------------------------------------------------------------------
+// dump data in hex format
+// usage : HexDump(data[10:20])
+//---------------------------------------------------------------------------
+func HexDump(data []byte) {
+	fmt.Println(hex.Dump(data))
 }
 
 //---------------------------------------------------------------------------

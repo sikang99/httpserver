@@ -146,7 +146,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "refactor prototcp package with bufio and raw io"
+	git commit -m "modify prototcp package"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

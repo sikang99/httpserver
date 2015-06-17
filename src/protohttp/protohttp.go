@@ -172,7 +172,7 @@ func RecvPartToData(mr *multipart.Reader) ([]byte, error) {
 		return nil, err
 	}
 
-	sl := p.Header.Get(sb.STR_HDR_LENGTH)
+	sl := p.Header.Get(sb.STR_HDR_CONTENT_LENGTH)
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s %d\n", p.Header, sl, nl)
@@ -208,7 +208,7 @@ func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 		return err
 	}
 
-	sl := p.Header.Get(sb.STR_HDR_LENGTH)
+	sl := p.Header.Get(sb.STR_HDR_CONTENT_LENGTH)
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s %d\n", p.Header, sl, nl)
@@ -228,7 +228,8 @@ func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 	}
 
 	ss.Length = nl
-	ss.Type = p.Header.Get(sb.STR_HDR_TYPE)
+	ss.Type = p.Header.Get(sb.STR_HDR_CONTENT_TYPE)
+	ss.Timestamp = sb.GetTimestamp()
 	//fmt.Println(ss)
 
 	return err
@@ -279,7 +280,7 @@ func RecvMultipartToData(mr *multipart.Reader) error {
 			return err
 		}
 
-		sl := p.Header.Get(sb.STR_HDR_LENGTH)
+		sl := p.Header.Get(sb.STR_HDR_CONTENT_LENGTH)
 		nl, err := strconv.Atoi(sl)
 		if sl == "" || nl == 0 {
 			log.Printf("%s %s %d\n", p.Header, sl, nl)
@@ -304,7 +305,7 @@ func RecvMultipartToData(mr *multipart.Reader) error {
 				tn += n
 			}
 
-			//log.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get(sb.STR_HDR_LENGTH), tn, nl, data[:2], data[nl-2:])
+			//log.Printf("%s %d/%d [%0x - %0x]\n", p.Header.Get(sb.STR_HDR_CONTENT_LENGTH), tn, nl, data[:2], data[nl-2:])
 		}
 	}
 

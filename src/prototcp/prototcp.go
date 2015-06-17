@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	ph "stoney/httpserver/src/protohttp"
 
@@ -43,6 +44,7 @@ type ProtoTcp struct {
 	Method   string // POST or GET
 	Boundary string
 	Conn     net.Conn
+	Quit     chan bool
 }
 
 //---------------------------------------------------------------------------
@@ -96,20 +98,22 @@ func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
 		Port:     hport,
 		Desc:     desc,
 		Boundary: sb.STR_DEF_BDRY,
+		Quit:     make(chan bool),
 	}
 }
 
 //---------------------------------------------------------------------------
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActCaster() {
+func (pt *ProtoTcp) ActCaster() error {
+	var err error
 	log.Printf("%s to %s:%s\n", STR_TCP_CASTER, pt.Host, pt.Port)
 
 	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 	defer conn.Close()
 	log.Printf("Caster> connected to %s\n", addr)
@@ -117,7 +121,7 @@ func (pt *ProtoTcp) ActCaster() {
 	err = conn.SetNoDelay(true)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	// CAUTION: set reader/writer before use
@@ -127,25 +131,26 @@ func (pt *ProtoTcp) ActCaster() {
 	err = pt.RequestPost(r, w)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	// send multipart stream of files
 	err = pt.WriteStreamFiles(w, "../../static/image/*", true)
 
-	return
+	return err
 }
 
 //---------------------------------------------------------------------------
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActServer(ring *sr.StreamRing) {
+func (pt *ProtoTcp) ActServer(ring *sr.StreamRing) error {
+	var err error
 	log.Printf("%s on :%s\n", STR_TCP_SERVER, pt.Port)
 
 	l, err := net.Listen("tcp", ":"+pt.Port)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 	defer l.Close()
 
@@ -154,7 +159,15 @@ func (pt *ProtoTcp) ActServer(ring *sr.StreamRing) {
 		conn, err := l.Accept()
 		if err != nil {
 			log.Println(err)
-			return
+
+			select {
+			case <-pt.Quit:
+				log.Printf("shutdown %s\n", STR_TCP_SERVER)
+				return nil
+			default:
+			}
+
+			continue
 		}
 
 		go pt.HandleRequest(conn, ring)
@@ -164,14 +177,15 @@ func (pt *ProtoTcp) ActServer(ring *sr.StreamRing) {
 //---------------------------------------------------------------------------
 // TCP Player to receive data in multipart
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActPlayer(ring *sr.StreamRing) {
+func (pt *ProtoTcp) ActPlayer(ring *sr.StreamRing) error {
+	var err error
 	log.Printf("%s\n", STR_TCP_PLAYER)
 
 	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 	defer conn.Close()
 	log.Printf("Player> connected to %s\n", addr)
@@ -179,7 +193,7 @@ func (pt *ProtoTcp) ActPlayer(ring *sr.StreamRing) {
 	err = conn.SetNoDelay(true)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	r := bufio.NewReader(conn)
@@ -188,7 +202,7 @@ func (pt *ProtoTcp) ActPlayer(ring *sr.StreamRing) {
 	err = pt.RequestGet(r, w)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	// recv multipart stream from server
@@ -196,10 +210,10 @@ func (pt *ProtoTcp) ActPlayer(ring *sr.StreamRing) {
 	//err = RecvStreamToData(conn)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
 //---------------------------------------------------------------------------
@@ -408,12 +422,13 @@ func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error
 }
 
 //---------------------------------------------------------------------------
-// recv multipart to data
+// recv multipart to data for debugging
+// - check compatiblity with multipart package
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ReadStreamToData(r *bufio.Reader) error {
 	var err error
 
-	mr := multipart.NewReader(r, "myboundary")
+	mr := multipart.NewReader(r, pt.Boundary)
 	err = ph.RecvMultipartToData(mr)
 
 	return err
@@ -477,14 +492,14 @@ func (pt *ProtoTcp) ReadFrameToSlot(r *bufio.Reader, ss *sr.StreamSlot) error {
 	}
 
 	clen := 0
-	value, ok := headers[sb.STR_HDR_LENGTH]
+	value, ok := headers[sb.STR_HDR_CONTENT_LENGTH]
 	if ok {
 		clen, _ = strconv.Atoi(value)
 	}
 
 	if clen > 0 {
-		ss.Type = headers[sb.STR_HDR_TYPE]
-		err = pt.ReadMessageBodyToSlot(r, clen, ss)
+		ss.Type = headers[sb.STR_HDR_CONTENT_TYPE]
+		err = pt.ReadBodyToSlot(r, clen, ss)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -530,19 +545,19 @@ func (pt *ProtoTcp) ReadMessage(r *bufio.Reader) error {
 		return err
 	}
 
-	value, ok := headers[sb.STR_HDR_TYPE]
+	value, ok := headers[sb.STR_HDR_CONTENT_TYPE]
 	if ok {
 		pt.GetTypeBoundary(value)
 	}
 
 	clen := 0
-	value, ok = headers[sb.STR_HDR_LENGTH]
+	value, ok = headers[sb.STR_HDR_CONTENT_LENGTH]
 	if ok {
 		clen, _ = strconv.Atoi(value)
 	}
 
 	if clen > 0 {
-		_, err = pt.ReadMessageBodyToData(r, clen)
+		_, err = pt.ReadBodyToData(r, clen)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -596,7 +611,7 @@ func (pt *ProtoTcp) ReadMessageHeader(r *bufio.Reader) (map[string]string, error
 //---------------------------------------------------------------------------
 // read(recv) body of message to data
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadMessageBodyToData(r *bufio.Reader, clen int) ([]byte, error) {
+func (pt *ProtoTcp) ReadBodyToData(r *bufio.Reader, clen int) ([]byte, error) {
 	var err error
 
 	data := make([]byte, clen)
@@ -619,7 +634,7 @@ func (pt *ProtoTcp) ReadMessageBodyToData(r *bufio.Reader, clen int) ([]byte, er
 //---------------------------------------------------------------------------
 // read(recv) body of message to slot of ring buffer
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadMessageBodyToSlot(r *bufio.Reader, clen int, ss *sr.StreamSlot) error {
+func (pt *ProtoTcp) ReadBodyToSlot(r *bufio.Reader, clen int, ss *sr.StreamSlot) error {
 	var err error
 
 	ss.Length = 0
@@ -696,6 +711,7 @@ func (pt *ProtoTcp) WriteFrameFile(w *bufio.Writer, file string) error {
 		return sb.ErrSize
 	}
 
+	//sb.HexDump(fdata[:16])
 	ctype := mime.TypeByExtension(file)
 	if ctype == "" {
 		ctype = http.DetectContentType(fdata)
@@ -716,30 +732,50 @@ func (pt *ProtoTcp) WriteFrameFile(w *bufio.Writer, file string) error {
 func (pt *ProtoTcp) WriteFrameData(w *bufio.Writer, data []byte, ctype string) error {
 	var err error
 
-	clen := len(data)
+	slot := sr.NewStreamSlot()
 
-	req := fmt.Sprintf("\r\n--%s\r\n", pt.Boundary)
-	req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
-	req += fmt.Sprintf("Content-Length: %d\r\n", clen)
-	req += fmt.Sprintf("x-Timestamp: %v\r\n", sb.GetTimestamp())
-	req += "\r\n"
+	slot.Type = ctype
+	slot.Length = len(data)
+	slot.Timestamp = sb.GetTimestamp()
+	if slot.Length > slot.LengthMax {
+		return sb.ErrSize
+	}
+	copy(slot.Content, data)
 
-	_, err = w.Write([]byte(req))
+	err = pt.WriteFrameSlot(w, slot)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	//defer fmt.Println("->", req)
+	fmt.Println("->", slot)
 
-	if clen > 0 {
-		_, err = w.Write(data)
+	/*
+		clen := len(data)
+
+		req := fmt.Sprintf("\r\n--%s\r\n", pt.Boundary)
+		req += fmt.Sprintf("Content-Type: %s\r\n", ctype)
+		req += fmt.Sprintf("Content-Length: %d\r\n", clen)
+		req += fmt.Sprintf("x-Timestamp: %v\r\n", sb.GetTimestamp())
+		req += "\r\n"
+
+		_, err = w.Write([]byte(req))
 		if err != nil {
 			log.Println(err)
 			return err
 		}
-	}
-	w.Flush()
+
+		//defer fmt.Println("->", req)
+
+		if clen > 0 {
+			_, err = w.Write(data)
+			if err != nil {
+				log.Println(err)
+				return err
+			}
+		}
+		w.Flush()
+	*/
 
 	return err
 }
@@ -782,14 +818,40 @@ func (pt *ProtoTcp) WriteFrameSlot(w *bufio.Writer, ss *sr.StreamSlot) error {
 //===========================================================================
 // functions using direct socket io
 //===========================================================================
-
+// - function names started with Send/Recv, and use Stream, Frame
 //---------------------------------------------------------------------------
 // recv http message
 //---------------------------------------------------------------------------
-func RecvMessage(conn net.Conn) error {
+func RecvMessage(conn net.Conn) (string, error) {
 	var err error
 
-	return err
+	rmsg := make([]byte, sb.LEN_MAX_MSG)
+
+	var tn int = 0
+	for {
+		n, err := conn.Read(rmsg[:tn])
+		if err != nil {
+			break
+		}
+
+		if n > sb.LEN_MAX_LINE {
+			log.Println("too long line")
+			continue
+		}
+
+		if !unicode.IsPrint(rune(rmsg[tn])) {
+			log.Println("binary?")
+			continue
+		}
+
+		tn += n
+		if tn > 3 && string(rmsg[tn-4:tn]) == "\r\n\r\n" {
+			//log.Println(string(line[:tn]))
+			break
+		}
+	}
+
+	return string(rmsg), err
 }
 
 //---------------------------------------------------------------------------
@@ -858,13 +920,13 @@ func RecvFrameToSlot(conn net.Conn, ss *sr.StreamSlot) error {
 	}
 
 	clen := 0
-	value, ok := headers[sb.STR_HDR_LENGTH]
+	value, ok := headers[sb.STR_HDR_CONTENT_LENGTH]
 	if ok {
 		clen, _ = strconv.Atoi(value)
 	}
 
 	if clen > 0 {
-		ss.Type = headers[sb.STR_HDR_TYPE]
+		ss.Type = headers[sb.STR_HDR_CONTENT_TYPE]
 		err = RecvFrameBodyToSlot(conn, clen, ss)
 		if err != nil {
 			log.Println(err)
@@ -887,13 +949,13 @@ func RecvFrameToData(conn net.Conn) error {
 		return err
 	}
 
-	tstamp, ok := headers[sb.STR_HDR_TSTAMP]
+	tstamp, ok := headers[sb.STR_HDR_TIMESTAMP]
 	if ok {
 		log.Println("<", tstamp)
 	}
 
 	clen := 0
-	value, ok := headers[sb.STR_HDR_LENGTH]
+	value, ok := headers[sb.STR_HDR_CONTENT_LENGTH]
 	if ok {
 		clen, _ = strconv.Atoi(value)
 	}
