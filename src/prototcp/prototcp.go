@@ -23,6 +23,8 @@ import (
 	"time"
 	"unicode"
 
+	//"github.com/kisom/go-schannel"	// Bidirectional secure channels over TCP/IP
+
 	ph "stoney/httpserver/src/protohttp"
 
 	sb "stoney/httpserver/src/streambase"
@@ -53,9 +55,10 @@ type ProtoTcp struct {
 func (pt *ProtoTcp) String() string {
 	str := fmt.Sprintf("\tHost: %s", pt.Host)
 	str += fmt.Sprintf("\tPort: %s", pt.Port)
-	str += fmt.Sprintf("\tConn: %v", pt.Conn)
 	str += fmt.Sprintf("\tBoundary: %s", pt.Boundary)
+	str += fmt.Sprintf("\tMethod: %s", pt.Method)
 	str += fmt.Sprintf("\tDesc: %s", pt.Desc)
+	str += fmt.Sprintf("\tConn: %v", pt.Conn)
 	return str
 }
 
@@ -90,9 +93,30 @@ func (pt *ProtoTcp) Clear() {
 }
 
 //---------------------------------------------------------------------------
-// new ProtoTcp struct
+// new ProtoTcp struct in variadic style
 //---------------------------------------------------------------------------
-func NewProtoTcp(hname, hport, desc string) *ProtoTcp {
+func NewProtoTcp(args ...string) *ProtoTcp {
+	pt := &ProtoTcp{
+		Host:     "localhost",
+		Port:     "8080",
+		Boundary: sb.STR_DEF_BDRY,
+		Quit:     make(chan bool),
+	}
+
+	for i, arg := range args {
+		if i == 0 {
+			pt.Host = arg
+		} else if i == 1 {
+			pt.Port = arg
+		} else if i == 2 {
+			pt.Desc = arg
+		}
+	}
+
+	return pt
+}
+
+func NewProtoTcpWithParams(hname, hport, desc string) *ProtoTcp {
 	return &ProtoTcp{
 		Host:     hname,
 		Port:     hport,

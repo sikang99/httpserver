@@ -182,12 +182,12 @@ func main() {
 
 	// package prototcp
 	case "tcp_caste":
-		pt.NewProtoTcp("localhost", "8087", "T-Tx").ActCaster()
+		pt.NewProtoTcpWithParams("localhost", "8087", "T-Tx").ActCaster()
 	case "tcp_server":
-		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+		tr := pt.NewProtoTcpWithParams("localhost", "8087", "T-Rx")
 		tr.ActServer(conf.Ring)
 	case "tcp_player":
-		tr := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+		tr := pt.NewProtoTcpWithParams("localhost", "8087", "T-Rx")
 		tr.ActPlayer(conf.Ring)
 
 	// package protows

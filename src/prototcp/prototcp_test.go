@@ -26,17 +26,26 @@ func init() {
 // test for info handling
 //---------------------------------------------------------------------------
 func TestHandleInfo(t *testing.T) {
-	tcp := NewProtoTcp("www.google.com", "9000", "Testing")
-	fmt.Println(tcp)
+	t1 := NewProtoTcp()
+	fmt.Println(t1)
 
-	tcp.Reset()
-	fmt.Println(tcp)
+	t2 := NewProtoTcp("www.google.com")
+	fmt.Println(t2)
 
-	tcp.Clear()
-	fmt.Println(tcp)
+	t3 := NewProtoTcp("www.google.com", "9000")
+	fmt.Println(t3)
 
-	tcp.SetAddr("www.facebook.com", "8080", "Redirect")
-	fmt.Println(tcp)
+	t4 := NewProtoTcp("www.google.com", "9000", "Testing")
+	fmt.Println(t4)
+
+	t4.Reset()
+	fmt.Println(t4)
+
+	t4.Clear()
+	fmt.Println(t4)
+
+	t4.SetAddr("www.facebook.com", "8080", "Redirect")
+	fmt.Println(t4)
 }
 
 //---------------------------------------------------------------------------
