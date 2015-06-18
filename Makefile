@@ -146,7 +146,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "tested all most functions of prototcp package"
+	git commit -m "refactoring protows package"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

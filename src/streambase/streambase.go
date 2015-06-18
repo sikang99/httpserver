@@ -47,6 +47,8 @@ const (
 
 // multipart headers
 const (
+	STR_HDR_SERVER         = "Server"
+	STR_HDR_USER_AGENT     = "User-Agent"
 	STR_HDR_CONTENT_TYPE   = "Content-Type"
 	STR_HDR_CONTENT_LENGTH = "Content-Length"
 	STR_HDR_TIMESTAMP      = "X-Timestamp"
