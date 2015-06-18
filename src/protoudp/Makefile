@@ -1,7 +1,7 @@
 #
 # Makefile for happy package
 #
-PACKAGE=protows
+PACKAGE=protoudp
 
 all: usage
 
@@ -11,6 +11,9 @@ edit e:
 et:
 	vi $(PACKAGE)_test.go
 
+ed:
+	vi doc.go
+
 build b:
 	go build
 
@@ -18,27 +21,20 @@ test t:
 	go test -v
 
 buildtest bt:
-	go build
+	@go build
 	go test -v
 
-btf:
-	go build
-	go test -run TestEcho
-
 btf1:
-	go build
-	go test -run TestCastServe
+	@go build
+	go test -run TestCastServe -timeout 60m
 
 btf2:
-	go build
-	go test -run TestServePlay
+	@go build
+	go test -run TestServePlay -timeout 60m
 
 btf3:
-	go build
+	@go build
 	go test -run TestCastServePlay
-
-gencert:
-	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 9999 -nodes
 
 view v:
 	shotwell output.jpg
@@ -51,5 +47,7 @@ make m:
 
 usage:
 	@echo ""
-	@echo "usage: make [edit|build|test|view]"
+	@echo "usage: make [edit|build|test|view|clean]"
+	@echo " - (edit) [e|et]"
+	@echo " - (test) [bt|btf1|btf2|btf3]"
 	@echo ""

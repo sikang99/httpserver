@@ -36,7 +36,8 @@ type ProtoFile struct {
 	Desc     string
 	Boundary string
 	//CreatedAt time.Time `bson:"created_at,omitempty json:"created_at,omitempty"`
-	CreatedAt int64
+	CreatedAt  int64
+	ModifiedAt int64
 }
 
 //---------------------------------------------------------------------------
@@ -62,48 +63,58 @@ func (pf *ProtoFile) Reset() {
 func (pf *ProtoFile) Clear() {
 	pf.Pattern = ""
 	pf.Boundary = ""
-	pf.Desc = "clear"
+	pf.Desc = "cleared"
 }
 
 //---------------------------------------------------------------------------
 // new ProtoTcp struct
 //---------------------------------------------------------------------------
-func NewProtoFile(pat, desc string) *ProtoFile {
-	return &ProtoFile{
-		Pattern:   pat,
-		Desc:      desc,
+func NewProtoFile(args ...string) *ProtoFile {
+	pf := &ProtoFile{
 		Boundary:  sb.STR_DEF_BDRY,
 		CreatedAt: time.Now().Unix(),
 	}
+
+	for i, arg := range args {
+		if i == 0 {
+			pf.Pattern = arg
+		} else if i == 1 {
+			pf.Desc = arg
+		}
+	}
+
+	return pf
 }
 
 //---------------------------------------------------------------------------
 // act file reader
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ActReader(sbuf *sr.StreamRing) {
+func (pf *ProtoFile) ActReader(ring *sr.StreamRing) error {
+	var err error
 	log.Println(STR_FILE_READER)
 
-	ReadDirToRing(sbuf, pf.Pattern, false)
-	fmt.Println(sbuf)
+	err = ReadDirToRing(ring, pf.Pattern, false)
+	fmt.Println(ring)
 
-	return
+	return err
 }
 
 //---------------------------------------------------------------------------
 // act file writer
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ActWriter(sbuf *sr.StreamRing) {
+func (pf *ProtoFile) ActWriter(ring *sr.StreamRing) error {
+	var err error
 	log.Println(STR_FILE_WRITER)
 
-	WriteRingToMultipartFile(sbuf, pf.Pattern)
+	err = WriteRingToMultipartFile(ring, pf.Pattern)
 
-	return
+	return err
 }
 
 //---------------------------------------------------------------------------
 // read files with the given pattern in the directory and put them to the ring buffer
 //---------------------------------------------------------------------------
-func ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
+func ReadDirToRing(ring *sr.StreamRing, pat string, loop bool) error {
 	var err error
 
 	// ReadDir : read directory
@@ -117,24 +128,24 @@ func ReadDirToRing(sbuf *sr.StreamRing, pat string, loop bool) error {
 		return err
 	}
 
-	err = sbuf.SetStatusUsing()
+	err = ring.SetStatusUsing()
 	if err != nil {
 		return sb.ErrStatus
 	}
-	defer sbuf.SetStatusIdle()
+	defer ring.SetStatusIdle()
 
 	// ToRing : to ring buffer
 	for {
 		for i := range files {
-			slot, pos := sbuf.GetSlotIn()
+			slot, pos := ring.GetSlotIn()
 
 			err = ReadFileToSlot(files[i], slot)
 			if err == sb.ErrNull {
 				continue
 			}
 
-			sbuf.SetPosInByPos(pos + 1)
-			fmt.Println(slot)
+			ring.SetPosInByPos(pos + 1)
+			fmt.Println("FR", slot)
 
 			time.Sleep(time.Second)
 		}
@@ -159,7 +170,7 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 		return err
 	}
 
-	sl := p.Header.Get("Content-Length")
+	sl := p.Header.Get(sb.STR_HDR_CONTENT_LENGTH)
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s %d\n", p.Header, sl, nl)
@@ -179,11 +190,11 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 	}
 
 	ss.Length = nl
-	ss.Type = p.Header.Get("Content-Type")
+	ss.Type = p.Header.Get(sb.STR_HDR_CONTENT_TYPE)
 	ss.Timestamp = sb.GetTimestamp()
 	//fmt.Println(ss)
 
-	ts := p.Header.Get("x-Timestamp")
+	ts := p.Header.Get(sb.STR_HDR_TIMESTAMP)
 	ss.Timestamp, err = strconv.ParseInt(ts, 10, 64)
 
 	return err
@@ -191,8 +202,9 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 
 //---------------------------------------------------------------------------
 // read multipart file to the ring buffer
+// TODO: change relative time gap into absolute one to prevent drift
 //---------------------------------------------------------------------------
-func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
+func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
 	var err error
 
 	f, err := os.Open(file)
@@ -202,35 +214,36 @@ func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
 	}
 	defer f.Close()
 
-	err = sbuf.SetStatusUsing()
+	err = ring.SetStatusUsing()
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	defer sbuf.SetStatusIdle()
+	defer ring.SetStatusIdle()
 
-	mr := multipart.NewReader(f, sbuf.Boundary)
+	// TODO: set boundary from the multipart file
 
-	var clockstamp int64 = 0
+	mr := multipart.NewReader(f, ring.Boundary)
+
+	var preTimestamp int64 = 0
 	for {
-		slot, pos := sbuf.GetSlotIn()
+		slot, pos := ring.GetSlotIn()
 
 		err = ReadPartToSlot(mr, slot)
 		if err != nil {
 			log.Println(err)
 			break
 		}
-		fmt.Println(slot)
 
-		sbuf.SetPosInByPos(pos + 1)
-
-		// read to ring buffer by timestamp
-		if clockstamp > 0 {
-			diff := slot.Timestamp - clockstamp
-			//println(diff)
+		// read multipart to ring buffer by timestamp
+		if preTimestamp > 0 {
+			diff := slot.Timestamp - preTimestamp
 			time.Sleep(sb.GetDuration(diff - 1))
 		}
-		clockstamp = slot.Timestamp
+		preTimestamp = slot.Timestamp
+
+		fmt.Println("MR", slot)
+		ring.SetPosInByPos(pos + 1)
 	}
 
 	return err
@@ -239,7 +252,7 @@ func ReadMultipartFileToRing(sbuf *sr.StreamRing, file string) error {
 //---------------------------------------------------------------------------
 // write the ring buffer to file
 //---------------------------------------------------------------------------
-func WriteRingToMultipartFile(sbuf *sr.StreamRing, file string) error {
+func WriteRingToMultipartFile(ring *sr.StreamRing, file string) error {
 	var err error
 
 	f, err := os.Create(file)
@@ -251,8 +264,8 @@ func WriteRingToMultipartFile(sbuf *sr.StreamRing, file string) error {
 
 	// write ring buffer to file
 	var pos int
-	for sbuf.IsUsing() {
-		slot, npos, err := sbuf.GetSlotNextByPos(pos)
+	for ring.IsUsing() {
+		slot, npos, err := ring.GetSlotNextByPos(pos)
 		if err != nil {
 			if err == sb.ErrEmpty {
 				time.Sleep(sb.TIME_DEF_WAIT)
@@ -263,11 +276,12 @@ func WriteRingToMultipartFile(sbuf *sr.StreamRing, file string) error {
 		}
 
 		// write slot
-		//err = WriteSlotToFile(out, slot, sbuf.Boundary)
+		//err = WriteSlotToFile(out, slot, ring.Boundary)
 
 		w := bufio.NewWriter(f)
-		err = WriteSlotToHandle(w, slot, sbuf.Boundary)
+		err = WriteSlotToHandle(w, slot, ring.Boundary)
 
+		fmt.Println("MW", slot)
 		pos = npos
 	}
 
@@ -292,6 +306,11 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 		return sb.ErrNull
 	}
 
+	if dsize > ss.LengthMax {
+		log.Printf("%d is too big than %d\n", dsize, ss.LengthMax)
+		return sb.ErrSize
+	}
+
 	ctype := mime.TypeByExtension(filepath.Ext(file))
 	if ctype == "" {
 		ctype = http.DetectContentType(data)
@@ -312,9 +331,9 @@ func WriteSlotToFile(f *os.File, ss *sr.StreamSlot, boundary string) error {
 	var err error
 
 	str := fmt.Sprintf("--%s\r\n", boundary)
-	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
-	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
-	str += fmt.Sprintf("x-Timestamp: %v; scale=millisecond\r\n", ss.Timestamp)
+	str += fmt.Sprintf("%s: %s\r\n", sb.STR_HDR_CONTENT_TYPE, ss.Type)
+	str += fmt.Sprintf("%s: %d\r\n", sb.STR_HDR_CONTENT_LENGTH, ss.Length)
+	str += fmt.Sprintf("%s: %v; scale=%s\r\n", sb.STR_HDR_TIMESTAMP, ss.Timestamp, sb.STR_TIME_PRECISION)
 	str += "\r\n"
 
 	f.WriteString(str)
@@ -332,9 +351,9 @@ func WriteSlotToHandle(w *bufio.Writer, ss *sr.StreamSlot, boundary string) erro
 	var err error
 
 	str := fmt.Sprintf("--%s\r\n", boundary)
-	str += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
-	str += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
-	str += fmt.Sprintf("x-Timestamp: %v\r\n", ss.Timestamp)
+	str += fmt.Sprintf("%s: %s\r\n", sb.STR_HDR_CONTENT_TYPE, ss.Type)
+	str += fmt.Sprintf("%s: %d\r\n", sb.STR_HDR_CONTENT_LENGTH, ss.Length)
+	str += fmt.Sprintf("%s: %v\r\n", sb.STR_HDR_TIMESTAMP, ss.Timestamp)
 	str += "\r\n"
 
 	_, err = w.WriteString(str)

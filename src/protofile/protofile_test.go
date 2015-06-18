@@ -24,6 +24,12 @@ func init() {
 // test for info handling
 //---------------------------------------------------------------------------------
 func TestHandleInfo(t *testing.T) {
+	f1 := NewProtoFile()
+	fmt.Println(f1)
+
+	f2 := NewProtoFile("../../static/image/*")
+	fmt.Println(f2)
+
 	file := NewProtoFile("../../static/image/*", "Testing")
 	fmt.Println(file)
 
@@ -37,28 +43,28 @@ func TestHandleInfo(t *testing.T) {
 //---------------------------------------------------------------------------------
 // test for read files and write to a file in multipart
 //---------------------------------------------------------------------------------
-func TestFileReadWrite(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, sb.MBYTE)
-	fmt.Println(sbuf)
+func TestReadDirWriteMultipart(t *testing.T) {
+	ring := sr.NewStreamRing(5, sb.MBYTE)
+	fmt.Println(ring)
 
 	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
-	go fr.ActReader(sbuf)
+	go fr.ActReader(ring)
 
 	time.Sleep(time.Millisecond)
 
 	fw := NewProtoFile("output.mjpg", "Testing")
-	fw.ActWriter(sbuf)
+	fw.ActWriter(ring)
 }
 
 //---------------------------------------------------------------------------------
 // test for reading multipart file
 //---------------------------------------------------------------------------------
 func TestReadMultipartFile(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, sb.MBYTE)
-	fmt.Println(sbuf)
+	ring := sr.NewStreamRing(5, sb.MBYTE)
+	fmt.Println(ring)
 
-	ReadMultipartFileToRing(sbuf, "output.mjpg")
-	fmt.Println(sbuf)
+	ReadMultipartFileToRing(ring, "output.mjpg")
+	fmt.Println(ring)
 }
 
 //----------------------------------E-----N-----D----------------------------------

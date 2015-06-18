@@ -21,7 +21,11 @@ buildtest bt:
 	go build
 	go test -v
 
-btf:
+btf1:
+	go build
+	go test -run TestReadDirWriteMultipart
+
+btf2:
 	go build
 	go test -run TestReadMultipartFile
 

@@ -39,7 +39,7 @@ func TestProtoInfo(t *testing.T) {
 //---------------------------------------------------------------------------------
 func TestEcho(t *testing.T) {
 	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
-	go rx.ActCatcher()
+	go rx.EchoServer()
 
 	time.Sleep(time.Millisecond)
 
@@ -50,23 +50,28 @@ func TestEcho(t *testing.T) {
 }
 
 //---------------------------------------------------------------------------------
-// test for single shoot
+// test for caster and server
 //---------------------------------------------------------------------------------
-func TestSingleShootCatch(t *testing.T) {
-	/*
-		rx := NewProtoWs("localhost", "8087", "8443", "Rx")
-		go ActCatcher(rx)
+func TestCastServe(t *testing.T) {
+	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
+	go rx.ActServer()
 
-		time.Sleep(time.Millisecond)
-	*/
+	time.Sleep(time.Millisecond)
+
 	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
-	tx.ActShooter()
+	tx.ActCaster()
 }
 
 //---------------------------------------------------------------------------------
-// test for multi shooters
+// test for server and player
 //---------------------------------------------------------------------------------
-func TestMultiShootCatch(t *testing.T) {
+func TestServePlay(t *testing.T) {
+}
+
+//---------------------------------------------------------------------------------
+// test for caster, server, and player
+//---------------------------------------------------------------------------------
+func TestCastServePlay(t *testing.T) {
 }
 
 // ----------------------------------E-----N-----D---------------------------------

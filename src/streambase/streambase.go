@@ -42,16 +42,17 @@ const (
 	LEN_MAX_MSG  = 1024
 
 	TIME_DEF_WAIT      = 100 * time.Microsecond
-	TIME_DEF_PRECISION = time.Millisecond
+	STR_TIME_PRECISION = "Millisecond"
 )
 
 // multipart headers
 const (
 	STR_HDR_CONTENT_TYPE   = "Content-Type"
 	STR_HDR_CONTENT_LENGTH = "Content-Length"
-	STR_HDR_TIMESTAMP      = "x-Timestamp"
-	STR_HDR_AUDIO_FORMAT   = "x-Audio-Format"
-	STR_HDR_VIDEO_FORMAT   = "x-Video-Format"
+	STR_HDR_TIMESTAMP      = "X-Timestamp"
+	STR_HDR_AUDIO_FORMAT   = "X-Audio-Format"
+	STR_HDR_VIDEO_FORMAT   = "X-Video-Format"
+	STR_HDR_GPS_FORMAT     = "X-GPS-Format"
 )
 
 var (
@@ -94,32 +95,32 @@ func GetTimestampSecond() int64 {
 // get current timestamp
 //---------------------------------------------------------------------------
 func GetTimestamp() int64 {
-	switch TIME_DEF_PRECISION {
-	case time.Second:
+	switch STR_TIME_PRECISION {
+	case "Second":
 		return GetTimestampSecond()
-	case time.Millisecond:
+	case "Millisecond":
 		return GetTimestampMillisecond()
-	case time.Microsecond:
+	case "Microsecond":
 		return GetTimestampMicrosecond()
-	case time.Nanosecond:
+	case "Nanosecond":
 		return GetTimestampNanosecond()
-	default:
-		return 0
 	}
+
+	return 0
 }
 
 //---------------------------------------------------------------------------
 // get wait time from timestamp difference
 //---------------------------------------------------------------------------
 func GetDuration(value int64) time.Duration {
-	switch TIME_DEF_PRECISION {
-	case time.Second:
+	switch STR_TIME_PRECISION {
+	case "Second":
 		value = value * 1000 * 1000 * 1000
-	case time.Millisecond:
+	case "Millisecond":
 		value = value * 1000 * 1000
-	case time.Microsecond:
+	case "Microsecond":
 		value = value * 1000
-	case time.Nanosecond:
+	case "Nanosecond":
 	}
 
 	return time.Duration(value)
