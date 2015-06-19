@@ -8,6 +8,7 @@ package protows
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -48,7 +49,7 @@ func TestEcho(t *testing.T) {
 
 	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
 	for i := 0; i < 5; i++ {
-		tx.EchoClient("Hello World!")
+		tx.EchoClient(strconv.Itoa(i+1) + "> Hello World!")
 	}
 }
 

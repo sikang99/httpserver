@@ -312,6 +312,7 @@ func (pw *ProtoWs) ActPlayer() (err error) {
 //---------------------------------------------------------------------------
 // connect
 // - https://code.google.com/p/go/source/browse/websocket/client.go?repo=net&r=d7ff1d8f275c5693a5fc301cbfdf0a6f89e4f57c
+// - http://andrewwdeane.blogspot.kr/2013/01/gobing-down-secure-websockets.html
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) Connect(hand string, sec ...string) (ws *websocket.Conn, err error) {
 	if sec == nil {
