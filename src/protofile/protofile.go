@@ -191,7 +191,7 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 
 	ss.Length = nl
 	ss.Type = p.Header.Get(sb.STR_HDR_CONTENT_TYPE)
-	ss.Timestamp = sb.GetTimestamp()
+	ss.Timestamp = sb.GetTimestampNow()
 	//fmt.Println(ss)
 
 	ts := p.Header.Get(sb.STR_HDR_TIMESTAMP)
@@ -319,7 +319,7 @@ func ReadFileToSlot(file string, ss *sr.StreamSlot) error {
 	copy(ss.Content, data)
 	ss.Length = dsize
 	ss.Type = ctype
-	ss.Timestamp = sb.GetTimestamp()
+	ss.Timestamp = sb.GetTimestampNow()
 
 	return err
 }

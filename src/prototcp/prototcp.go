@@ -364,7 +364,7 @@ func (pt *ProtoTcp) WriteDataToStream(w *bufio.Writer, ring *sr.StreamRing) erro
 
 	for pos := 0; ; pos++ {
 		slot, _ := ring.GetSlotByPos(pos)
-		slot.Timestamp = sb.GetTimestamp()
+		slot.Timestamp = sb.GetTimestampNow()
 
 		err = pt.WriteSlotInFrame(w, slot)
 		if err != nil {
@@ -532,7 +532,7 @@ func (pt *ProtoTcp) ResponseGet(w *bufio.Writer) error {
 //---------------------------------------------------------------------------
 // read a message in http header style
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadFrameToSlot(r *bufio.Reader, ss *sr.StreamSlot) error {
+func (pt *ProtoTcp) ReadFrameToSlot(r *bufio.Reader, slot *sr.StreamSlot) error {
 	var err error
 
 	headers, err := ParseFrameHeader(r)
@@ -548,8 +548,8 @@ func (pt *ProtoTcp) ReadFrameToSlot(r *bufio.Reader, ss *sr.StreamSlot) error {
 	}
 
 	if clen > 0 {
-		ss.Type = headers[sb.STR_HDR_CONTENT_TYPE]
-		err = pt.ReadBodyToSlot(r, clen, ss)
+		slot.Type = headers[sb.STR_HDR_CONTENT_TYPE]
+		err = pt.ReadBodyToSlot(r, clen, slot)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -684,19 +684,19 @@ func (pt *ProtoTcp) ReadBodyToData(r *bufio.Reader, clen int) ([]byte, error) {
 //---------------------------------------------------------------------------
 // read(recv) body of message to slot of ring buffer
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadBodyToSlot(r *bufio.Reader, clen int, ss *sr.StreamSlot) error {
+func (pt *ProtoTcp) ReadBodyToSlot(r *bufio.Reader, clen int, slot *sr.StreamSlot) error {
 	var err error
 
-	if clen > ss.LengthMax {
-		log.Printf("%d is too big than %d\n", clen, ss.LengthMax)
+	if clen > slot.LengthMax {
+		log.Printf("%d is too big than %d\n", clen, slot.LengthMax)
 		return sb.ErrSize
 	}
 
-	ss.Length = 0
+	slot.Length = 0
 
 	tn := 0
 	for tn < clen {
-		n, err := r.Read(ss.Content[tn:])
+		n, err := r.Read(slot.Content[tn:])
 		if err != nil {
 			log.Println(err)
 			break
@@ -704,8 +704,8 @@ func (pt *ProtoTcp) ReadBodyToSlot(r *bufio.Reader, clen int, ss *sr.StreamSlot)
 		tn += n
 	}
 
-	ss.Length = clen
-	ss.Timestamp = sb.GetTimestamp()
+	slot.Length = clen
+	slot.Timestamp = sb.GetTimestampNow()
 
 	//fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
 	return err
@@ -794,7 +794,7 @@ func (pt *ProtoTcp) WriteDataInFrame(w *bufio.Writer, data []byte, ctype string)
 
 	slot.Type = ctype
 	slot.Length = clen
-	slot.Timestamp = sb.GetTimestamp()
+	slot.Timestamp = sb.GetTimestampNow()
 	copy(slot.Content, data)
 
 	// send the slot
@@ -810,19 +810,19 @@ func (pt *ProtoTcp) WriteDataInFrame(w *bufio.Writer, data []byte, ctype string)
 //---------------------------------------------------------------------------
 // send a frame of slot data
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) WriteSlotInFrame(w *bufio.Writer, ss *sr.StreamSlot) error {
+func (pt *ProtoTcp) WriteSlotInFrame(w *bufio.Writer, slot *sr.StreamSlot) error {
 	var err error
 
-	if ss.Length > ss.LengthMax {
-		log.Printf("%d is too big than %d\n", ss.Length, ss.LengthMax)
+	if slot.Length > slot.LengthMax {
+		log.Printf("%d is too big than %d\n", slot.Length, slot.LengthMax)
 		return sb.ErrSize
 	}
 
 	// make frame header
 	req := fmt.Sprintf("\r\n--%s\r\n", pt.Boundary)
-	req += fmt.Sprintf("Content-Type: %s\r\n", ss.Type)
-	req += fmt.Sprintf("Content-Length: %d\r\n", ss.Length)
-	req += fmt.Sprintf("x-Timestamp: %v\r\n", ss.Timestamp)
+	req += fmt.Sprintf("Content-Type: %s\r\n", slot.Type)
+	req += fmt.Sprintf("Content-Length: %d\r\n", slot.Length)
+	req += fmt.Sprintf("x-Timestamp: %v\r\n", slot.Timestamp)
 	req += "\r\n"
 
 	//defer fmt.Println("->", req)
@@ -835,8 +835,8 @@ func (pt *ProtoTcp) WriteSlotInFrame(w *bufio.Writer, ss *sr.StreamSlot) error {
 	}
 
 	// write frame body
-	if ss.Length > 0 {
-		_, err = w.Write(ss.Content[:ss.Length])
+	if slot.Length > 0 {
+		_, err = w.Write(slot.Content[:slot.Length])
 		if err != nil {
 			log.Println(err)
 			return err
@@ -942,7 +942,7 @@ func RecvStreamToData(conn net.Conn) error {
 //---------------------------------------------------------------------------
 // recv a frame to slot
 //---------------------------------------------------------------------------
-func RecvFrameToSlot(conn net.Conn, ss *sr.StreamSlot) error {
+func RecvFrameToSlot(conn net.Conn, slot *sr.StreamSlot) error {
 	var err error
 
 	headers, err := RecvFrameHeader(conn)
@@ -958,8 +958,8 @@ func RecvFrameToSlot(conn net.Conn, ss *sr.StreamSlot) error {
 	}
 
 	if clen > 0 {
-		ss.Type = headers[sb.STR_HDR_CONTENT_TYPE]
-		err = RecvFrameBodyToSlot(conn, clen, ss)
+		slot.Type = headers[sb.STR_HDR_CONTENT_TYPE]
+		err = RecvFrameBodyToSlot(conn, slot, clen)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -1119,18 +1119,22 @@ func RecvFrameBodyToData(conn net.Conn, clen int) error {
 //---------------------------------------------------------------------------
 // recv frame body to data
 //---------------------------------------------------------------------------
-func RecvFrameBodyToSlot(conn net.Conn, clen int, ss *sr.StreamSlot) error {
+func RecvFrameBodyToSlot(conn net.Conn, slot *sr.StreamSlot, clen int) error {
 	var err error
+
+	slot.Length = 0
 
 	tn := 0
 	for tn < clen {
-		n, err := conn.Read(ss.Content[tn:])
+		n, err := conn.Read(slot.Content[tn:])
 		if err != nil {
 			log.Println(err)
 			break
 		}
 		tn += n
 	}
+
+	slot.Length = tn
 
 	return err
 }

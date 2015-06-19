@@ -12,6 +12,7 @@ package protows
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -29,17 +30,18 @@ import (
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 
+	"github.com/fatih/color"
 	"golang.org/x/net/websocket"
 )
 
 //---------------------------------------------------------------------------
 const (
-	STR_ECHO_CLIENT = "Echo WS Client"
-	STR_ECHO_SERVER = "Echo WS Server"
+	STR_ECHO_CLIENT = "Echo WebSocket Client"
+	STR_ECHO_SERVER = "Echo WebSocket Server"
 
-	STR_WS_CASTER = "Happy Media WS Caster"
-	STR_WS_SERVER = "Happy Media WS Server"
-	STR_WS_PLAYER = "Happy Media WS Player"
+	STR_WS_CASTER = "Happy Media WebSocket Caster"
+	STR_WS_SERVER = "Happy Media WebSocket Server"
+	STR_WS_PLAYER = "Happy Media WebSocket Player"
 )
 
 type ProtoWs struct {
@@ -50,6 +52,7 @@ type ProtoWs struct {
 	Method   string
 	Boundary string
 	Conn     *websocket.Conn
+	Ring     *sr.StreamRing
 }
 
 //---------------------------------------------------------------------------
@@ -59,6 +62,7 @@ func (pw *ProtoWs) String() string {
 	str := fmt.Sprintf("\tHost: %s", pw.Host)
 	str += fmt.Sprintf("\tPort: %s,%s", pw.Port, pw.PortTls)
 	str += fmt.Sprintf("\tConn: %v", pw.Conn)
+	str += fmt.Sprintf("\tMethod: %s", pw.Method)
 	str += fmt.Sprintf("\tBoundary: %s", pw.Boundary)
 	str += fmt.Sprintf("\tDesc: %s", pw.Desc)
 	return str
@@ -126,18 +130,20 @@ func (pw *ProtoWs) Clear() {
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) EchoClient(smsg string) error {
 	var err error
-	log.Printf("%s\n", STR_ECHO_CLIENT)
+	log.Printf("%s to %s:%s,%s\n", STR_ECHO_CLIENT, pw.Host, pw.Port, pw.PortTls)
 
-	origin := fmt.Sprintf("http://%s/", pw.Host)
-	url := fmt.Sprintf("ws://%s:%s/echo", pw.Host, pw.Port)
+	/*
+		origin := fmt.Sprintf("http://%s/", pw.Host)
+		url := fmt.Sprintf("ws://%s:%s/echo", pw.Host, pw.Port)
+		ws, err := websocket.Dial(url, "", origin)
+	*/
 
-	ws, err := websocket.Dial(url, "", origin)
+	ws, err := pw.Connect("echo", "sec")
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	//smsg := "Hello World!"
 	err = websocket.Message.Send(ws, smsg)
 	if err != nil {
 		log.Fatalln(err)
@@ -158,18 +164,29 @@ func (pw *ProtoWs) EchoClient(smsg string) error {
 //---------------------------------------------------------------------------
 // Echo server
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) EchoServer() error {
-	var err error
+func (pw *ProtoWs) EchoServer() (err error) {
 	log.Printf("%s\n", STR_ECHO_SERVER)
 
 	http.Handle("/echo", websocket.Handler(pw.EchoHandler))
-	log.Fatal(http.ListenAndServe(":"+pw.Port, nil))
+	//log.Fatal(http.ListenAndServe(":"+pw.Port, nil))
+
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	// HTTP server
+	go pw.serveHttp(&wg)
+
+	wg.Add(1)
+	// HTTPS server
+	go pw.serveHttps(&wg)
+
+	wg.Wait()
 
 	return err
 }
 
 //---------------------------------------------------------------------------
-// websocket echo handler
+// echo handler
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 	var err error
@@ -182,16 +199,16 @@ func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 
 	case "change":
 		for {
-			var reply string
+			var rmsg string
 
-			err = websocket.Message.Receive(ws, &reply)
+			err = websocket.Message.Receive(ws, &rmsg)
 			if err != nil {
 				log.Println(err)
 				break
 			}
-			//log.Println("Received from client: " + reply)
+			//log.Println("Received from client: " + rmsg)
 
-			smsg := "Echo " + reply
+			smsg := "Echo " + rmsg
 			err = websocket.Message.Send(ws, smsg)
 			if err != nil {
 				log.Println(err)
@@ -201,21 +218,17 @@ func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 		}
 
 	default:
-		log.Println("unknown mode")
+		log.Println("unknown echo mode")
 	}
 }
 
 //---------------------------------------------------------------------------
-// caster for test and debugging
+// Caster for test and debugging
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActCaster() error {
-	var err error
+func (pw *ProtoWs) ActCaster(sec ...string) (err error) {
 	log.Printf("%s\n", STR_WS_CASTER)
 
-	origin := fmt.Sprintf("http://%s/", pw.Host)
-	url := fmt.Sprintf("ws://%s:%s/stream", pw.Host, pw.Port)
-
-	ws, err := websocket.Dial(url, "", origin)
+	ws, err := pw.Connect("stream")
 	if err != nil {
 		log.Println(err)
 		return err
@@ -237,11 +250,12 @@ func (pw *ProtoWs) ActCaster() error {
 }
 
 //---------------------------------------------------------------------------
-// websocket server
+// Server
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActServer() error {
-	var err error
+func (pw *ProtoWs) ActServer() (err error) {
 	log.Printf("%s on ws:%s and wss:%s\n", STR_WS_SERVER, pw.Port, pw.PortTls)
+
+	pw.Ring = sr.NewStreamRing(2, sb.MBYTE)
 
 	http.Handle("/stream", websocket.Handler(pw.StreamHandler))
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
@@ -262,10 +276,9 @@ func (pw *ProtoWs) ActServer() error {
 }
 
 //---------------------------------------------------------------------------
-// websocket player
+// Player
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActPlayer() error {
-	var err error
+func (pw *ProtoWs) ActPlayer() (err error) {
 	log.Printf("%s\n", STR_WS_PLAYER)
 
 	origin := fmt.Sprintf("http://%s/", pw.Host)
@@ -287,7 +300,7 @@ func (pw *ProtoWs) ActPlayer() error {
 	}
 
 	// recv multipart stream from server
-	err = pw.ReadMultipartToData(r)
+	err = ReadMultipartToData(r, pw.Boundary)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -296,7 +309,40 @@ func (pw *ProtoWs) ActPlayer() error {
 	return err
 }
 
-//--------------------------------------------------------------------------r
+//---------------------------------------------------------------------------
+// connect
+// - https://code.google.com/p/go/source/browse/websocket/client.go?repo=net&r=d7ff1d8f275c5693a5fc301cbfdf0a6f89e4f57c
+//---------------------------------------------------------------------------
+func (pw *ProtoWs) Connect(hand string, sec ...string) (ws *websocket.Conn, err error) {
+	if sec == nil {
+		origin := fmt.Sprintf("http://%s:%s/", pw.Host, pw.Port)
+		url := fmt.Sprintf("ws://%s:%s/%s", pw.Host, pw.Port, hand)
+
+		ws, err = websocket.Dial(url, "", origin)
+	} else {
+		origin := fmt.Sprintf("http://%s:%s/", pw.Host, pw.PortTls)
+		url := fmt.Sprintf("wss://%s:%s/%s", pw.Host, pw.PortTls, hand)
+
+		wconf, err := websocket.NewConfig(url, origin)
+		cert, err := tls.LoadX509KeyPair("sec/cert.pem", "sec/key.pem")
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+		tconf := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+		wconf.TlsConfig = &tconf
+
+		ws, err = websocket.DialConfig(wconf)
+	}
+
+	if err == nil {
+		log.Println("connected")
+	}
+
+	return ws, err
+}
+
+//---------------------------------------------------------------------------
 // start server to receive requests
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) serveHttp(wg *sync.WaitGroup) {
@@ -329,9 +375,11 @@ func (pw *ProtoWs) serveHttps(wg *sync.WaitGroup) {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket stream handler in the server
+// stream handler in the server
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
+	var err error
+
 	log.Printf("in from %s\n", ws.RemoteAddr())
 	defer log.Printf("out %s\n", ws.RemoteAddr())
 	defer ws.Close()
@@ -339,16 +387,7 @@ func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
 	r := bufio.NewReader(ws)
 	w := bufio.NewWriter(ws)
 
-	ring := sr.NewStreamRing(2, sb.MBYTE)
-
-	err := pw.HandleRequest(r, w, ring)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	//err = pw.ReadMultipartToData(r, pw.Boundary)
-	err = pw.ReadMultipartToRing(r, ring)
+	err = pw.HandleRequest(r, w, pw.Ring)
 	if err != nil {
 		log.Println(err)
 		return
@@ -363,7 +402,7 @@ func (pw *ProtoWs) RequestGet(r *bufio.Reader, w *bufio.Writer) error {
 
 	// send GET request
 	req := "GET /stream HTTP/1.1\r\n"
-	req += fmt.Sprintf("User-Agent: %s\r\n", STR_WS_PLAYER)
+	req += fmt.Sprintf("%s: %s\r\n", sb.STR_HDR_USER_AGENT, STR_WS_PLAYER)
 	req += "\r\n"
 
 	_, err = w.Write([]byte(req))
@@ -373,10 +412,10 @@ func (pw *ProtoWs) RequestGet(r *bufio.Reader, w *bufio.Writer) error {
 	}
 	w.Flush()
 
-	log.Printf("SEND [%d]\n%s", len(req), req)
+	log.Printf("SEND [%d]\n%s", len(req), color.GreenString(req))
 
 	// recv response
-	err = pw.ReadMessage(r)
+	err = pw.ReadResponse(r)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -393,8 +432,8 @@ func (pw *ProtoWs) RequestPost(r *bufio.Reader, w *bufio.Writer) error {
 
 	// send POST request
 	req := "POST /stream HTTP/1.1\r\n"
-	req += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pw.Boundary)
-	req += fmt.Sprintf("User-Agent: %s\r\n", STR_WS_CASTER)
+	req += fmt.Sprintf("%s: multipart/x-mixed-replace; boundary=%s\r\n", sb.STR_HDR_CONTENT_TYPE, pw.Boundary)
+	req += fmt.Sprintf("%s: %s\r\n", sb.STR_HDR_USER_AGENT, STR_WS_CASTER)
 	req += "\r\n"
 
 	_, err = w.Write([]byte(req))
@@ -404,10 +443,10 @@ func (pw *ProtoWs) RequestPost(r *bufio.Reader, w *bufio.Writer) error {
 	}
 	w.Flush()
 
-	log.Printf("SEND [%d]\n%s", len(req), req)
+	log.Printf("SEND [%d]\n%s", len(req), color.GreenString(req))
 
 	// recv response
-	err = pw.ReadMessage(r)
+	err = pw.ReadResponse(r)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -423,10 +462,10 @@ func (pw *ProtoWs) ResponsePost(w *bufio.Writer) error {
 	var err error
 
 	res := "HTTP/1.1 200 Ok\r\n"
-	res += fmt.Sprintf("Server: %s\r\n", STR_WS_SERVER)
+	res += fmt.Sprintf("%s: %s\r\n", sb.STR_HDR_SERVER, STR_WS_SERVER)
 	res += "\r\n"
 
-	defer log.Printf("SEND [%d]\n%s", len(res), res)
+	defer log.Printf("SEND [%d]\n%s", len(res), color.CyanString(res))
 
 	_, err = w.Write([]byte(res))
 	if err != nil {
@@ -445,11 +484,11 @@ func (pw *ProtoWs) ResponseGet(w *bufio.Writer) error {
 	var err error
 
 	res := "HTTP/1.1 200 Ok\r\n"
-	res += fmt.Sprintf("Server: %s\r\n", STR_WS_SERVER)
-	res += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pw.Boundary)
+	res += fmt.Sprintf("%s: multipart/x-mixed-replace; boundary=%s\r\n", sb.STR_HDR_CONTENT_TYPE, pw.Boundary)
+	res += fmt.Sprintf("%s: %s\r\n", sb.STR_HDR_SERVER, STR_WS_SERVER)
 	res += "\r\n"
 
-	defer log.Printf("SEND [%d]\n%s", len(res), res)
+	defer log.Printf("SEND [%d]\n%s", len(res), color.CyanString(res))
 
 	_, err = w.Write([]byte(res))
 	if err != nil {
@@ -462,13 +501,13 @@ func (pw *ProtoWs) ResponseGet(w *bufio.Writer) error {
 }
 
 //---------------------------------------------------------------------------
-// WebSocket handle a client request in the server
+// handle a client request in the server
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) HandleRequest(r *bufio.Reader, w *bufio.Writer, ring *sr.StreamRing) error {
 	var err error
 
 	// recv request and parse it
-	err = pw.ReadMessage(r)
+	err = pw.ReadRequest(r)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -477,24 +516,27 @@ func (pw *ProtoWs) HandleRequest(r *bufio.Reader, w *bufio.Writer, ring *sr.Stre
 	// send response and multipart
 	switch pw.Method {
 	case "POST":
+		ring.Boundary = pw.Boundary
+
 		err = pw.ResponsePost(w)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
-		err = pw.ReadMultipartToRing(r, ring)
+		err = ReadMultipartToRing(r, ring)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
 	case "GET":
+		pw.Boundary = ring.Boundary
+
 		err = pw.ResponseGet(w)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
-		err = pw.WriteRingInMultipart(w, ring)
-		//err = pt.WriteDataToStream(w, ring)
+		err = WriteRingInMultipart(w, ring)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -507,159 +549,51 @@ func (pw *ProtoWs) HandleRequest(r *bufio.Reader, w *bufio.Writer, ring *sr.Stre
 }
 
 //---------------------------------------------------------------------------
-// read http message
+// read http request message
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadMessage(r *bufio.Reader) error {
+func (pw *ProtoWs) ReadRequest(r *bufio.Reader) error {
 	var err error
 
-	headers, err := pw.ReadMessageHeader(r)
+	req, err := http.ReadRequest(r)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+	//fmt.Println(req)
 
-	value, ok := headers[sb.STR_HDR_CONTENT_TYPE]
-	if ok {
-		pw.Boundary, err = GetTypeBoundary(value)
-	}
-
-	clen := 0
-	value, ok = headers[sb.STR_HDR_CONTENT_LENGTH]
-	if ok {
-		clen, _ = strconv.Atoi(value)
-	}
-
-	if clen > 0 {
-		_, err = pw.ReadBodyToData(r, clen)
+	pw.Method = req.Method
+	ctype := req.Header.Get(sb.STR_HDR_CONTENT_TYPE)
+	if ctype != "" {
+		pw.Boundary, err = GetTypeBoundary(req.Header.Get(sb.STR_HDR_CONTENT_TYPE))
 		if err != nil {
 			log.Println(err)
 			return err
 		}
 	}
+	//fmt.Println(pw)
 
 	return err
 }
 
 //---------------------------------------------------------------------------
-// read header of message and return a map
+// read http response message
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadMessageHeader(r *bufio.Reader) (map[string]string, error) {
+func (pw *ProtoWs) ReadResponse(r *bufio.Reader) error {
 	var err error
 
-	result := make(map[string]string)
-
-	// parse a request line
-	line, _, err := r.ReadLine()
-	if err != nil {
-		log.Println(err)
-		return result, err
-	}
-
-	res := strings.Fields(string(line))
-	pw.Method = res[0]
-
-	// parse header lines
-	for {
-		line, _, err := r.ReadLine()
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		//fmt.Println(string(line))
-
-		if string(line) == "" {
-			break
-		}
-
-		keyvalue := strings.SplitN(string(line), ":", 2)
-		if len(keyvalue) > 1 {
-			result[keyvalue[0]] = strings.TrimSpace(keyvalue[1])
-		}
-	}
-
-	//fmt.Println(result)
-	return result, err
-}
-
-//---------------------------------------------------------------------------
-// read(recv) body of message to data
-//---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadBodyToData(r *bufio.Reader, clen int) ([]byte, error) {
-	var err error
-
-	data := make([]byte, clen)
-
-	tn := 0
-	for tn < clen {
-		n, err := r.Read(data[tn:])
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		tn += n
-	}
-
-	//fmt.Printf(string(data[:tn]))
-	fmt.Printf("[DATA] (%d/%d)\n\n", tn, clen)
-	return data, err
-}
-
-//---------------------------------------------------------------------------
-// WebSocket parse request
-//---------------------------------------------------------------------------
-func ParseRequest(msg string) error {
-	var err error
-
-	req, err := GetHttpRequest(msg)
+	res, err := http.ReadResponse(r, nil)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	_, err = GetTypeBoundary(req.Header.Get(sb.STR_HDR_CONTENT_TYPE))
-	if err != nil {
-		log.Println(err)
-		return err
+	//fmt.Println(res)
+
+	if res.StatusCode != 200 {
+		log.Println(res.Status)
+		return sb.ErrStatus
 	}
 
 	return err
-}
-
-//---------------------------------------------------------------------------
-// get http request from message
-//---------------------------------------------------------------------------
-func GetHttpRequest(msg string) (*http.Request, error) {
-	var err error
-
-	reader := bufio.NewReader(strings.NewReader(msg))
-	req, err := http.ReadRequest(reader)
-	if err != nil {
-		log.Println(err)
-		return req, err
-	}
-	//fmt.Println(req.Header)
-
-	return req, err
-}
-
-//---------------------------------------------------------------------------
-// get http header from message
-//---------------------------------------------------------------------------
-func GetHttpHeader(msg string) (http.Header, error) {
-	var err error
-
-	reader := bufio.NewReader(strings.NewReader(msg))
-	tp := textproto.NewReader(reader)
-
-	mimeHeader, err := tp.ReadMIMEHeader()
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
-	httpHeader := http.Header(mimeHeader)
-	//fmt.Println(httpHeader)
-
-	return httpHeader, err
 }
 
 //---------------------------------------------------------------------------
@@ -672,7 +606,7 @@ func GetTypeBoundary(ctype string) (string, error) {
 	//fmt.Printf("%v %v\n", params, req.Header.Get("Content-Type"))
 	if err != nil {
 		log.Printf("ParseMediaType: %s %v", mt, err)
-		return "", err
+		return "", sb.ErrParse
 	}
 
 	boundary := params["boundary"]
@@ -758,17 +692,19 @@ func WriteFileInPart(mw *multipart.Writer, file string) error {
 //---------------------------------------------------------------------------
 // recv multipart (for debugging)
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadMultipartToData(r *bufio.Reader) error {
+func ReadMultipartToData(r *bufio.Reader, boundary string) error {
 	var err error
 
-	mr := multipart.NewReader(r, pw.Boundary)
+	slot := sr.NewStreamSlot()
+	mr := multipart.NewReader(r, boundary)
 
 	for {
-		err = ReadPartToData(mr)
+		err = ReadPartToSlot(mr, slot)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
+		fmt.Println(">4", slot)
 	}
 
 	return err
@@ -777,8 +713,14 @@ func (pw *ProtoWs) ReadMultipartToData(r *bufio.Reader) error {
 //---------------------------------------------------------------------------
 // recv multipart to ring buffer
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ReadMultipartToRing(r *bufio.Reader, ring *sr.StreamRing) error {
+func ReadMultipartToRing(r *bufio.Reader, ring *sr.StreamRing) error {
 	var err error
+
+	err = ring.SetStatusUsing()
+	if err != nil {
+		return sb.ErrStatus
+	}
+	defer ring.Reset()
 
 	mr := multipart.NewReader(r, ring.Boundary)
 
@@ -800,7 +742,7 @@ func (pw *ProtoWs) ReadMultipartToRing(r *bufio.Reader, ring *sr.StreamRing) err
 //---------------------------------------------------------------------------
 // recv multipart to ring buffer
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) WriteRingInMultipart(w *bufio.Writer, ring *sr.StreamRing) error {
+func WriteRingInMultipart(w *bufio.Writer, ring *sr.StreamRing) error {
 	var err error
 
 	if !ring.IsUsing() {
@@ -848,7 +790,7 @@ func WriteDataInPart(mw *multipart.Writer, data []byte, dsize int, dtype string)
 
 	slot.Type = dtype
 	slot.Length = dsize
-	slot.Timestamp = sb.GetTimestamp()
+	slot.Timestamp = sb.GetTimestampNow()
 	copy(slot.Content, data)
 
 	// send the slot
@@ -864,105 +806,90 @@ func WriteDataInPart(mw *multipart.Writer, data []byte, dsize int, dtype string)
 //---------------------------------------------------------------------------
 // send a part of multipart
 //---------------------------------------------------------------------------
-func WriteSlotInPart(mw *multipart.Writer, ss *sr.StreamSlot) error {
+func WriteSlotInPart(mw *multipart.Writer, slot *sr.StreamSlot) error {
 	var err error
 
 	buf := new(bytes.Buffer)
 
 	part, err := mw.CreatePart(textproto.MIMEHeader{
-		sb.STR_HDR_CONTENT_TYPE:   {ss.Type},
-		sb.STR_HDR_CONTENT_LENGTH: {strconv.Itoa(ss.Length)},
+		sb.STR_HDR_CONTENT_TYPE:   {slot.Type},
+		sb.STR_HDR_CONTENT_LENGTH: {strconv.Itoa(slot.Length)},
+		sb.STR_HDR_TIMESTAMP:      {strconv.FormatInt(slot.Timestamp, 10)},
 	})
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	_, err = buf.Write(ss.Content[:ss.Length])
+	_, err = buf.Write(slot.Content[:slot.Length])
 	_, err = buf.WriteTo(part)
 
 	return err
 }
 
 //---------------------------------------------------------------------------
-// recv a part of multipart
-//---------------------------------------------------------------------------
-func ReadPartToData(mr *multipart.Reader) error {
-	var err error
-
-	p, nl, err := ReadPartHeader(mr)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	ss := sr.NewStreamSlotBySize(nl)
-
-	err = ReadPartBodyToSlot(p, nl, ss)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	fmt.Printf("%d [%0x-%0x]\n", nl, ss.Content[:2], ss.Content[nl-2:nl])
-	return err
-}
-
-//---------------------------------------------------------------------------
 // recv a part to slot of ring
 //---------------------------------------------------------------------------
-func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
+func ReadPartToSlot(mr *multipart.Reader, slot *sr.StreamSlot) error {
 	var err error
 
-	p, nl, err := ReadPartHeader(mr)
+	// read a part
+	p, err := mr.NextPart()
+	if err != nil { // io.EOF
+		log.Println(err)
+		return err
+	}
+
+	nl, err := ParsePartHeaderToSlot(p, slot)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	err = ReadPartBodyToSlot(p, nl, ss)
+	err = ReadPartBodyToSlot(p, slot, nl)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	fmt.Printf("%d [%0x-%0x]\n", nl, ss.Content[:2], ss.Content[nl-2:nl])
+	fmt.Println(">2", slot)
 	return err
 }
 
 //---------------------------------------------------------------------------
 // read a part header and parse it
 //---------------------------------------------------------------------------
-func ReadPartHeader(mr *multipart.Reader) (*multipart.Part, int, error) {
+func ParsePartHeaderToSlot(p *multipart.Part, slot *sr.StreamSlot) (int, error) {
 	var err error
 
-	p, err := mr.NextPart()
-	if err != nil { // io.EOF
-		log.Println(err)
-		return p, 0, err
-	}
+	// get header information of each part
+	stamp := p.Header.Get(sb.STR_HDR_TIMESTAMP)
+	slot.Timestamp = sb.GetTimestampFromString(stamp)
+
+	slot.Type = p.Header.Get(sb.STR_HDR_CONTENT_TYPE)
 
 	sl := p.Header.Get(sb.STR_HDR_CONTENT_LENGTH)
 	nl, err := strconv.Atoi(sl)
 	if err != nil {
 		log.Printf("%s %s -> %d\n", p.Header, sl, nl)
-		return p, nl, err
+		return nl, err
 	}
 
-	return p, nl, err
+	return nl, err
 }
 
 //---------------------------------------------------------------------------
 // read a part body to slot
 //---------------------------------------------------------------------------
-func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
+func ReadPartBodyToSlot(p *multipart.Part, slot *sr.StreamSlot, nl int) error {
 	var err error
 
-	ss.Length = 0
+	// to prevent from handling incomplete data
+	slot.Length = 0
 
 	var tn int
 	for tn < nl {
-		n, err := p.Read(ss.Content[tn:])
+		n, err := p.Read(slot.Content[tn:])
 		if err != nil {
 			log.Println(err)
 			return err
@@ -970,7 +897,7 @@ func ReadPartBodyToSlot(p *multipart.Part, nl int, ss *sr.StreamSlot) error {
 		tn += n
 	}
 
-	ss.Length = nl
+	slot.Length = nl
 
 	return err
 }

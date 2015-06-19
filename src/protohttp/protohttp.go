@@ -229,7 +229,7 @@ func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 
 	ss.Length = nl
 	ss.Type = p.Header.Get(sb.STR_HDR_CONTENT_TYPE)
-	ss.Timestamp = sb.GetTimestamp()
+	ss.Timestamp = sb.GetTimestampNow()
 	//fmt.Println(ss)
 
 	return err

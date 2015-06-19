@@ -12,18 +12,21 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"time"
 )
 
 //----------------------------------------------------------------------------------
 const (
 	_     = iota
-	KBYTE = 1024             // Kilo
+	KBYTE = 1024             // Kilo byte
 	MBYTE = 1 << (10 * iota) // Mega
 	GBYTE                    // Giga
 	TBYTE                    // Tera
 	PBYTE                    // Peta
-	EBYTE                    // Exa byte
+	EBYTE                    // Exa
+	ZBYTE                    // Zetta
+	YBYTE                    // Yotta
 )
 
 const (
@@ -58,6 +61,8 @@ const (
 )
 
 var (
+	ErrFound   = errors.New("error not found")
+	ErrParse   = errors.New("error to parse")
 	ErrEmpty   = errors.New("error empty")
 	ErrFull    = errors.New("error full")
 	ErrNull    = errors.New("error null")
@@ -96,7 +101,15 @@ func GetTimestampSecond() int64 {
 //---------------------------------------------------------------------------
 // get current timestamp
 //---------------------------------------------------------------------------
-func GetTimestamp() int64 {
+func GetTimestampFromString(str string) int64 {
+	tstamp, _ := strconv.ParseInt(str, 0, 64)
+	return tstamp
+}
+
+//---------------------------------------------------------------------------
+// get current timestamp
+//---------------------------------------------------------------------------
+func GetTimestampNow() int64 {
 	switch STR_TIME_PRECISION {
 	case "Second":
 		return GetTimestampSecond()

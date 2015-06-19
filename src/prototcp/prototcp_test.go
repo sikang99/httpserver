@@ -80,7 +80,7 @@ func TestServePlay(t *testing.T) {
 				slot, _ := sbuf.GetSlotIn()
 				slot.Type = "test/data"
 				slot.Length = i * 100 * sb.KBYTE
-				slot.Timestamp = sb.GetTimestamp()
+				slot.Timestamp = sb.GetTimestampNow()
 				sbuf.SetPosInByPos(i)
 				i++
 			default:

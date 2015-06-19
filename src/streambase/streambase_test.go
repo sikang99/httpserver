@@ -35,7 +35,7 @@ func TestTimestamp(t *testing.T) {
 	tstring := time.Unix(ctime, 0).Format(time.RFC3339)
 	fmt.Printf("\tCurrent Timestamp: %v, %v\n", ctime, tstring)
 
-	dsec := GetTimestamp()
+	dsec := GetTimestampNow()
 	sec := GetTimestampSecond()
 	msec := GetTimestampMillisecond()
 	nsec := GetTimestampNanosecond()
