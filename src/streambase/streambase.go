@@ -12,8 +12,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"time"
+
+	"github.com/fatih/color"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 //----------------------------------------------------------------------------------
@@ -30,6 +35,7 @@ const (
 )
 
 const (
+	STR_DEF_MODE = "normal" // or "secure"
 	STR_DEF_HOST = "localhost"
 	STR_DEF_PORT = "8080"
 	STR_DEF_PTLS = "8443"
@@ -171,12 +177,18 @@ func HexDump(data []byte) {
 }
 
 //---------------------------------------------------------------------------
-// function template
+// stdin is terminal or not
+// - http://rosettacode.org/wiki/Check_input_device_is_a_terminal
 //---------------------------------------------------------------------------
-func malfunction() error {
-	var err error
+func IsTerminal() bool {
+	return terminal.IsTerminal(int(os.Stdin.Fd()))
+}
 
-	return err
+//---------------------------------------------------------------------------
+// print err in log
+//---------------------------------------------------------------------------
+func LogPrintln(err error) {
+	log.Println(color.RedString(fmt.Sprint(err)))
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

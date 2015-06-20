@@ -1,6 +1,7 @@
 //=================================================================================
 // Author: Stoney Kang, sikang99@gmail.com, 2015
 // Package for WebSocket Test
+// - http://talks.golang.kr/2015/go-test.slide
 //=================================================================================
 
 package protows
@@ -13,9 +14,17 @@ import (
 	"time"
 )
 
+//---------------------------------------------------------------------------------
 func init() {
 	//log.SetFlags(log.Lshortfile)
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
+//---------------------------------------------------------------------------------
+// test for input
+//---------------------------------------------------------------------------------
+func testMain(m *testing.M) {
+	m.Run()
 }
 
 //---------------------------------------------------------------------------------
@@ -39,9 +48,17 @@ func TestProtoInfo(t *testing.T) {
 }
 
 //---------------------------------------------------------------------------------
-// test for echo
+// test for echo server
 //---------------------------------------------------------------------------------
-func TestEcho(t *testing.T) {
+func TestEchoReceive(t *testing.T) {
+	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
+	rx.EchoServer()
+}
+
+//---------------------------------------------------------------------------------
+// test for echo send and receive
+//---------------------------------------------------------------------------------
+func TestEchoSendReceive(t *testing.T) {
 	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
 	go rx.EchoServer()
 
@@ -51,50 +68,59 @@ func TestEcho(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		tx.EchoClient(strconv.Itoa(i+1) + "> Hello World!")
 	}
+	tx.EchoClient("quit")
+}
+
+//---------------------------------------------------------------------------------
+// test for stream server
+//---------------------------------------------------------------------------------
+func TestStreamServe(t *testing.T) {
+	rx := NewProtoWs("localhost", "8087", "8443", "Nx")
+	rx.StreamServer()
 }
 
 //---------------------------------------------------------------------------------
 // test for caster and server
 //---------------------------------------------------------------------------------
-func TestCastServe(t *testing.T) {
+func TestStreamCastServe(t *testing.T) {
 	nx := NewProtoWs("localhost", "8087", "8443", "Nx")
-	go nx.ActServer()
+	go nx.StreamServer()
 
 	time.Sleep(time.Second)
 
 	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
-	tx.ActCaster("sec")
+	tx.StreamCaster("sec")
 }
 
 //---------------------------------------------------------------------------------
 // test for server and player
 //---------------------------------------------------------------------------------
-func TestServePlay(t *testing.T) {
+func TestStreamServePlay(t *testing.T) {
 	nx := NewProtoWs("localhost", "8087", "8443", "Nx")
-	go nx.ActServer()
+	go nx.StreamServer()
 
 	time.Sleep(time.Second)
 
 	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
-	rx.ActPlayer()
+	rx.StreamPlayer()
 }
 
 //---------------------------------------------------------------------------------
 // test for caster, server, and player
 //---------------------------------------------------------------------------------
-func TestCastServePlay(t *testing.T) {
+func TestStreamCastServePlay(t *testing.T) {
 	nx := NewProtoWs("localhost", "8087", "8443", "Nx")
-	go nx.ActServer()
+	go nx.StreamServer()
 
 	time.Sleep(time.Second)
 
 	tx := NewProtoWs("localhost", "8087", "8443", "Tx")
-	go tx.ActCaster()
+	go tx.StreamCaster()
 
 	time.Sleep(time.Millisecond)
 
 	rx := NewProtoWs("localhost", "8087", "8443", "Rx")
-	rx.ActPlayer()
+	rx.StreamPlayer()
 }
 
 // ----------------------------------E-----N-----D---------------------------------

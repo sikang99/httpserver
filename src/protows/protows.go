@@ -21,6 +21,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -45,6 +46,7 @@ const (
 )
 
 type ProtoWs struct {
+	Mode     string // normal or TLS secure mode
 	Host     string
 	Port     string
 	PortTls  string // for TLS
@@ -59,7 +61,8 @@ type ProtoWs struct {
 // string information of struct
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) String() string {
-	str := fmt.Sprintf("\tHost: %s", pw.Host)
+	str := fmt.Sprintf("\tMode: %s", pw.Mode)
+	str += fmt.Sprintf("\tHost: %s", pw.Host)
 	str += fmt.Sprintf("\tPort: %s,%s", pw.Port, pw.PortTls)
 	str += fmt.Sprintf("\tConn: %v", pw.Conn)
 	str += fmt.Sprintf("\tMethod: %s", pw.Method)
@@ -73,6 +76,7 @@ func (pw *ProtoWs) String() string {
 //---------------------------------------------------------------------------
 func NewProtoWs(args ...string) *ProtoWs {
 	pw := &ProtoWs{
+		Mode:     sb.STR_DEF_MODE,
 		Host:     sb.STR_DEF_HOST,
 		Port:     sb.STR_DEF_PORT,
 		PortTls:  sb.STR_DEF_PTLS,
@@ -105,6 +109,7 @@ func (pw *ProtoWs) SetAddr(hname, hport, hptls, desc string) {
 }
 
 func (pw *ProtoWs) Reset() {
+	pw.Mode = sb.STR_DEF_MODE
 	pw.Host = sb.STR_DEF_HOST
 	pw.Port = sb.STR_DEF_PORT
 	pw.PortTls = sb.STR_DEF_PTLS
@@ -132,23 +137,34 @@ func (pw *ProtoWs) EchoClient(smsg string) error {
 	var err error
 	log.Printf("%s to %s:%s,%s\n", STR_ECHO_CLIENT, pw.Host, pw.Port, pw.PortTls)
 
-	/*
-		origin := fmt.Sprintf("http://%s/", pw.Host)
-		url := fmt.Sprintf("ws://%s:%s/echo", pw.Host, pw.Port)
-		ws, err := websocket.Dial(url, "", origin)
-	*/
-
 	ws, err := pw.Connect("echo", "sec")
+	//ws, err := pw.Connect("/echo")
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
+	// if testing state?
+	if sb.IsTerminal() {
+		err = InputSendReceive(ws)
+	} else {
+		err = SendReceive(ws, smsg)
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send and receive message
+//---------------------------------------------------------------------------
+func SendReceive(ws *websocket.Conn, smsg string) error {
+	var err error
+
 	err = websocket.Message.Send(ws, smsg)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println(smsg)
+	log.Println(color.BlueString(smsg))
 
 	var rmsg string
 	err = websocket.Message.Receive(ws, &rmsg)
@@ -156,7 +172,41 @@ func (pw *ProtoWs) EchoClient(smsg string) error {
 		log.Println(err)
 		return err
 	}
-	log.Println(rmsg)
+	log.Println(color.GreenString(rmsg))
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// input a line and send, receive message
+//---------------------------------------------------------------------------
+func InputSendReceive(ws *websocket.Conn) error {
+	var err error
+
+	r := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print("> ")
+
+		line, _, err := r.ReadLine()
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		input := strings.Replace(string(line), "\r", "", -1)
+
+		if strings.EqualFold(input, "quit") {
+			fmt.Println("Bye bye.")
+			break
+		}
+
+		err = SendReceive(ws, input)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+	}
 
 	return err
 }
@@ -168,6 +218,7 @@ func (pw *ProtoWs) EchoServer() (err error) {
 	log.Printf("%s\n", STR_ECHO_SERVER)
 
 	http.Handle("/echo", websocket.Handler(pw.EchoHandler))
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 	//log.Fatal(http.ListenAndServe(":"+pw.Port, nil))
 
 	wg := sync.WaitGroup{}
@@ -191,6 +242,10 @@ func (pw *ProtoWs) EchoServer() (err error) {
 func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 	var err error
 
+	log.Printf("in for %s\n", ws.LocalAddr())
+	defer log.Printf("out for %s\n", ws.RemoteAddr())
+	defer ws.Close()
+
 	mode := "change"
 
 	switch mode {
@@ -203,15 +258,20 @@ func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 
 			err = websocket.Message.Receive(ws, &rmsg)
 			if err != nil {
-				log.Println(err)
+				sb.LogPrintln(err)
 				break
 			}
 			//log.Println("Received from client: " + rmsg)
 
+			if strings.EqualFold(rmsg, "quit") {
+				log.Println("quit")
+				os.Exit(0)
+			}
+
 			smsg := "Echo " + rmsg
 			err = websocket.Message.Send(ws, smsg)
 			if err != nil {
-				log.Println(err)
+				sb.LogPrintln(err)
 				break
 			}
 			//log.Println("Sending to client: " + smsg)
@@ -225,10 +285,10 @@ func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 //---------------------------------------------------------------------------
 // Caster for test and debugging
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActCaster(sec ...string) (err error) {
+func (pw *ProtoWs) StreamCaster(sec ...string) (err error) {
 	log.Printf("%s\n", STR_WS_CASTER)
 
-	ws, err := pw.Connect("stream")
+	ws, err := pw.Connect("/stream")
 	if err != nil {
 		log.Println(err)
 		return err
@@ -252,7 +312,7 @@ func (pw *ProtoWs) ActCaster(sec ...string) (err error) {
 //---------------------------------------------------------------------------
 // Server
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActServer() (err error) {
+func (pw *ProtoWs) StreamServer() (err error) {
 	log.Printf("%s on ws:%s and wss:%s\n", STR_WS_SERVER, pw.Port, pw.PortTls)
 
 	pw.Ring = sr.NewStreamRing(2, sb.MBYTE)
@@ -278,7 +338,7 @@ func (pw *ProtoWs) ActServer() (err error) {
 //---------------------------------------------------------------------------
 // Player
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) ActPlayer() (err error) {
+func (pw *ProtoWs) StreamPlayer() (err error) {
 	log.Printf("%s\n", STR_WS_PLAYER)
 
 	origin := fmt.Sprintf("http://%s/", pw.Host)
@@ -314,15 +374,16 @@ func (pw *ProtoWs) ActPlayer() (err error) {
 // - https://code.google.com/p/go/source/browse/websocket/client.go?repo=net&r=d7ff1d8f275c5693a5fc301cbfdf0a6f89e4f57c
 // - http://andrewwdeane.blogspot.kr/2013/01/gobing-down-secure-websockets.html
 //---------------------------------------------------------------------------
-func (pw *ProtoWs) Connect(hand string, sec ...string) (ws *websocket.Conn, err error) {
-	if sec == nil {
-		origin := fmt.Sprintf("http://%s:%s/", pw.Host, pw.Port)
-		url := fmt.Sprintf("ws://%s:%s/%s", pw.Host, pw.Port, hand)
+func (pw *ProtoWs) Connect(hand string, secure ...string) (ws *websocket.Conn, err error) {
+	if secure == nil {
+		origin := fmt.Sprintf("http://%s:%s", pw.Host, pw.Port)
+		url := fmt.Sprintf("ws://%s:%s%s", pw.Host, pw.Port, hand)
 
 		ws, err = websocket.Dial(url, "", origin)
 	} else {
-		origin := fmt.Sprintf("http://%s:%s/", pw.Host, pw.PortTls)
-		url := fmt.Sprintf("wss://%s:%s/%s", pw.Host, pw.PortTls, hand)
+		pw.Mode = "secure"
+		origin := fmt.Sprintf("http://%s:%s", pw.Host, pw.PortTls)
+		url := fmt.Sprintf("wss://%s:%s%s", pw.Host, pw.PortTls, hand)
 
 		wconf, err := websocket.NewConfig(url, origin)
 		cert, err := tls.LoadX509KeyPair("sec/cert.pem", "sec/key.pem")
@@ -337,7 +398,7 @@ func (pw *ProtoWs) Connect(hand string, sec ...string) (ws *websocket.Conn, err 
 	}
 
 	if err == nil {
-		log.Println("connected")
+		log.Printf("connected in %s mode", pw.Mode)
 	}
 
 	return ws, err
@@ -381,8 +442,8 @@ func (pw *ProtoWs) serveHttps(wg *sync.WaitGroup) {
 func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
 	var err error
 
-	log.Printf("in from %s\n", ws.RemoteAddr())
-	defer log.Printf("out %s\n", ws.RemoteAddr())
+	log.Printf("in for %s\n", ws.LocalAddr())
+	defer log.Printf("out for %s\n", ws.RemoteAddr())
 	defer ws.Close()
 
 	r := bufio.NewReader(ws)
