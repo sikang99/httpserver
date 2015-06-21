@@ -132,6 +132,7 @@ func (pw *ProtoWs) Clear() {
 //---------------------------------------------------------------------------
 // Echo client
 // - http://www.websocket.org/echo.html
+// - http://41j.com/blog/2014/12/simple-websocket-example-golang/
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) EchoClient(smsg string) error {
 	var err error
@@ -808,7 +809,7 @@ func WriteRingInMultipart(w *bufio.Writer, ring *sr.StreamRing) error {
 	var err error
 
 	if !ring.IsUsing() {
-		log.Println("ErrStatus")
+		sb.LogPrintln("ErrStatus")
 		return sb.ErrStatus
 	}
 

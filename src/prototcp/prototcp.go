@@ -14,7 +14,6 @@ import (
 	"io/ioutil"
 	"log"
 	"mime"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -23,9 +22,9 @@ import (
 	"time"
 	"unicode"
 
-	//"github.com/kisom/go-schannel"	// Bidirectional secure channels over TCP/IP
+	"github.com/fatih/color"
 
-	ph "stoney/httpserver/src/protohttp"
+	//"github.com/kisom/go-schannel"	// Bidirectional secure channels over TCP/IP
 
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
@@ -260,7 +259,7 @@ func (pt *ProtoTcp) RequestGet(r *bufio.Reader, w *bufio.Writer) error {
 	}
 	w.Flush()
 
-	log.Printf("SEND [%d]\n%s", len(req), req)
+	log.Printf("SEND [%d]\n%s", len(req), color.GreenString(req))
 
 	// recv response
 	err = pt.ReadMessage(r)
@@ -291,7 +290,7 @@ func (pt *ProtoTcp) RequestPost(r *bufio.Reader, w *bufio.Writer) error {
 	}
 	w.Flush()
 
-	log.Printf("SEND [%d]\n%s", len(req), req)
+	log.Printf("SEND [%d]\n%s", len(req), color.GreenString(req))
 
 	// recv response
 	err = pt.ReadMessage(r)
@@ -471,20 +470,6 @@ func (pt *ProtoTcp) ReadStreamToData(r *bufio.Reader) error {
 }
 
 //---------------------------------------------------------------------------
-// recv multipart to data for debugging
-// - same function with ReadStreamToData() above
-// - check compatiblity with multipart package
-//---------------------------------------------------------------------------
-func (pt *ProtoTcp) ReadMultipartToData(r *bufio.Reader) error {
-	var err error
-
-	mr := multipart.NewReader(r, pt.Boundary)
-	err = ph.RecvMultipartToData(mr)
-
-	return err
-}
-
-//---------------------------------------------------------------------------
 // send response for POST request
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) ResponsePost(w *bufio.Writer) error {
@@ -494,7 +479,7 @@ func (pt *ProtoTcp) ResponsePost(w *bufio.Writer) error {
 	res += fmt.Sprintf("Server: %s\r\n", STR_TCP_SERVER)
 	res += "\r\n"
 
-	defer log.Printf("SEND [%d]\n%s", len(res), res)
+	defer log.Printf("SEND [%d]\n%s", len(res), color.CyanString(res))
 
 	_, err = w.Write([]byte(res))
 	if err != nil {
@@ -517,7 +502,7 @@ func (pt *ProtoTcp) ResponseGet(w *bufio.Writer) error {
 	res += fmt.Sprintf("Content-Type: multipart/x-mixed-replace; boundary=%s\r\n", pt.Boundary)
 	res += "\r\n"
 
-	defer log.Printf("SEND [%d]\n%s", len(res), res)
+	defer log.Printf("SEND [%d]\n%s", len(res), color.CyanString(res))
 
 	_, err = w.Write([]byte(res))
 	if err != nil {

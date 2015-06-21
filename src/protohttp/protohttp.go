@@ -99,7 +99,7 @@ func NewClientConfig() *http.Client {
 //---------------------------------------------------------------------------
 // http GET to server
 //---------------------------------------------------------------------------
-func SendRequestGet(client *http.Client, ph *ProtoHttp) error {
+func (ph *ProtoHttp) RequestGet(client *http.Client) error {
 	var err error
 
 	res, err := client.Get(ph.Url)
@@ -121,7 +121,7 @@ func SendRequestGet(client *http.Client, ph *ProtoHttp) error {
 //---------------------------------------------------------------------------
 // http POST to server
 //---------------------------------------------------------------------------
-func SendRequestPost(client *http.Client, ph *ProtoHttp) error {
+func (ph *ProtoHttp) RequestPost(client *http.Client) error {
 	var err error
 
 	// send multipart data
@@ -163,7 +163,7 @@ func SendRequestPost(client *http.Client, ph *ProtoHttp) error {
 //---------------------------------------------------------------------------
 //	receive a part to data
 //---------------------------------------------------------------------------
-func RecvPartToData(mr *multipart.Reader) ([]byte, error) {
+func ReadPartToData(mr *multipart.Reader) ([]byte, error) {
 	var err error
 
 	p, err := mr.NextPart()
@@ -198,8 +198,8 @@ func RecvPartToData(mr *multipart.Reader) ([]byte, error) {
 
 //---------------------------------------------------------------------------
 //	receive a part to slot of buffer
-//----------------------------------------s-----------------------------------
-func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
+//---------------------------------------------------------------------------
+func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 	var err error
 
 	p, err := mr.NextPart()
@@ -238,7 +238,7 @@ func RecvPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
 //---------------------------------------------------------------------------
-func RecvMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
+func ReadMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
 	var err error
 
 	err = sbuf.SetStatusUsing()
@@ -254,7 +254,7 @@ func RecvMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
 		slot, pos := sbuf.GetSlotIn()
 		//fmt.Println(i, pos, slot)
 
-		err = RecvPartToSlot(mr, slot)
+		err = ReadPartToSlot(mr, slot)
 		if err != nil {
 			log.Println(err)
 			break
@@ -270,7 +270,7 @@ func RecvMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 //	receive multipart data and decode jpeg
 //---------------------------------------------------------------------------
-func RecvMultipartToData(mr *multipart.Reader) error {
+func ReadMultipartToData(mr *multipart.Reader) error {
 	var err error
 
 	for {
@@ -384,7 +384,7 @@ func FileServer(path string) http.Handler {
 //---------------------------------------------------------------------------
 // send a favicon
 //---------------------------------------------------------------------------
-func SendFavicon(w http.ResponseWriter, file string) error {
+func WriteFavicon(w http.ResponseWriter, file string) error {
 	w.Header().Set("Content-Type", "image/icon")
 	w.Header().Set("Server", STR_HTTP_SERVER)
 	body, err := ioutil.ReadFile("static/favicon.ico")
@@ -400,7 +400,7 @@ func SendFavicon(w http.ResponseWriter, file string) error {
 //---------------------------------------------------------------------------
 // send a template page
 //---------------------------------------------------------------------------
-func SendTemplatePage(w http.ResponseWriter, page string, data interface{}) error {
+func WriteTemplatePage(w http.ResponseWriter, page string, data interface{}) error {
 	t, err := template.New("mjpeg").Parse(page)
 	if err != nil {
 		log.Println(err)
@@ -413,11 +413,11 @@ func SendTemplatePage(w http.ResponseWriter, page string, data interface{}) erro
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func SendMultipartImage(w io.Writer, dtype string, loop bool) error {
+func WriteMultipartImage(w io.Writer, dtype string, loop bool) error {
 	var err error
 
 	for {
-		err = SendPartImage(w, dtype, "myboundary")
+		err = WriteImageInPart(w, dtype, "myboundary")
 		if err != nil {
 			log.Println(err)
 			break
@@ -436,7 +436,7 @@ func SendMultipartImage(w io.Writer, dtype string, loop bool) error {
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
+func WriteMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 	var err error
 
 	if !sbuf.IsUsing() {
@@ -456,7 +456,7 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 			break
 		}
 
-		err = SendPartSlot(w, slot, sbuf.Boundary)
+		err = WriteSlotInPart(w, slot, sbuf.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
@@ -472,7 +472,7 @@ func SendMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 // send files with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func SendMultipartDir(w io.Writer, pat string, loop bool) error {
+func WriteMultipartDir(w io.Writer, pat string, loop bool) error {
 	var err error
 
 	// direct pattern matching
@@ -488,7 +488,7 @@ func SendMultipartDir(w io.Writer, pat string, loop bool) error {
 
 	for {
 		for i := range files {
-			err = SendPartFile(w, files[i], "myboundary")
+			err = WriteFileInPart(w, files[i], "myboundary")
 			if err != nil {
 				return err
 			}
@@ -506,7 +506,7 @@ func SendMultipartDir(w io.Writer, pat string, loop bool) error {
 //---------------------------------------------------------------------------
 // send any file in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func SendPartFile(w io.Writer, file string, boundary string) error {
+func WriteFileInPart(w io.Writer, file string, boundary string) error {
 	var err error
 
 	data, err := ioutil.ReadFile(file)
@@ -544,7 +544,7 @@ func SendPartFile(w io.Writer, file string, boundary string) error {
 //---------------------------------------------------------------------------
 // send image in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func SendPartImage(w io.Writer, dtype string, boundary string) error {
+func WriteImageInPart(w io.Writer, dtype string, boundary string) error {
 	var err error
 
 	//img := si.GenSpiralImage(1080, 768)
@@ -580,7 +580,7 @@ func SendPartImage(w io.Writer, dtype string, boundary string) error {
 //---------------------------------------------------------------------------
 // send slot in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func SendPartSlot(w io.Writer, ss *sr.StreamSlot, boundary string) error {
+func WriteSlotInPart(w io.Writer, ss *sr.StreamSlot, boundary string) error {
 	var err error
 
 	mw := multipart.NewWriter(w)
@@ -625,7 +625,7 @@ func GetTypeBoundary(ctype string) (string, error) {
 //---------------------------------------------------------------------------
 // send response for Player
 //---------------------------------------------------------------------------
-func SendResponseGet(w http.ResponseWriter, boundary string) error {
+func ResponseGet(w http.ResponseWriter, boundary string) error {
 	var err error
 
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=--"+boundary)
@@ -638,7 +638,7 @@ func SendResponseGet(w http.ResponseWriter, boundary string) error {
 //---------------------------------------------------------------------------
 // send response for Caster
 //---------------------------------------------------------------------------
-func SendResponsePost(w http.ResponseWriter, boundary string) error {
+func ResponsePost(w http.ResponseWriter, boundary string) error {
 	var err error
 
 	w.Header().Set("Server", STR_HTTP_SERVER)
@@ -650,7 +650,7 @@ func SendResponsePost(w http.ResponseWriter, boundary string) error {
 //---------------------------------------------------------------------------
 // send response message simply
 //---------------------------------------------------------------------------
-func SendResponseMessage(w http.ResponseWriter, status int, message string) error {
+func WriteResponseMessage(w http.ResponseWriter, status int, message string) error {
 	var err error
 
 	w.WriteHeader(status)

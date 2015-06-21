@@ -89,7 +89,7 @@ func NewProtoFile(args ...string) *ProtoFile {
 //---------------------------------------------------------------------------
 // act file reader
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ActReader(ring *sr.StreamRing) error {
+func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
 	var err error
 	log.Println(STR_FILE_READER)
 
@@ -102,7 +102,7 @@ func (pf *ProtoFile) ActReader(ring *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 // act file writer
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) ActWriter(ring *sr.StreamRing) error {
+func (pf *ProtoFile) StreamWriter(ring *sr.StreamRing) error {
 	var err error
 	log.Println(STR_FILE_WRITER)
 

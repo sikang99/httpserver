@@ -1,11 +1,17 @@
 #
-# Makefile for happy package
+# Makefile for httpserver package
 #
 PACKAGE=protows
 
 all: usage
 
-edit e:
+#--------------------------------------------------------------------------------------
+edit:
+	@echo ""
+	@echo "usage: make (edit) [e|et|em]"
+	@echo ""
+
+e:
 	vi $(PACKAGE).go
 
 et:
@@ -17,10 +23,13 @@ em:
 build b:
 	go build
 
+#--------------------------------------------------------------------------------------
 test t:
-	go test -v
+	@echo ""
+	@echo "usage: make (test) [bte1|bte2|btf1|btf2|btf3|btf4]"
+	@echo ""
 
-buildtest bt:
+bt:
 	go build
 	go test -v
 

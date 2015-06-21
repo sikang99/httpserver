@@ -193,21 +193,21 @@ func main() {
 	// package protows
 	case "ws_caster":
 		ws := pw.NewProtoWs("localhost", "8087", "8443", "W-Tx")
-		ws.ActCaster()
+		ws.StreamCaster()
 	case "ws_server":
 		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		wr.ActServer()
+		wr.StreamServer()
 	case "ws_player":
 		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		wr.ActPlayer()
+		wr.StreamPlayer()
 
 	// package protofile
 	case "file_reader":
 		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rr")
-		fr.ActReader(conf.Ring)
+		fr.StreamReader(conf.Ring)
 	case "file_writer":
 		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Wr")
-		fr.ActWriter(conf.Ring)
+		fr.StreamWriter(conf.Ring)
 
 	default:
 		fmt.Println("Unknown working mode")
@@ -333,7 +333,7 @@ func ActHttpPlayer(url string, sbuf *sr.StreamRing) error {
 	sbuf.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, sbuf.Boundary)
 
-	err = ph.RecvMultipartToRing(mr, sbuf)
+	err = ph.ReadMultipartToRing(mr, sbuf)
 
 	return err
 }
@@ -346,7 +346,7 @@ func ActHttpCaster(url string) error {
 
 	hp := ph.NewProtoHttp("localhost", "8080")
 	client := ph.NewClientConfig()
-	return ph.SendRequestPost(client, hp)
+	return hp.RequestPost(client)
 }
 
 //---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ func ActHttpReader(url string, sbuf *sr.StreamRing) {
 	sbuf.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, sbuf.Boundary)
 
-	err = ph.RecvMultipartToRing(mr, sbuf)
+	err = ph.ReadMultipartToRing(mr, sbuf)
 }
 
 //---------------------------------------------------------------------------
@@ -521,7 +521,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ph.SendTemplatePage(w, index_tmpl, conf)
+	ph.WriteTemplatePage(w, index_tmpl, conf)
 }
 
 //---------------------------------------------------------------------------
@@ -541,7 +541,7 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := os.Stat(hello_page)
 	if err != nil {
-		ph.SendTemplatePage(w, hello_tmpl, conf)
+		ph.WriteTemplatePage(w, hello_tmpl, conf)
 		log.Printf("Hello serve %s\n", "hello_tmpl")
 	} else {
 		http.ServeFile(w, r, hello_page)
@@ -557,9 +557,9 @@ func mediaHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := os.Stat(r.URL.Path[1:])
 	if err != nil {
-		ph.SendResponseMessage(w, 404, r.URL.Path+" is Not Found")
+		ph.WriteResponseMessage(w, 404, r.URL.Path+" is Not Found")
 	} else {
-		ph.SendResponseMessage(w, 200, r.URL.Path)
+		ph.WriteResponseMessage(w, 200, r.URL.Path)
 	}
 }
 
@@ -581,7 +581,7 @@ func websocketHandler(ws *websocket.Conn) {
 func searchHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	err := ph.SendResponseMessage(w, 200, "/search: Not yet implemented")
+	err := ph.WriteResponseMessage(w, 200, "/search: Not yet implemented")
 	if err != nil {
 		log.Println(err)
 	}
@@ -595,7 +595,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	err := ph.SendResponseMessage(w, 200, "/status: Not yet implemented")
+	err := ph.WriteResponseMessage(w, 200, "/status: Not yet implemented")
 	if err != nil {
 		log.Println(err)
 	}
@@ -614,7 +614,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 	case "POST": // for Caster
 		sbuf.Boundary, err = ph.GetTypeBoundary(r.Header.Get("Content-Type"))
 
-		err = ph.SendResponsePost(w, sbuf.Boundary)
+		err = ph.ResponsePost(w, sbuf.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
@@ -622,20 +622,20 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 
 		mr := multipart.NewReader(r.Body, sbuf.Boundary)
 
-		err = ph.RecvMultipartToRing(mr, sbuf)
+		err = ph.ReadMultipartToRing(mr, sbuf)
 		if err != nil {
 			log.Println(err)
 			break
 		}
 
 	case "GET": // for Player
-		err = ph.SendResponseGet(w, sbuf.Boundary)
+		err = ph.ResponseGet(w, sbuf.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
 		}
 
-		err = ph.SendMultipartRing(w, sbuf)
+		err = ph.WriteMultipartRing(w, sbuf)
 		if err != nil {
 			log.Println(err)
 			break

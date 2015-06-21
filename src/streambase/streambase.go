@@ -177,7 +177,7 @@ func HexDump(data []byte) {
 }
 
 //---------------------------------------------------------------------------
-// stdin is terminal or not
+// check if stdin is terminal or not
 // - http://rosettacode.org/wiki/Check_input_device_is_a_terminal
 //---------------------------------------------------------------------------
 func IsTerminal() bool {
@@ -185,10 +185,10 @@ func IsTerminal() bool {
 }
 
 //---------------------------------------------------------------------------
-// print err in log
+// print interface in colored log
 //---------------------------------------------------------------------------
-func LogPrintln(err error) {
-	log.Println(color.RedString(fmt.Sprint(err)))
+func LogPrintln(obj interface{}) {
+	log.Println(color.RedString(fmt.Sprint(obj)))
 }
 
 // ---------------------------------E-----N-----D-----------------------------------
