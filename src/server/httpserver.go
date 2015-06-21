@@ -635,7 +635,7 @@ func streamHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		err = ph.WriteMultipartRing(w, sbuf)
+		err = ph.WriteRingInMultipart(w, sbuf)
 		if err != nil {
 			log.Println(err)
 			break

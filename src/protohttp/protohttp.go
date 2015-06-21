@@ -413,7 +413,7 @@ func WriteTemplatePage(w http.ResponseWriter, page string, data interface{}) err
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func WriteMultipartImage(w io.Writer, dtype string, loop bool) error {
+func WriteImagesInMultipart(w io.Writer, dtype string, loop bool) error {
 	var err error
 
 	for {
@@ -436,7 +436,7 @@ func WriteMultipartImage(w io.Writer, dtype string, loop bool) error {
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func WriteMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
+func WriteRingInMultipart(w io.Writer, sbuf *sr.StreamRing) error {
 	var err error
 
 	if !sbuf.IsUsing() {
@@ -472,7 +472,7 @@ func WriteMultipartRing(w io.Writer, sbuf *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 // send files with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func WriteMultipartDir(w io.Writer, pat string, loop bool) error {
+func WriteDirInMultipart(w io.Writer, pat string, loop bool) error {
 	var err error
 
 	// direct pattern matching
@@ -608,7 +608,7 @@ func GetTypeBoundary(ctype string) (string, error) {
 	var err error
 
 	mt, params, err := mime.ParseMediaType(ctype)
-	fmt.Printf("%v %v\n", params, ctype)
+	//fmt.Printf("%v %v\n", params, ctype)
 	if err != nil {
 		log.Println("ParseMediaType: %s %v", mt, err)
 		return "", err
