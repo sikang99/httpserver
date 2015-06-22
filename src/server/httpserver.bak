@@ -222,18 +222,6 @@ func main() {
 func ParseCommand(cmdstr string) error {
 	var err error
 
-	//fmt.Println(cmdstr)
-	/*
-		r := bufio.NewReader(cmdstr)
-		var s scanner.Scanner
-		s.Init(cmdstr)
-		tok := s.Scan()
-		for tok != scanner.EOF {
-			fmt.Print(tok)
-			tok = s.Scan()
-		}
-	*/
-
 	res := strings.Fields(cmdstr)
 	if len(res) < 1 {
 		return err

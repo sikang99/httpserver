@@ -32,10 +32,9 @@ const (
 
 //---------------------------------------------------------------------------
 type ProtoFile struct {
-	Pattern  string
-	Desc     string
-	Boundary string
-	//CreatedAt time.Time `bson:"created_at,omitempty json:"created_at,omitempty"`
+	Pattern    string
+	Boundary   string
+	Desc       string
 	CreatedAt  int64
 	ModifiedAt int64
 }
@@ -47,7 +46,7 @@ func (pf *ProtoFile) String() string {
 	str := fmt.Sprintf("\tPattern: %v", pf.Pattern)
 	str += fmt.Sprintf("\tBoundary: %v", pf.Boundary)
 	str += fmt.Sprintf("\tDesc: %v", pf.Desc)
-	str += fmt.Sprintf("\tCreatedAt: %v", pf.CreatedAt)
+	str += fmt.Sprintf("\tCreatedAt: %v,%v", pf.CreatedAt, pf.ModifiedAt)
 	return str
 }
 

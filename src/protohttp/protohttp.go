@@ -11,14 +11,12 @@ package protohttp
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"mime"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"net/textproto"
 	"os"
@@ -202,7 +200,7 @@ func ParseCommand(cmdstr string) error {
 //---------------------------------------------------------------------------
 //	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) StreamReader(url string, sbuf *sr.StreamRing) {
+func (ph *ProtoHttp) StreamReader(url string, ring *sr.StreamRing) {
 	log.Printf("%s for %s\n", STR_HTTP_READER, url)
 
 	var err error
@@ -220,10 +218,10 @@ func (ph *ProtoHttp) StreamReader(url string, sbuf *sr.StreamRing) {
 	}
 	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
-	sbuf.Boundary, err = GetTypeBoundary(res.Header.Get("Content-Type"))
-	mr := multipart.NewReader(res.Body, sbuf.Boundary)
+	ring.Boundary, err = GetTypeBoundary(res.Header.Get("Content-Type"))
+	mr := multipart.NewReader(res.Body, ring.Boundary)
 
-	err = ReadMultipartToRing(mr, sbuf)
+	err = ReadMultipartToRing(mr, ring)
 }
 
 //---------------------------------------------------------------------------
@@ -232,7 +230,7 @@ func (ph *ProtoHttp) StreamReader(url string, sbuf *sr.StreamRing) {
 func (ph *ProtoHttp) StreamCaster(url string) error {
 	log.Printf("%s for %s\n", STR_HTTP_CASTER, url)
 
-	hp := NewProtoHttp("localhost", "8080")
+	hp := NewProtoHttp()
 	client := NewClientConfig()
 	return hp.RequestPost(client)
 }
@@ -240,7 +238,7 @@ func (ph *ProtoHttp) StreamCaster(url string) error {
 //---------------------------------------------------------------------------
 // http player client
 //---------------------------------------------------------------------------
-func (ph *ProtoHttp) StreamPlayer(url string, sbuf *sr.StreamRing) error {
+func (ph *ProtoHttp) StreamPlayer(url string, ring *sr.StreamRing) error {
 	log.Printf("%s for %s\n", STR_HTTP_PLAYER, url)
 
 	var err error
@@ -258,10 +256,10 @@ func (ph *ProtoHttp) StreamPlayer(url string, sbuf *sr.StreamRing) error {
 	}
 	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
-	sbuf.Boundary, err = GetTypeBoundary(res.Header.Get("Content-Type"))
-	mr := multipart.NewReader(res.Body, sbuf.Boundary)
+	ring.Boundary, err = GetTypeBoundary(res.Header.Get("Content-Type"))
+	mr := multipart.NewReader(res.Body, ring.Boundary)
 
-	err = ReadMultipartToRing(mr, sbuf)
+	err = ReadMultipartToRing(mr, ring)
 
 	return err
 }
@@ -270,7 +268,7 @@ func (ph *ProtoHttp) StreamPlayer(url string, sbuf *sr.StreamRing) error {
 // http server entry
 //---------------------------------------------------------------------------
 func (ph *ProtoHttp) StreamServer(ring *sr.StreamRing) error {
-	log.Println("Happy Media Server")
+	log.Printf("%s\n", STR_HTTP_SERVER)
 
 	http.HandleFunc("/", ph.IndexHandler)
 	http.HandleFunc("/hello", ph.HelloHandler)   // view
@@ -341,7 +339,7 @@ func (ph *ProtoHttp) HelloHandler(w http.ResponseWriter, r *http.Request) {
 	hello_page := "static/hello.html"
 
 	host := strings.Split(r.Host, ":")
-	conf.Http.Port = host[1]
+	conf.Port = host[1]
 
 	if r.TLS != nil {
 		conf.Addr = "https://localhost"
@@ -416,34 +414,34 @@ func (ph *ProtoHttp) StreamHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
 	var err error
-	sbuf := conf.Ring
+	ring := conf.Ring
 
 	switch r.Method {
 	case "POST": // for Caster
-		sbuf.Boundary, err = GetTypeBoundary(r.Header.Get("Content-Type"))
+		ring.Boundary, err = GetTypeBoundary(r.Header.Get("Content-Type"))
 
-		err = ResponsePost(w, sbuf.Boundary)
+		err = ResponsePost(w, ring.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
 		}
 
-		mr := multipart.NewReader(r.Body, sbuf.Boundary)
+		mr := multipart.NewReader(r.Body, ring.Boundary)
 
-		err = ReadMultipartToRing(mr, sbuf)
+		err = ReadMultipartToRing(mr, ring)
 		if err != nil {
 			log.Println(err)
 			break
 		}
 
 	case "GET": // for Player
-		err = ResponseGet(w, sbuf.Boundary)
+		err = ResponseGet(w, ring.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
 		}
 
-		err = WriteRingInMultipart(w, sbuf)
+		err = WriteRingInMultipart(w, ring)
 		if err != nil {
 			log.Println(err)
 			break
@@ -460,7 +458,7 @@ func (ph *ProtoHttp) StreamHandler(w http.ResponseWriter, r *http.Request) {
 // for http access
 //---------------------------------------------------------------------------
 func (ph *ProtoHttp) ServeHttp(wg *sync.WaitGroup) {
-	log.Println("Starting HTTP server at http://" + ph.Port + ":" + ph.PortTls)
+	log.Println("Starting HTTP server at http://" + ph.Host + ":" + ph.Port)
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -476,7 +474,7 @@ func (ph *ProtoHttp) ServeHttp(wg *sync.WaitGroup) {
 // for https tls access
 //---------------------------------------------------------------------------
 func (ph *ProtoHttp) ServeHttps(wg *sync.WaitGroup) {
-	log.Println("Starting HTTPS server at https://" + ph.Port + ":" + ph.PortTls)
+	log.Println("Starting HTTPS server at https://" + ph.Host + ":" + ph.PortTls)
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -492,7 +490,7 @@ func (ph *ProtoHttp) ServeHttps(wg *sync.WaitGroup) {
 // for http2 tls access
 //---------------------------------------------------------------------------
 func (ph *ProtoHttp) ServeHttp2(wg *sync.WaitGroup) {
-	log.Println("Starting HTTP2 server at https://" + ph.Host + ":" + ph.PortTls)
+	log.Println("Starting HTTP2 server at https://" + ph.Host + ":" + ph.Port2)
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -536,25 +534,6 @@ func (ph *ProtoHttp) ServeWss(wg *sync.WaitGroup) {
 	}
 
 	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
-}
-
-//---------------------------------------------------------------------------
-// new client config transport with timeout
-//---------------------------------------------------------------------------
-var timeout = time.Duration(3 * time.Second)
-
-func dialTimeout(network, addr string) (net.Conn, error) {
-	return net.DialTimeout(network, addr, timeout)
-}
-
-func NewClientConfig() *http.Client {
-	// simple timeout and tls setting
-	tp := &http.Transport{
-		Dial:            dialTimeout,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	return &http.Client{Transport: tp, Timeout: timeout}
 }
 
 //---------------------------------------------------------------------------
@@ -699,20 +678,20 @@ func ReadPartToSlot(mr *multipart.Reader, slot *sr.StreamSlot) error {
 //---------------------------------------------------------------------------
 //	receive multipart data into buffer
 //---------------------------------------------------------------------------
-func ReadMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
+func ReadMultipartToRing(mr *multipart.Reader, ring *sr.StreamRing) error {
 	var err error
 
-	err = sbuf.SetStatusUsing()
+	err = ring.SetStatusUsing()
 	if err != nil {
 		return sb.ErrStatus
 	}
 
 	// insert slots to the buffer
 	for i := 0; true; i++ {
-		//pre, pos := sbuf.ReadSlotIn()
+		//pre, pos := ring.ReadSlotIn()
 		//fmt.Println("P", pos, pre)
 
-		slot, pos := sbuf.GetSlotIn()
+		slot, pos := ring.GetSlotIn()
 		//fmt.Println(i, pos, slot)
 
 		err = ReadPartToSlot(mr, slot)
@@ -722,7 +701,7 @@ func ReadMultipartToRing(mr *multipart.Reader, sbuf *sr.StreamRing) error {
 		}
 		//fmt.Println(i, pos, slot)
 
-		sbuf.SetPosInByPos(pos + 1)
+		ring.SetPosInByPos(pos + 1)
 	}
 
 	return err
@@ -778,11 +757,11 @@ func ReadMultipartToData(mr *multipart.Reader) error {
 //---------------------------------------------------------------------------
 func PrepareRing(nb int, size int, desc string) *sr.StreamRing {
 
-	sbuf := sr.NewStreamRing(nb, size)
-	sbuf.Desc = desc
-	fmt.Println(sbuf)
+	ring := sr.NewStreamRing(nb, size)
+	ring.Desc = desc
+	fmt.Println(ring)
 
-	return sbuf
+	return ring
 }
 
 //---------------------------------------------------------------------------
@@ -848,17 +827,17 @@ func WriteImagesInMultipart(w io.Writer, dtype string, loop bool) error {
 //---------------------------------------------------------------------------
 // send image stream with the given format(extension) in the directory
 //---------------------------------------------------------------------------
-func WriteRingInMultipart(w io.Writer, sbuf *sr.StreamRing) error {
+func WriteRingInMultipart(w io.Writer, ring *sr.StreamRing) error {
 	var err error
 
-	if !sbuf.IsUsing() {
+	if !ring.IsUsing() {
 		return sb.ErrStatus
 	}
-	fmt.Println(sbuf)
+	fmt.Println(ring)
 
 	var pos int
 	for {
-		slot, npos, err := sbuf.GetSlotNextByPos(pos)
+		slot, npos, err := ring.GetSlotNextByPos(pos)
 		if err != nil {
 			if err == sb.ErrEmpty {
 				time.Sleep(sb.TIME_DEF_WAIT)
@@ -868,7 +847,7 @@ func WriteRingInMultipart(w io.Writer, sbuf *sr.StreamRing) error {
 			break
 		}
 
-		err = WriteSlotInPart(w, slot, sbuf.Boundary)
+		err = WriteSlotInPart(w, slot, ring.Boundary)
 		if err != nil {
 			log.Println(err)
 			break
