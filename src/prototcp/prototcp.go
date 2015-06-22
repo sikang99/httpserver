@@ -41,6 +41,8 @@ const (
 type ProtoTcp struct {
 	Host     string
 	Port     string
+	PortTls  string
+	Port2    string
 	Desc     string
 	Method   string // POST or GET
 	Boundary string
@@ -96,8 +98,8 @@ func (pt *ProtoTcp) Clear() {
 //---------------------------------------------------------------------------
 func NewProtoTcp(args ...string) *ProtoTcp {
 	pt := &ProtoTcp{
-		Host:     "localhost",
-		Port:     "8080",
+		Host:     sb.STR_DEF_HOST,
+		Port:     sb.STR_DEF_PORT,
 		Boundary: sb.STR_DEF_BDRY,
 		Quit:     make(chan bool),
 	}
@@ -115,14 +117,21 @@ func NewProtoTcp(args ...string) *ProtoTcp {
 	return pt
 }
 
-func NewProtoTcpWithParams(hname, hport, desc string) *ProtoTcp {
-	return &ProtoTcp{
-		Host:     hname,
-		Port:     hport,
-		Desc:     desc,
-		Boundary: sb.STR_DEF_BDRY,
-		Quit:     make(chan bool),
+func NewProtoTcpWithPorts(args ...string) *ProtoTcp {
+	pt := NewProtoTcp()
+
+	for i, arg := range args {
+		switch {
+		case i == 0:
+			pt.Port = arg
+		case i == 1:
+			pt.PortTls = arg
+		case i == 2:
+			pt.Port2 = arg
+		}
 	}
+
+	return pt
 }
 
 //---------------------------------------------------------------------------
@@ -130,7 +139,7 @@ func NewProtoTcpWithParams(hname, hport, desc string) *ProtoTcp {
 //---------------------------------------------------------------------------
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActCaster() error {
+func (pt *ProtoTcp) StreamCaster() error {
 	var err error
 	log.Printf("%s to %s:%s\n", STR_TCP_CASTER, pt.Host, pt.Port)
 
@@ -168,7 +177,7 @@ func (pt *ProtoTcp) ActCaster() error {
 //---------------------------------------------------------------------------
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActServer(ring *sr.StreamRing) error {
+func (pt *ProtoTcp) StreamServer(ring *sr.StreamRing) error {
 	var err error
 	log.Printf("%s on :%s\n", STR_TCP_SERVER, pt.Port)
 
@@ -202,7 +211,7 @@ func (pt *ProtoTcp) ActServer(ring *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 // TCP Player to receive data in multipart
 //---------------------------------------------------------------------------
-func (pt *ProtoTcp) ActPlayer(ring *sr.StreamRing) error {
+func (pt *ProtoTcp) StreamPlayer(ring *sr.StreamRing) error {
 	var err error
 	log.Printf("%s\n", STR_TCP_PLAYER)
 

@@ -50,6 +50,7 @@ type ProtoWs struct {
 	Host     string
 	Port     string
 	PortTls  string // for TLS
+	Port2    string // for HTTP/2
 	Desc     string
 	Method   string
 	Boundary string
@@ -63,7 +64,7 @@ type ProtoWs struct {
 func (pw *ProtoWs) String() string {
 	str := fmt.Sprintf("\tMode: %s", pw.Mode)
 	str += fmt.Sprintf("\tHost: %s", pw.Host)
-	str += fmt.Sprintf("\tPort: %s,%s", pw.Port, pw.PortTls)
+	str += fmt.Sprintf("\tPort: %s,%s,%s", pw.Port, pw.PortTls, pw.Port2)
 	str += fmt.Sprintf("\tConn: %v", pw.Conn)
 	str += fmt.Sprintf("\tMethod: %s", pw.Method)
 	str += fmt.Sprintf("\tBoundary: %s", pw.Boundary)
@@ -80,8 +81,11 @@ func NewProtoWs(args ...string) *ProtoWs {
 		Host:     sb.STR_DEF_HOST,
 		Port:     sb.STR_DEF_PORT,
 		PortTls:  sb.STR_DEF_PTLS,
+		Port2:    sb.STR_DEF_PORT2,
 		Boundary: sb.STR_DEF_BDRY,
 	}
+
+	pw.Desc = "NewProtoWs"
 
 	for i, arg := range args {
 		if i == 0 {
@@ -92,6 +96,25 @@ func NewProtoWs(args ...string) *ProtoWs {
 			pw.PortTls = arg
 		} else if i == 3 {
 			pw.Desc = arg
+		}
+	}
+
+	return pw
+}
+
+func NewProtoWsWithPorts(args ...string) *ProtoWs {
+	pw := NewProtoWs()
+
+	pw.Desc = "NewProtoWsWithPorts"
+
+	for i, arg := range args {
+		switch {
+		case i == 0:
+			pw.Port = arg
+		case i == 1:
+			pw.PortTls = arg
+		case i == 2:
+			pw.Port2 = arg
 		}
 	}
 

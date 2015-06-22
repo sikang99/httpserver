@@ -9,6 +9,7 @@
 package protohttp
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"fmt"
@@ -20,12 +21,15 @@ import (
 	"net"
 	"net/http"
 	"net/textproto"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+
+	"golang.org/x/net/websocket"
 
 	"github.com/bradfitz/http2"
 
@@ -50,6 +54,7 @@ type ProtoHttp struct {
 	Port     string
 	PortTls  string
 	Port2    string
+	Method   string
 	Boundary string
 	Desc     string
 }
@@ -69,12 +74,468 @@ func (ph *ProtoHttp) String() string {
 //---------------------------------------------------------------------------
 // make a new struct
 //---------------------------------------------------------------------------
-func NewProtoHttp(hname, hport string) *ProtoHttp {
-
-	return &ProtoHttp{
-		Host: hname,
-		Port: hport,
+func NewProtoHttp(args ...string) *ProtoHttp {
+	ph := &ProtoHttp{
+		Host:     sb.STR_DEF_HOST,
+		Port:     sb.STR_DEF_PORT,
+		PortTls:  sb.STR_DEF_PTLS,
+		Port2:    sb.STR_DEF_PORT2,
+		Boundary: sb.STR_DEF_BDRY,
 	}
+
+	ph.Desc = "NewProtoHttp"
+
+	for i, arg := range args {
+		switch {
+		case i == 0:
+			ph.Boundary = arg
+		case i == 1:
+			ph.Desc = arg
+		}
+	}
+
+	return ph
+}
+
+func NewProtoHttpWithPorts(args ...string) *ProtoHttp {
+	ph := NewProtoHttp()
+
+	ph.Desc = "NewProtoHttpWithPorts"
+
+	for i, arg := range args {
+		switch {
+		case i == 0:
+			ph.Port = arg
+		case i == 1:
+			ph.PortTls = arg
+		case i == 2:
+			ph.Port2 = arg
+		}
+	}
+	return ph
+}
+
+//---------------------------------------------------------------------------
+// http monitor client
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) StreamMonitor(url string) error {
+	log.Printf("%s for %s\n", STR_HTTP_MONITOR, url)
+
+	var err error
+
+	r := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("> ")
+
+		line, _, err := r.ReadLine()
+		if err != nil {
+			continue
+		}
+
+		cmdstr := strings.Replace(string(line), "\r", "", -1)
+
+		if strings.EqualFold(cmdstr, "quit") {
+			fmt.Println("Bye bye.")
+			return err
+		}
+
+		err = ParseCommand(cmdstr)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// parse command
+//---------------------------------------------------------------------------
+func ParseCommand(cmdstr string) error {
+	var err error
+
+	//fmt.Println(cmdstr)
+	res := strings.Fields(cmdstr)
+	if len(res) < 1 {
+		return err
+	}
+	//fmt.Println(res)
+
+	switch res[0] {
+	case "show":
+		if len(res) < 2 {
+			fmt.Printf("usage: show [network|channel|ring]\n")
+			break
+		}
+		switch res[1] {
+		case "network":
+			sb.ShowNetInterfaces()
+		case "channel":
+			fallthrough
+		case "ring":
+			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
+		default:
+			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+		}
+	case "help":
+		if len(res) < 2 {
+			fmt.Printf("usage: help [show|act]\n")
+			break
+		}
+		switch res[1] {
+		case "act":
+			fallthrough
+		case "show":
+			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
+		default:
+			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+		}
+
+	default:
+		fmt.Printf("usage: [show|help|quit]\n")
+	}
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+//	multipart reader entry, mainly from camera
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) StreamReader(url string, sbuf *sr.StreamRing) {
+	log.Printf("%s for %s\n", STR_HTTP_READER, url)
+
+	var err error
+	var res *http.Response
+
+	// WHY: different behavior?
+	if strings.Contains(url, "axis") {
+		res, err = http.Get(url)
+	} else {
+		client := NewClientConfig()
+		res, err = client.Get(url)
+	}
+	if err != nil {
+		log.Fatalf("GET of %q: %v", url, err)
+	}
+	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
+
+	sbuf.Boundary, err = GetTypeBoundary(res.Header.Get("Content-Type"))
+	mr := multipart.NewReader(res.Body, sbuf.Boundary)
+
+	err = ReadMultipartToRing(mr, sbuf)
+}
+
+//---------------------------------------------------------------------------
+// http caster client
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) StreamCaster(url string) error {
+	log.Printf("%s for %s\n", STR_HTTP_CASTER, url)
+
+	hp := NewProtoHttp("localhost", "8080")
+	client := NewClientConfig()
+	return hp.RequestPost(client)
+}
+
+//---------------------------------------------------------------------------
+// http player client
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) StreamPlayer(url string, sbuf *sr.StreamRing) error {
+	log.Printf("%s for %s\n", STR_HTTP_PLAYER, url)
+
+	var err error
+	var res *http.Response
+
+	// WHY: different behavior?
+	if strings.Contains(url, "axis") {
+		res, err = http.Get(url)
+	} else {
+		client := NewClientConfig()
+		res, err = client.Get(url)
+	}
+	if err != nil {
+		log.Fatalf("GET of %q: %v", url, err)
+	}
+	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
+
+	sbuf.Boundary, err = GetTypeBoundary(res.Header.Get("Content-Type"))
+	mr := multipart.NewReader(res.Body, sbuf.Boundary)
+
+	err = ReadMultipartToRing(mr, sbuf)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// http server entry
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) StreamServer(ring *sr.StreamRing) error {
+	log.Println("Happy Media Server")
+
+	http.HandleFunc("/", ph.IndexHandler)
+	http.HandleFunc("/hello", ph.HelloHandler)   // view
+	http.HandleFunc("/media", ph.MediaHandler)   // on-demand
+	http.HandleFunc("/stream", ph.StreamHandler) // live
+	http.HandleFunc("/search", ph.SearchHandler) // server info
+	http.HandleFunc("/status", ph.StatusHandler) // server status
+
+	http.Handle("/websocket/", websocket.Handler(ph.WebsocketHandler))
+
+	// CAUTION: don't use /static not /static/ as the prefix
+	http.Handle("/static/", http.StripPrefix("/static/", FileServer("./static")))
+
+	//var wg sync.WaitGroup
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	// HTTP server
+	go ph.ServeHttp(&wg)
+
+	wg.Add(1)
+	// HTTPS server
+	go ph.ServeHttps(&wg)
+
+	wg.Add(1)
+	// HTTP2 server
+	go ph.ServeHttp2(&wg)
+
+	/*
+		wg.Add(1)
+		// WS server
+		go ph.ServeWs(&wg)
+
+		wg.Add(1)
+		// WSS server
+		go ph.ServeWss(&wg)
+	*/
+
+	go ph.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", ring)
+	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(ring)
+	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").StreamCaster(ring)
+
+	wg.Wait()
+
+	return nil
+}
+
+//---------------------------------------------------------------------------
+// index file handler
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) IndexHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Index %s to %s\n", r.URL.Path, r.Host)
+
+	if strings.Contains(r.URL.Path, "favicon.ico") {
+		http.ServeFile(w, r, "static/favicon.ico")
+		return
+	}
+
+	WriteTemplatePage(w, index_tmpl, conf)
+}
+
+//---------------------------------------------------------------------------
+// hello file handler (default: hello.html)
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) HelloHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Hello %s to %s\n", r.URL.Path, r.Host)
+
+	hello_page := "static/hello.html"
+
+	host := strings.Split(r.Host, ":")
+	conf.Http.Port = host[1]
+
+	if r.TLS != nil {
+		conf.Addr = "https://localhost"
+	}
+
+	_, err := os.Stat(hello_page)
+	if err != nil {
+		WriteTemplatePage(w, hello_tmpl, conf)
+		log.Printf("Hello serve %s\n", "hello_tmpl")
+	} else {
+		http.ServeFile(w, r, hello_page)
+		log.Printf("Hello serve %s\n", hello_page)
+	}
+}
+
+//---------------------------------------------------------------------------
+// media file handler
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) MediaHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Media %s to %s\n", r.URL.Path, r.Host)
+
+	_, err := os.Stat(r.URL.Path[1:])
+	if err != nil {
+		WriteResponseMessage(w, 404, r.URL.Path+" is Not Found")
+	} else {
+		WriteResponseMessage(w, 200, r.URL.Path)
+	}
+}
+
+//---------------------------------------------------------------------------
+// media file handler
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) WebsocketHandler(ws *websocket.Conn) {
+	log.Printf("Websocket \n")
+
+	err := websocket.Message.Send(ws, "Not yet implemented")
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+//---------------------------------------------------------------------------
+// handle /search access
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) SearchHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+
+	err := WriteResponseMessage(w, 200, "/search: Not yet implemented")
+	if err != nil {
+		log.Println(err)
+	}
+
+	return
+}
+
+//---------------------------------------------------------------------------
+// handle /search access
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) StatusHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+
+	err := WriteResponseMessage(w, 200, "/status: Not yet implemented")
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+//---------------------------------------------------------------------------
+// handle /stream access
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) StreamHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+
+	var err error
+	sbuf := conf.Ring
+
+	switch r.Method {
+	case "POST": // for Caster
+		sbuf.Boundary, err = GetTypeBoundary(r.Header.Get("Content-Type"))
+
+		err = ResponsePost(w, sbuf.Boundary)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		mr := multipart.NewReader(r.Body, sbuf.Boundary)
+
+		err = ReadMultipartToRing(mr, sbuf)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+	case "GET": // for Player
+		err = ResponseGet(w, sbuf.Boundary)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		err = WriteRingInMultipart(w, sbuf)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+	default:
+		log.Println("Unknown request method: ", r.Method)
+	}
+
+	return
+}
+
+//---------------------------------------------------------------------------
+// for http access
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) ServeHttp(wg *sync.WaitGroup) {
+	log.Println("Starting HTTP server at http://" + ph.Port + ":" + ph.PortTls)
+	defer wg.Done()
+
+	srv := &http.Server{
+		Addr: ":" + ph.Port,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
+	}
+
+	log.Fatal(srv.ListenAndServe())
+}
+
+//---------------------------------------------------------------------------
+// for https tls access
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) ServeHttps(wg *sync.WaitGroup) {
+	log.Println("Starting HTTPS server at https://" + ph.Port + ":" + ph.PortTls)
+	defer wg.Done()
+
+	srv := &http.Server{
+		Addr: ":" + ph.PortTls,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
+	}
+
+	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
+}
+
+//---------------------------------------------------------------------------
+// for http2 tls access
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) ServeHttp2(wg *sync.WaitGroup) {
+	log.Println("Starting HTTP2 server at https://" + ph.Host + ":" + ph.PortTls)
+	defer wg.Done()
+
+	srv := &http.Server{
+		Addr: ":" + ph.Port2,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
+	}
+
+	http2.ConfigureServer(srv, &http2.Server{})
+	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
+}
+
+//---------------------------------------------------------------------------
+// for ws access
+// http://www.ajanicij.info/content/websocket-tutorial-go
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) ServeWs(wg *sync.WaitGroup) {
+	log.Println("Starting WS server at https://" + ph.Host + ":" + ph.Port)
+	defer wg.Done()
+
+	srv := &http.Server{
+		Addr: ":" + ph.Port,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
+	}
+
+	log.Fatal(srv.ListenAndServe())
+}
+
+//---------------------------------------------------------------------------
+// for wss access
+//---------------------------------------------------------------------------
+func (ph *ProtoHttp) ServeWss(wg *sync.WaitGroup) {
+	log.Println("Starting WSS server at https://" + ph.Host + ":" + ph.PortTls)
+	defer wg.Done()
+
+	srv := &http.Server{
+		Addr: ":" + ph.PortTls,
+		//ReadTimeout:  30 * time.Second,
+		//WriteTimeout: 30 * time.Second,
+	}
+
+	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
 }
 
 //---------------------------------------------------------------------------
@@ -199,7 +660,7 @@ func ReadPartToData(mr *multipart.Reader) ([]byte, error) {
 //---------------------------------------------------------------------------
 //	receive a part to slot of buffer
 //---------------------------------------------------------------------------
-func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
+func ReadPartToSlot(mr *multipart.Reader, slot *sr.StreamSlot) error {
 	var err error
 
 	p, err := mr.NextPart()
@@ -215,11 +676,11 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 		return err
 	}
 
-	ss.Length = 0
+	slot.Length = 0
 
 	var tn int
 	for tn < nl {
-		n, err := p.Read(ss.Content[tn:])
+		n, err := p.Read(slot.Content[tn:])
 		if err != nil {
 			log.Println(err)
 			return err
@@ -227,10 +688,10 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 		tn += n
 	}
 
-	ss.Length = nl
-	ss.Type = p.Header.Get(sb.STR_HDR_CONTENT_TYPE)
-	ss.Timestamp = sb.GetTimestampNow()
-	//fmt.Println(ss)
+	slot.Length = nl
+	slot.Type = p.Header.Get(sb.STR_HDR_CONTENT_TYPE)
+	slot.Timestamp = sb.GetTimestampNow()
+	//fmt.Println(slot)
 
 	return err
 }
@@ -322,55 +783,6 @@ func PrepareRing(nb int, size int, desc string) *sr.StreamRing {
 	fmt.Println(sbuf)
 
 	return sbuf
-}
-
-//---------------------------------------------------------------------------
-// for http access
-//---------------------------------------------------------------------------
-func (ph *ProtoHttp) ServeHttp(wg *sync.WaitGroup) {
-	log.Println("Starting HTTP server at http://" + ph.Host + ":" + ph.Port)
-	defer wg.Done()
-
-	srv := &http.Server{
-		Addr: ":" + ph.Port,
-		//ReadTimeout:  30 * time.Second,
-		//WriteTimeout: 30 * time.Second,
-	}
-
-	log.Fatal(srv.ListenAndServe())
-}
-
-//---------------------------------------------------------------------------
-// for https tls access
-//---------------------------------------------------------------------------
-func (ph *ProtoHttp) ServeHttps(wg *sync.WaitGroup) {
-	log.Println("Starting HTTPS server at https://" + ph.Host + ":" + ph.PortTls)
-	defer wg.Done()
-
-	srv := &http.Server{
-		Addr: ":" + ph.PortTls,
-		//ReadTimeout:  30 * time.Second,
-		//WriteTimeout: 30 * time.Second,
-	}
-
-	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
-}
-
-//---------------------------------------------------------------------------
-// for http2 tls access
-//---------------------------------------------------------------------------
-func (ph *ProtoHttp) ServeHttp2(wg *sync.WaitGroup) {
-	log.Println("Starting HTTP2 server at https://" + ph.Host + ":" + ph.Port2)
-	defer wg.Done()
-
-	srv := &http.Server{
-		Addr: ":" + ph.Port2,
-		//ReadTimeout:  30 * time.Second,
-		//WriteTimeout: 30 * time.Second,
-	}
-
-	http2.ConfigureServer(srv, &http2.Server{})
-	log.Fatal(srv.ListenAndServeTLS("sec/cert.pem", "sec/key.pem"))
 }
 
 //---------------------------------------------------------------------------
@@ -580,14 +992,14 @@ func WriteImageInPart(w io.Writer, dtype string, boundary string) error {
 //---------------------------------------------------------------------------
 // send slot in multipart format with boundary (standard style)
 //---------------------------------------------------------------------------
-func WriteSlotInPart(w io.Writer, ss *sr.StreamSlot, boundary string) error {
+func WriteSlotInPart(w io.Writer, slot *sr.StreamSlot, boundary string) error {
 	var err error
 
 	mw := multipart.NewWriter(w)
 	mw.SetBoundary(boundary)
 	part, err := mw.CreatePart(textproto.MIMEHeader{
-		"Content-Type":   {ss.Type},
-		"Content-Length": {strconv.Itoa(ss.Length)},
+		"Content-Type":   {slot.Type},
+		"Content-Length": {strconv.Itoa(slot.Length)},
 	})
 	if err != nil {
 		log.Println(err)
@@ -595,7 +1007,7 @@ func WriteSlotInPart(w io.Writer, ss *sr.StreamSlot, boundary string) error {
 	}
 
 	buf := new(bytes.Buffer)
-	_, err = buf.Write(ss.Content[:ss.Length])
+	_, err = buf.Write(slot.Content[:slot.Length])
 	_, err = buf.WriteTo(part)
 
 	return err

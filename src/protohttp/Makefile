@@ -11,6 +11,9 @@ edit e:
 et:
 	vi $(PACKAGE)_test.go
 
+ed:
+	vi $(PACKAGE)_data.go
+
 build b:
 	go build
 

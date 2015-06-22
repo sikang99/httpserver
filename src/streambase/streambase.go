@@ -35,12 +35,13 @@ const (
 )
 
 const (
-	STR_DEF_MODE = "normal" // or "secure"
-	STR_DEF_HOST = "localhost"
-	STR_DEF_PORT = "8080"
-	STR_DEF_PTLS = "8443"
-	STR_DEF_BDRY = "myboundary"
-	STR_DEF_PATN = "*.jpg"
+	STR_DEF_MODE  = "normal" // or "secure"
+	STR_DEF_HOST  = "localhost"
+	STR_DEF_PORT  = "8080"
+	STR_DEF_PORT2 = "8081" // 8443?
+	STR_DEF_PTLS  = "8082"
+	STR_DEF_BDRY  = "myboundary"
+	STR_DEF_PATN  = "*.jpg"
 )
 
 const (

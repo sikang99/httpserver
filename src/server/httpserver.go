@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -84,9 +85,9 @@ const (
 var (
 	fmode  = flag.String("m", "player", "Working mode of program [caster|server|player|reader|sender|receiver|shooter|catcher]")
 	fhost  = flag.String("host", "localhost", "server host address")
-	fport  = flag.String("port", "8000", "TCP port to be used for http")
-	fports = flag.String("ports", "8001", "TCP port to be used for https")
-	fport2 = flag.String("port2", "8002", "TCP port to be used for http2")
+	fport  = flag.String("port", sb.STR_DEF_PORT, "TCP port to be used for http")
+	fports = flag.String("ports", sb.STR_DEF_PTLS, "TCP port to be used for https")
+	fport2 = flag.String("port2", sb.STR_DEF_PORT2, "TCP port to be used for http2")
 	furl   = flag.String("url", "http://localhost:8000/[index|hello|/stream]", "url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
 	vflag  = flag.Bool("verbose", false, "Verbose display")
@@ -94,6 +95,8 @@ var (
 
 //---------------------------------------------------------------------------
 func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	//log.SetOutput(os.Stdout)
 	//log.SetPrefix("TRACE: ")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -147,8 +150,6 @@ var conf = ServerConfig{
 // a single program including client and server in go style
 //---------------------------------------------------------------------------
 func main() {
-	//flag.Parse()
-
 	// check arguments
 	if flag.NFlag() == 0 && flag.NArg() == 0 {
 		flag.Usage()
@@ -170,44 +171,44 @@ func main() {
 	switch *fmode {
 	// package protohttp
 	case "http_reader":
-		ActHttpReader(*furl, conf.Ring)
+		StreamReader(*furl, conf.Ring)
 	case "http_player":
-		ActHttpPlayer(*furl, conf.Ring)
+		StreamPlayer(*furl, conf.Ring)
 	case "http_caster":
-		ActHttpCaster(*furl)
-	case "http_monitor":
-		ActHttpMonitor(*furl)
+		StreamCaster(*furl)
 	case "http_server":
-		ActHttpServer()
+		StreamServer()
+	case "http_monitor":
+		StreamMonitor(*furl)
 
 	// package prototcp
-	case "tcp_caste":
-		pt.NewProtoTcpWithParams("localhost", "8087", "T-Tx").ActCaster()
+	case "tcp_caster":
+		pt.NewProtoTcpWithPorts("8087").StreamCaster()
 	case "tcp_server":
-		tr := pt.NewProtoTcpWithParams("localhost", "8087", "T-Rx")
-		tr.ActServer(conf.Ring)
+		ts := pt.NewProtoTcpWithPorts("8087")
+		ts.StreamServer(conf.Ring)
 	case "tcp_player":
-		tr := pt.NewProtoTcpWithParams("localhost", "8087", "T-Rx")
-		tr.ActPlayer(conf.Ring)
+		tp := pt.NewProtoTcpWithPorts("8087")
+		tp.StreamPlayer(conf.Ring)
 
 	// package protows
 	case "ws_caster":
-		ws := pw.NewProtoWs("localhost", "8087", "8443", "W-Tx")
-		ws.StreamCaster()
+		wc := pw.NewProtoWsWithPorts("8087", "8443")
+		wc.StreamCaster()
 	case "ws_server":
-		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		wr.StreamServer()
+		ws := pw.NewProtoWsWithPorts("8087", "8443")
+		ws.StreamServer()
 	case "ws_player":
-		wr := pw.NewProtoWs("localhost", "8087", "8443", "W-Rx")
-		wr.StreamPlayer()
+		wp := pw.NewProtoWsWithPorts("8087", "8443")
+		wp.StreamPlayer()
 
 	// package protofile
 	case "file_reader":
 		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rr")
 		fr.StreamReader(conf.Ring)
 	case "file_writer":
-		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Wr")
-		fr.StreamWriter(conf.Ring)
+		fw := pf.NewProtoFile("./static/image/*.jpg", "F-Wr")
+		fw.StreamWriter(conf.Ring)
 
 	default:
 		fmt.Println("Unknown working mode")
@@ -278,7 +279,7 @@ func ParseCommand(cmdstr string) error {
 //---------------------------------------------------------------------------
 // http monitor client
 //---------------------------------------------------------------------------
-func ActHttpMonitor(url string) error {
+func StreamMonitor(url string) error {
 	log.Printf("%s for %s\n", ph.STR_HTTP_MONITOR, url)
 
 	var err error
@@ -310,9 +311,47 @@ func ActHttpMonitor(url string) error {
 }
 
 //---------------------------------------------------------------------------
+//	multipart reader entry, mainly from camera
+//---------------------------------------------------------------------------
+func StreamReader(url string, sbuf *sr.StreamRing) {
+	log.Printf("%s for %s\n", ph.STR_HTTP_READER, url)
+
+	var err error
+	var res *http.Response
+
+	// WHY: different behavior?
+	if strings.Contains(url, "axis") {
+		res, err = http.Get(url)
+	} else {
+		client := ph.NewClientConfig()
+		res, err = client.Get(url)
+	}
+	if err != nil {
+		log.Fatalf("GET of %q: %v", url, err)
+	}
+	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
+
+	sbuf.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
+	mr := multipart.NewReader(res.Body, sbuf.Boundary)
+
+	err = ph.ReadMultipartToRing(mr, sbuf)
+}
+
+//---------------------------------------------------------------------------
+// http caster client
+//---------------------------------------------------------------------------
+func StreamCaster(url string) error {
+	log.Printf("%s for %s\n", ph.STR_HTTP_CASTER, url)
+
+	hp := ph.NewProtoHttp("localhost", "8080")
+	client := ph.NewClientConfig()
+	return hp.RequestPost(client)
+}
+
+//---------------------------------------------------------------------------
 // http player client
 //---------------------------------------------------------------------------
-func ActHttpPlayer(url string, sbuf *sr.StreamRing) error {
+func StreamPlayer(url string, sbuf *sr.StreamRing) error {
 	log.Printf("%s for %s\n", ph.STR_HTTP_PLAYER, url)
 
 	var err error
@@ -339,47 +378,9 @@ func ActHttpPlayer(url string, sbuf *sr.StreamRing) error {
 }
 
 //---------------------------------------------------------------------------
-// http caster client
-//---------------------------------------------------------------------------
-func ActHttpCaster(url string) error {
-	log.Printf("%s for %s\n", ph.STR_HTTP_CASTER, url)
-
-	hp := ph.NewProtoHttp("localhost", "8080")
-	client := ph.NewClientConfig()
-	return hp.RequestPost(client)
-}
-
-//---------------------------------------------------------------------------
-//	multipart reader entry, mainly from camera
-//---------------------------------------------------------------------------
-func ActHttpReader(url string, sbuf *sr.StreamRing) {
-	log.Printf("%s for %s\n", ph.STR_HTTP_READER, url)
-
-	var err error
-	var res *http.Response
-
-	// WHY: different behavior?
-	if strings.Contains(url, "axis") {
-		res, err = http.Get(url)
-	} else {
-		client := ph.NewClientConfig()
-		res, err = client.Get(url)
-	}
-	if err != nil {
-		log.Fatalf("GET of %q: %v", url, err)
-	}
-	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
-
-	sbuf.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
-	mr := multipart.NewReader(res.Body, sbuf.Boundary)
-
-	err = ph.ReadMultipartToRing(mr, sbuf)
-}
-
-//---------------------------------------------------------------------------
 // http server entry
 //---------------------------------------------------------------------------
-func ActHttpServer() error {
+func StreamServer() error {
 	log.Println("Happy Media Server")
 
 	http.HandleFunc("/", indexHandler)
@@ -419,9 +420,9 @@ func ActHttpServer() error {
 		go serveWss(&wg)
 	*/
 
-	go ActHttpReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
-	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").ActServer(conf.Ring)
-	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").ActCaster(conf.Ring)
+	go StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", conf.Ring)
+	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(conf.Ring)
+	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").StreamCaster(conf.Ring)
 
 	wg.Wait()
 
