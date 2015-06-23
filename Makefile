@@ -7,7 +7,13 @@ all: usage
 PROGRAM=httpserver
 EDITOR=vim
 
-edit e:
+#------------------------------------------------------------------------------------
+edit: 
+	@echo ""
+	@echo "make (edit) [e|ew|em]"
+	@echo ""
+
+e:
 	$(EDITOR) src/server/$(PROGRAM).go
 
 ew:
@@ -17,19 +23,22 @@ em:
 	$(EDITOR) src/base/mjpeg.go
 
 
+#------------------------------------------------------------------------------------
 build b:
 	go build -o $(PROGRAM) src/server/$(PROGRAM).go
 	@ls -alF --color=auto
 
+#------------------------------------------------------------------------------------
 run r:
 	@echo ""
 	@echo "make (run) [rh|rh2|rc|rc2|rs|rm]"
-	@echo "    rh  : run server and access to it with http"
-	@echo "    rh2 : run server and access to it with http2"
+	@echo "    rh  : run server"
+	@echo "    rh2 : run server with http2"
 	@echo "    rs  : run server"
-	@echo "    rp  : run player for http"
-	@echo "    rp2 : run player for http2"
-	@echo "    rc : run caster for http"
+	@echo "    rp  : run player"
+	@echo "    rp2 : run player with http2"
+	@echo "    rc  : run caster"
+	@echo "    rm  : run reader"
 	@echo "    rm  : run monitor"
 	@echo ""
 
@@ -102,6 +111,7 @@ rdt:
 rt:
 	curl -I http://localhost:8080/stream
 
+#------------------------------------------------------------------------------------
 ping:
 	ping -c 3 192.168.0.91
 

@@ -24,6 +24,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/fatih/color"
+
 	sb "stoney/httpserver/src/streambase"
 	si "stoney/httpserver/src/streamimage"
 	sr "stoney/httpserver/src/streamring"
@@ -256,8 +258,8 @@ func ReadMultipartToRing(mr *multipart.Reader, ring *sr.StreamRing) error {
 		log.Println(sb.RedString("ErrStatus/ReadMultipartToRing"))
 		return sb.ErrStatus
 	}
-
 	fmt.Println(ring)
+
 	// insert slots to the buffer
 	for i := 0; true; i++ {
 		//pre, pos := ring.ReadSlotIn()
@@ -271,7 +273,7 @@ func ReadMultipartToRing(mr *multipart.Reader, ring *sr.StreamRing) error {
 			log.Println(err)
 			break
 		}
-		fmt.Println(i, pos, slot)
+		//fmt.Println(i, pos, slot)
 
 		ring.SetPosInByPos(pos + 1)
 	}
@@ -387,6 +389,7 @@ func WriteRingInMultipart(w io.Writer, ring *sr.StreamRing) error {
 		log.Println(sb.RedString("ErrStatus/WriteRingInMultipart"))
 		return sb.ErrStatus
 	}
+	//fmt.Println(ring)
 
 	var pos int
 	for {
@@ -405,7 +408,7 @@ func WriteRingInMultipart(w io.Writer, ring *sr.StreamRing) error {
 			log.Println(err)
 			break
 		}
-		fmt.Println(slot)
+		//fmt.Println(slot)
 
 		pos = npos
 	}
@@ -426,8 +429,8 @@ func WriteDirInMultipart(w io.Writer, pat string, loop bool) error {
 		return err
 	}
 	if files == nil {
-		log.Println("no matched file")
-		return err
+		log.Println(color.RedString("ErrFound/WriteDirInMultipart"))
+		return sb.ErrFound
 	}
 
 	for {

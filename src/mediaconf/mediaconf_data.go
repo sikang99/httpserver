@@ -99,8 +99,9 @@ func NewServerConfig() *ServerConfig {
 	sc.Host = sb.STR_DEF_HOST
 	sc.Port = sb.STR_DEF_PORT
 	sc.PortS = sb.STR_DEF_PTLS
+	sc.Port2 = sb.STR_DEF_PORT2
 
-	sc.Ring = sr.NewStreamRingWithParams(3, sb.MBYTE, "Server ring buffer")
+	sc.Ring = sr.NewStreamRingWithParams(3, sb.MBYTE, "Server stream buffer")
 
 	return sc
 }

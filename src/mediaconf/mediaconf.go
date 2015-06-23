@@ -114,7 +114,7 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 //---------------------------------------------------------------------------
 //	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
-func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) {
+func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) error {
 	log.Printf("%s for %s\n", ph.STR_HTTP_READER, url)
 
 	var err error
@@ -136,6 +136,8 @@ func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) {
 	mr := multipart.NewReader(res.Body, ring.Boundary)
 
 	err = ph.ReadMultipartToRing(mr, ring)
+
+	return err
 }
 
 //---------------------------------------------------------------------------

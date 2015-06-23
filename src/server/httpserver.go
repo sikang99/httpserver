@@ -24,18 +24,18 @@ import (
 
 //---------------------------------------------------------------------------
 const (
-	STR_MEDIA_VERSION = "0.9.3"
+	STR_MEDIA_VERSION = "0.9.5"
 	STR_MEDIA_SYSTEM  = "Happy Media System"
 )
 
 //---------------------------------------------------------------------------
 var (
-	fmode  = flag.String("m", "player", "Working mode of program [caster|server|player|reader|sender|receiver|shooter|catcher]")
+	fmode  = flag.String("m", "player", "Working mode of program")
 	fhost  = flag.String("host", "localhost", "server host address")
 	fport  = flag.String("port", sb.STR_DEF_PORT, "TCP port to be used for http")
 	fports = flag.String("ports", sb.STR_DEF_PTLS, "TCP port to be used for https")
 	fport2 = flag.String("port2", sb.STR_DEF_PORT2, "TCP port to be used for http2")
-	furl   = flag.String("url", "http://localhost:8000/[index|hello|/stream]", "url to be accessed")
+	furl   = flag.String("url", "http://localhost:8080/[index|hello|/stream]", "url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
 	vflag  = flag.Bool("verbose", false, "Verbose display")
 )
@@ -44,6 +44,7 @@ var (
 // init for main
 //---------------------------------------------------------------------------
 func init() {
+	// maximize concurrency
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	//log.SetOutput(os.Stdout)
@@ -90,11 +91,10 @@ func main() {
 	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
 	fmt.Printf("Working mode: %s\n", sc.Mode)
 
-	//hp := ph.NewProtoHttpWithPorts(sc.Port, sc.PortS, sc.Port2)
 	tp := pt.NewProtoTcpWithPorts("8087")
 	wp := pw.NewProtoWsWithPorts("8087", "8443")
 
-	// let's do by the working mode
+	// let's do work by the working mode
 	switch sc.Mode {
 
 	// package protohttp
