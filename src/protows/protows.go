@@ -282,7 +282,7 @@ func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 
 			err = websocket.Message.Receive(ws, &rmsg)
 			if err != nil {
-				sb.LogPrintln(err)
+				log.Println(sb.RedString(err))
 				break
 			}
 			//log.Println("Received from client: " + rmsg)
@@ -295,7 +295,7 @@ func (pw *ProtoWs) EchoHandler(ws *websocket.Conn) {
 			smsg := "Echo " + rmsg
 			err = websocket.Message.Send(ws, smsg)
 			if err != nil {
-				sb.LogPrintln(err)
+				log.Println(sb.RedString(err))
 				break
 			}
 			//log.Println("Sending to client: " + smsg)
@@ -832,7 +832,7 @@ func WriteRingInMultipart(w *bufio.Writer, ring *sr.StreamRing) error {
 	var err error
 
 	if !ring.IsUsing() {
-		sb.LogPrintln("ErrStatus")
+		log.Println(sb.RedString("ErrStatus"))
 		return sb.ErrStatus
 	}
 

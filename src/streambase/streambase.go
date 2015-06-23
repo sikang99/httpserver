@@ -188,8 +188,8 @@ func IsTerminal() bool {
 //---------------------------------------------------------------------------
 // print interface in colored log
 //---------------------------------------------------------------------------
-func LogPrintln(obj interface{}) {
-	log.Println(color.RedString(fmt.Sprint(obj)))
+func RedString(obj interface{}) string {
+	return color.RedString(fmt.Sprint(obj))
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

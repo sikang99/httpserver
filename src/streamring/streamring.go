@@ -193,6 +193,12 @@ func NewStreamRing(num int, size int) *StreamRing {
 	}
 }
 
+func NewStreamRingWithParams(num int, size int, desc string) *StreamRing {
+	ring := NewStreamRing(num, size)
+	ring.Desc = desc
+	return ring
+}
+
 //----------------------------------------------------------------------------------
 // get the number of slots in buffer for used(len) and allocted(cap)
 //----------------------------------------------------------------------------------
