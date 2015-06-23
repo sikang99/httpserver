@@ -26,6 +26,7 @@ import (
 
 	pf "stoney/httpserver/src/protofile"
 	ph "stoney/httpserver/src/protohttp"
+	pt "stoney/httpserver/src/prototcp"
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
@@ -292,7 +293,7 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 	*/
 
 	//go sc.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", ring)
-	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(ring)
+	go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(ring)
 	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").StreamCaster(ring)
 
 	wg.Wait()

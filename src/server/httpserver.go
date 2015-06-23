@@ -73,12 +73,12 @@ func main() {
 	sc := mc.NewServerConfig()
 
 	// set command parameters to config
+	sc.Mode = *fmode
 	sc.Url = *furl
 	sc.Host = *fhost
 	sc.Port = *fport
 	sc.PortS = *fports
 	sc.Port2 = *fport2
-	sc.Mode = *fmode
 
 	fmt.Printf("%s, v.%s\n", STR_MEDIA_SYSTEM, STR_MEDIA_VERSION)
 	fmt.Printf("Default config: %s,%s,%s\n", sc.Port, sc.PortS, sc.Port2)
