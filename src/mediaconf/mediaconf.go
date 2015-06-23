@@ -11,6 +11,7 @@ package mediaconf
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -96,19 +97,33 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 	switch res[0] {
 	case "show":
 		if len(res) < 2 {
-			fmt.Printf("usage: show [network|channel|ring]\n")
+			fmt.Printf("usage: show [config|network|channel|ring]\n")
 			break
 		}
+
+		params := url.Values{}
+
 		switch res[1] {
 		case "network":
 			sb.ShowNetInterfaces()
 		case "channel":
 			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
 		case "ring":
-			fmt.Println(sc.Ring)
+			params.Add("command", "ring")
+		case "config":
+			params.Add("command", "config")
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
 		}
+
+		baseUrl.RawQuery = params.Encode()
+		res, err := http.Get(fmt.Sprint(baseUrl))
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		body, err := ioutil.ReadAll(res.Body)
+		fmt.Println(string(body))
 
 	case "start":
 		if len(res) < 2 {
@@ -116,30 +131,29 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 			break
 		}
 
+		params := url.Values{}
+
 		switch res[1] {
 		case "read":
-			params := url.Values{}
 			params.Add("command", "read")
 			params.Add("url", "http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
-			baseUrl.RawQuery = params.Encode()
 
 		case "write":
-			params := url.Values{}
 			params.Add("command", "write")
-			params.Add("file", "record.mjpg")
-			baseUrl.RawQuery = params.Encode()
+			params.Add("file", "record/output.mjpg")
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
 			break
 		}
 
-		fmt.Println(baseUrl)
+		baseUrl.RawQuery = params.Encode()
 		res, err := http.Post(fmt.Sprint(baseUrl), "text/plain", nil)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
-		fmt.Println(res)
+		body, err := ioutil.ReadAll(res.Body)
+		fmt.Println(string(body))
 
 	case "help":
 		if len(res) < 2 {
@@ -383,14 +397,14 @@ func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		switch command {
+		case "config":
+			str := fmt.Sprint(sc)
+			err = ph.WriteResponseMessage(w, http.StatusOK, str)
 		case "ring":
+			fallthrough
 		default:
 			str := fmt.Sprint(ring)
 			err = ph.WriteResponseMessage(w, http.StatusOK, str)
-			if err != nil {
-				log.Println(err)
-				return
-			}
 		}
 
 	case "POST":
@@ -411,10 +425,10 @@ func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		err = ph.WriteResponseMessage(w, http.StatusMethodNotAllowed, "/status: Not yet implemented")
-		if err != nil {
-			log.Println(err)
-			return
-		}
+	}
+
+	if err != nil {
+		log.Println(err)
 	}
 }
 
