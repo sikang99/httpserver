@@ -34,6 +34,7 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 	log.Printf("%s for %s\n", ph.STR_HTTP_MONITOR, url)
 
 	var err error
+	var prestr string
 
 	r := bufio.NewReader(os.Stdin)
 	for {
@@ -41,15 +42,25 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 
 		line, _, err := r.ReadLine()
 		if err != nil {
-			continue
+			log.Println(err)
+			break
 		}
 
 		cmdstr := strings.Replace(string(line), "\r", "", -1)
+		if cmdstr == "" {
+			continue
+		}
 
 		if strings.EqualFold(cmdstr, "quit") {
 			fmt.Println("Bye bye.")
-			return err
+			break
+		} else if cmdstr == "." {
+			// previous command
+			cmdstr = prestr
 		}
+
+		// remember command
+		prestr = cmdstr
 
 		err = sc.ParseCommand(cmdstr)
 		if err != nil {
@@ -90,9 +101,24 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
 		}
+
+	case "start":
+		if len(res) < 2 {
+			fmt.Printf("usage: start [read|write]\n")
+			break
+		}
+		switch res[1] {
+		case "read":
+			go sc.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", sc.Ring)
+		case "write":
+			fallthrough
+		default:
+			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+		}
+
 	case "help":
 		if len(res) < 2 {
-			fmt.Printf("usage: help [show|act]\n")
+			fmt.Printf("usage: help [show|start]\n")
 			break
 		}
 		switch res[1] {
@@ -105,7 +131,7 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 		}
 
 	default:
-		fmt.Printf("usage: [show|help|quit]\n")
+		fmt.Printf("usage: [show|start|help|quit]\n")
 	}
 
 	return err
@@ -303,7 +329,9 @@ func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
 func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	err := ph.WriteResponseMessage(w, 200, "/search: Not yet implemented")
+	var err error
+
+	err = ph.WriteResponseMessage(w, 200, "/search: Not yet implemented")
 	if err != nil {
 		log.Println(err)
 	}
@@ -317,9 +345,25 @@ func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
 func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
-	err := ph.WriteResponseMessage(w, 200, "/status: Not yet implemented")
-	if err != nil {
-		log.Println(err)
+	var err error
+	ring := sc.Ring
+
+	switch r.Method {
+	case "GET":
+		str := fmt.Sprint(ring)
+		err = ph.WriteResponseMessage(w, 200, str)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	case "POST":
+		fallthrough
+	default:
+		err = ph.WriteResponseMessage(w, 200, "/status: Not yet implemented")
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 }
 

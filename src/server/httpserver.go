@@ -31,7 +31,7 @@ const (
 //---------------------------------------------------------------------------
 var (
 	fmode  = flag.String("m", "player", "Working mode of program")
-	fhost  = flag.String("host", "localhost", "server host address")
+	fhost  = flag.String("host", sb.STR_DEF_HOST, "server host address")
 	fport  = flag.String("port", sb.STR_DEF_PORT, "TCP port to be used for http")
 	fports = flag.String("ports", sb.STR_DEF_PTLS, "TCP port to be used for https")
 	fport2 = flag.String("port2", sb.STR_DEF_PORT2, "TCP port to be used for http2")

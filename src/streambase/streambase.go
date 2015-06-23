@@ -38,8 +38,9 @@ const (
 	STR_DEF_MODE  = "normal" // or "secure"
 	STR_DEF_HOST  = "localhost"
 	STR_DEF_PORT  = "8080"
-	STR_DEF_PTLS  = "8081"
-	STR_DEF_PORT2 = "8082" // 8443?
+	STR_DEF_PTLS  = "8081" // for HTTPS
+	STR_DEF_PORT2 = "8082" // for HTTP2
+	STR_DEF_PORTM = "8088" // for Monitor
 	STR_DEF_BDRY  = "myboundary"
 	STR_DEF_PATN  = "*.jpg"
 )
