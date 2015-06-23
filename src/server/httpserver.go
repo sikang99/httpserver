@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"runtime"
 
@@ -71,12 +70,6 @@ func main() {
 		flag.Usage()
 	}
 
-	url, err := url.ParseRequestURI(*furl)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
 	sc := mc.NewServerConfig()
 
 	// set command parameters to config
@@ -88,7 +81,7 @@ func main() {
 	sc.Mode = *fmode
 
 	fmt.Printf("%s, v.%s\n", STR_MEDIA_SYSTEM, STR_MEDIA_VERSION)
-	fmt.Printf("Default config: %s %s\n", url.Scheme, url.Host)
+	fmt.Printf("Default config: %s,%s,%s\n", sc.Port, sc.PortS, sc.Port2)
 	fmt.Printf("Working mode: %s\n", sc.Mode)
 
 	tp := pt.NewProtoTcpWithPorts("8087")

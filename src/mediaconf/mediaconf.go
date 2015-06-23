@@ -14,6 +14,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/bradfitz/http2"
 
+	pf "stoney/httpserver/src/protofile"
 	ph "stoney/httpserver/src/protohttp"
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
@@ -85,6 +87,12 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 	}
 	//fmt.Println(res)
 
+	baseUrl, err := url.Parse("http://localhost:8080/status")
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
 	switch res[0] {
 	case "show":
 		if len(res) < 2 {
@@ -107,14 +115,31 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 			fmt.Printf("usage: start [read|write]\n")
 			break
 		}
+
 		switch res[1] {
 		case "read":
-			go sc.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", sc.Ring)
+			params := url.Values{}
+			params.Add("command", "read")
+			params.Add("url", "http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
+			baseUrl.RawQuery = params.Encode()
+
 		case "write":
-			fallthrough
+			params := url.Values{}
+			params.Add("command", "write")
+			params.Add("file", "record.mjpg")
+			baseUrl.RawQuery = params.Encode()
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+			break
 		}
+
+		fmt.Println(baseUrl)
+		res, err := http.Post(fmt.Sprint(baseUrl), "text/plain", nil)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		fmt.Println(res)
 
 	case "help":
 		if len(res) < 2 {
@@ -122,13 +147,16 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 			break
 		}
 		switch res[1] {
-		case "act":
-			fallthrough
 		case "show":
+			fallthrough
+		case "start":
 			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+			break
 		}
+
+	case "test":
 
 	default:
 		fmt.Printf("usage: [show|start|help|quit]\n")
@@ -154,9 +182,9 @@ func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) error {
 		res, err = client.Get(url)
 	}
 	if err != nil {
-		log.Fatalf("GET of %q: %v", url, err)
+		log.Println(sb.RedString(err))
+		return err
 	}
-	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
 	ring.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, ring.Boundary)
@@ -194,9 +222,9 @@ func (sc *ServerConfig) StreamPlayer(url string, ring *sr.StreamRing) error {
 		res, err = client.Get(url)
 	}
 	if err != nil {
-		log.Fatalf("GET of %q: %v", url, err)
+		log.Println(sb.RedString(err))
+		return err
 	}
-	//log.Printf("Content-Type: %v", res.Header.Get("Content-Type"))
 
 	ring.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, ring.Boundary)
@@ -249,7 +277,7 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 		go sc.ServeWss(&wg)
 	*/
 
-	go sc.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", ring)
+	//go sc.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", ring)
 	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(ring)
 	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").StreamCaster(ring)
 
@@ -298,7 +326,7 @@ func (sc *ServerConfig) HelloHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //---------------------------------------------------------------------------
-// media file handler
+// handle /media to provide on-demand media file request
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) MediaHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Media %s to %s\n", r.URL.Path, r.Host)
@@ -312,7 +340,7 @@ func (sc *ServerConfig) MediaHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //---------------------------------------------------------------------------
-// media file handler
+// websocket handler
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
 	log.Printf("Websocket \n")
@@ -340,26 +368,49 @@ func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //---------------------------------------------------------------------------
-// handle /search access
+// handle /status access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+	log.Printf("Status %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
 	ring := sc.Ring
 
+	query := r.URL.Query()
+	//fmt.Println(query)
+	command := query.Get("command")
+
 	switch r.Method {
 	case "GET":
-		str := fmt.Sprint(ring)
-		err = ph.WriteResponseMessage(w, 200, str)
-		if err != nil {
-			log.Println(err)
-			return
+		switch command {
+		case "ring":
+		default:
+			str := fmt.Sprint(ring)
+			err = ph.WriteResponseMessage(w, http.StatusOK, str)
+			if err != nil {
+				log.Println(err)
+				return
+			}
 		}
+
 	case "POST":
-		fallthrough
+		switch command {
+		case "read":
+			url := query.Get("url")
+			go sc.StreamReader(url, sc.Ring)
+			err = ph.WriteResponseMessage(w, http.StatusOK, "started http_reader")
+		case "write":
+			file := query.Get("file")
+			fp := pf.NewProtoFile()
+			fp.Pattern = file
+			go fp.StreamWriter(sc.Ring)
+			err = ph.WriteResponseMessage(w, http.StatusOK, "started file_writer")
+		default:
+			err = ph.WriteResponseMessage(w, http.StatusNotAcceptable, "noop")
+		}
+
 	default:
-		err = ph.WriteResponseMessage(w, 200, "/status: Not yet implemented")
+		err = ph.WriteResponseMessage(w, http.StatusMethodNotAllowed, "/status: Not yet implemented")
 		if err != nil {
 			log.Println(err)
 			return
@@ -415,7 +466,7 @@ func (sc *ServerConfig) StreamHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //---------------------------------------------------------------------------
-// for http access
+// serve http access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeHttp(wg *sync.WaitGroup) {
 	log.Println("Starting HTTP server at http://" + sc.Host + ":" + sc.Port)
@@ -431,7 +482,7 @@ func (sc *ServerConfig) ServeHttp(wg *sync.WaitGroup) {
 }
 
 //---------------------------------------------------------------------------
-// for https tls access
+// serve https tls access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeHttps(wg *sync.WaitGroup) {
 	log.Println("Starting HTTPS server at https://" + sc.Host + ":" + sc.PortS)
@@ -447,7 +498,7 @@ func (sc *ServerConfig) ServeHttps(wg *sync.WaitGroup) {
 }
 
 //---------------------------------------------------------------------------
-// for http2 tls access
+// serve http2 tls access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeHttp2(wg *sync.WaitGroup) {
 	log.Println("Starting HTTP2 server at https://" + sc.Host + ":" + sc.Port2)
@@ -464,7 +515,7 @@ func (sc *ServerConfig) ServeHttp2(wg *sync.WaitGroup) {
 }
 
 //---------------------------------------------------------------------------
-// for ws access
+// serve ws access
 // http://www.ajanicij.info/content/websocket-tutorial-go
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeWs(wg *sync.WaitGroup) {
@@ -481,7 +532,7 @@ func (sc *ServerConfig) ServeWs(wg *sync.WaitGroup) {
 }
 
 //---------------------------------------------------------------------------
-// for wss access
+// serve wss access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeWss(wg *sync.WaitGroup) {
 	log.Println("Starting WSS server at https://" + sc.Host + ":" + sc.PortS)
@@ -497,7 +548,7 @@ func (sc *ServerConfig) ServeWss(wg *sync.WaitGroup) {
 }
 
 //---------------------------------------------------------------------------
-// static file server handler
+// file server for path
 //---------------------------------------------------------------------------
 func FileServer(path string) http.Handler {
 	log.Println("File server for " + path)

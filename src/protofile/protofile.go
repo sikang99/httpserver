@@ -89,8 +89,9 @@ func NewProtoFile(args ...string) *ProtoFile {
 // act file reader
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
+	log.Printf("%s for %s\n", STR_FILE_READER, pf.Pattern)
+
 	var err error
-	log.Println(STR_FILE_READER)
 
 	err = ReadDirToRing(ring, pf.Pattern, false)
 	fmt.Println(ring)
@@ -102,8 +103,9 @@ func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
 // act file writer
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) StreamWriter(ring *sr.StreamRing) error {
+	log.Printf("%s for %s\n", STR_FILE_WRITER, pf.Pattern)
+
 	var err error
-	log.Println(STR_FILE_WRITER)
 
 	err = WriteRingToMultipartFile(ring, pf.Pattern)
 

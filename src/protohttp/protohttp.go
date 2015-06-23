@@ -259,7 +259,7 @@ func ReadMultipartToRing(mr *multipart.Reader, ring *sr.StreamRing) error {
 		return sb.ErrStatus
 	}
 	defer ring.SetStatusIdle()
-	fmt.Println(ring)
+	//fmt.Println(ring)
 
 	// insert slots to the buffer
 	for i := 0; ring.IsUsing(); i++ {
