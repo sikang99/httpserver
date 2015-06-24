@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8" />
+<title>WebSocket Test</title>
+<script language="javascript" type="text/javascript">
+
+var Queue = function() {
+  this.first = null;
+  this.size = 0;
+};
+
+var Node = function(data) {
+  this.data = data;
+  this.next = null;
+};
+
+Queue.prototype.on = function(callback_fun) {
+  this.callback = callback_fun;
+}
+
+Queue.prototype.noty = function() {
+  if(this.callback != null)
+    this.callback();
+}
+
+Queue.prototype.enqueue = function(data) {
+  var node = new Node(data);
+
+  if (!this.first){
+    this.first = node;
+  } else {
+    n = this.first;
+    while (n.next) {
+      n = n.next;
+    }
+    n.next = node;
+  }
+
+  this.size += 1;
+  return node;
+};
+
+Queue.prototype.dequeue = function() {
+  temp = this.first;
+
+  if(this.first != null) {
+      this.first = this.first.next;
+      this.size -= 1;
+  }
+  return temp;
+};
+
+
+	var wsUri = "ws://116.124.171.49:8050/agilecam?action=stream&channel=1&resource=1";
+	//var wsUri = "ws://10.101.101.49:8050";
+	var output;  function init(spec, picture) {
+		this.callback1 = spec;
+		this.callback2 = picture;
+		output = document.getElementById("output");
+		testWebSocket();
+	}
+
+	function testWebSocket() {
+		websocket = new WebSocket(wsUri);
+		websocket.binaryType = "arraybuffer";
+		websocket.onopen = function(evt) {
+			onOpen(evt)
+		};
+
+		websocket.onclose = function(evt) {
+			onClose(evt)
+		};
+	       
+		websocket.onmessage = function(evt) {
+			onMessage(evt)
+		};
+	       
+		websocket.onerror = function(evt) {
+			onError(evt)
+		};
+	}
+
+	function onOpen(evt) {
+		writeToScreen("CONNECTED");
+		codec_info = '{"type" : "data", "content" : ' +
+			'{"codec" : "h264", "resolution" : "480p"}}';
+		msg = '--agilemedia\r\n' + 
+			'Content-Type: command/text; operation=VIDEO_START\r\n' +
+			'Content-Length: '+ codec_info.length + '\r\n\r\n' +
+	       		codec_info + '\r\n';
+		doSend(msg);
+       	}
+
+	function onClose(evt) {
+		writeToScreen("DISCONNECTED");
+	}
+
+	function reset() {
+	    _cont_type = null;
+	    _operation = null;
+	    _cont_len = 0;
+	    _video_format = null;
+	    _timestamp = null;
+	    _isHead = true;
+	    _stream_len = 0;
+	    _stream = [];
+   	    _code = [];
+	    //_sps = [];
+	    //_pps = [];
+	    _width = 0;
+	    _height = 0;
+
+	    /// Audio..
+	    //_audio_format = null;
+	    //_audio_channel = 0;
+	    //_audio_frequency = 0;
+	}
+
+	var _cont_type;
+	var _operation;
+	var _cont_len;
+	var _video_format;
+	var _timestamp;
+	var _isHead = true;
+	var _stream_len;
+	var _stream = [];
+   	var _code = [];
+	var _sps = [];
+	var _pps = [];
+	var _width;
+	var _height;
+
+	var _first_frame = true;
+
+	const CONTENT_TYPE = "Content-Type";
+	const COMMAND_TYPE = "command/text"
+	const OPERATION = "operation";
+	const CONTENT_LENGTH = "Content-Length";
+	const X_VIDEO_FORMAT = "X-Video-Format";
+	const X_AUDIO_FORMAT = "X-Audio-Format";
+	const X_TIMESTAMP = "X-Timestamp";
+
+	const CONTENT_AVC = "video/avc";
+	const CONTENT_H264 = "video/h264";
+	const CONTENT_AAC = "audio/aac";
+
+	// Audio Variable.
+	//var _audioBufferList;
+    	var _audioPlaying = false;
+	//var _audioPlay;
+
+	var _audio_format;
+	var _audio_channel;
+	var _audio_frequency;
+	var _audio_asc = [];
+	/////////////////////
+
+	var __AudioQue = new Queue();
+	var __AudioPlayer;
+
+	
+	if (typeof String.prototype.startsWith != 'function') {
+  	    String.prototype.startsWith = function (str){
+    		return this.indexOf(str) == 0;
+  	    };
+	}
+
+	function onMessage(evt) {
+		//var dataView = new DataView(evt.data);
+		//writeToScreen('length=' + evt.data.length);
+
+		//DEBUG(evt.type);
+
+		if(evt.data instanceof ArrayBuffer) {
+		    var bytearray = new Uint8Array(evt.data);
+		    //var string = String.fromCharCode.apply(null, bytearray);
+		    //DEBUG(string);
+		    //idr_frame = false;
+		    for(var i=0; i<bytearray.length; i++) {
+			    if(_isHead) {
+			    	if( (i>0) && (bytearray[i-1] == 13) && (bytearray[i] == 10) ) { // '\r\n' check..
+		    		    var head = String.fromCharCode.apply(null, _code);
+				    _code = [];
+
+				    if(head.startsWith(CONTENT_TYPE)) {
+					//DEBUG(head);
+					_cont_type = head.substring(CONTENT_TYPE.length+1, head.length).trim();
+					if(_cont_type == CONTENT_AVC || _cont_type == CONTENT_H264)
+					    _cont_type = CONTENT_AVC;
+					//DEBUG(_cont_type);
+					
+					if(_cont_type.startsWith(COMMAND_TYPE)) {
+					    var indx = _cont_type.indexOf(OPERATION);
+					    if(indx > 0) {
+						_operation = _cont_type.substring(indx+OPERATION.length+1, _cont_type.length).trim();
+						DEBUG(_operation);
+					    }
+					}
+					
+				    } else
+				    if(head.startsWith(CONTENT_LENGTH)) {
+		    		    	//DEBUG(head);
+					_cont_len = Number(head.substring(CONTENT_LENGTH.length+1, head.length).trim());
+					//DEBUG("cont_len=" + _cont_len + ", " + (typeof _cont_len));
+				    } else
+				    if(head.startsWith(X_VIDEO_FORMAT)) {
+					_video_format = head.substring(X_VIDEO_FORMAT.length+1, head.length).trim();
+					//DEBUG(_video_format);
+
+					if(_video_format != null) {
+					    list = _video_format.split(";");
+					    //DEBUG("list.length=" + list.length);
+		    			    for(var z=0;z<list.length; z++) {
+		    				a = list[z].trim();
+						//DEBUG("a=" + a);
+		    				split = a.split("=");
+						if(split.length == 2) {
+						    if(split[0] == "width") {
+							_width = Number(split[1]);
+							//DEBUG("_width=" + _width);
+						    } else
+						    if(split[0] == "height") {
+							_height = Number(split[1]);
+							//DEBUG("_height=" + _height);
+						    } else
+						    if(split[0] == "sps") {
+	    						_sps = [];
+							_sps = hex2bin(split[1]);
+							//_sps[4] = 67;
+						    } else
+						    if(split[0] == "pps") {
+	    						_pps = [];
+							_pps = hex2bin(split[1]);
+							//_pps[4] = 68;
+						    }
+						}
+					    }
+					}
+				    } else
+				    if(head.startsWith(X_AUDIO_FORMAT)) {
+					_audio_format = head.substring(X_AUDIO_FORMAT.length+1, head.length).trim();
+					DEBUG(_audio_format);
+					if(_audio_format != null) {
+					    list = _audio_format.split(";");
+					    //DEBUG("list.length=" + list.length);
+		    			    for(var z=0;z<list.length; z++) {
+		    				a = list[z].trim();
+						//DEBUG("a=" + a);
+		    				split = a.split("=");
+						if(split.length == 2) {
+						    if(split[0] == "format") {
+							DEBUG("format=" + split[1]);
+						    } else
+						    if(split[0] == "channel") {
+							_audio_channel = Number(split[1]);
+							DEBUG("_channel=" + _audio_channel);
+						    } else
+						    if(split[0] == "frequency") {
+							_audio_frequency = Number(split[1]);
+							DEBUG("_frequency=" + _audio_frequency);
+						    } else
+						    if(split[0] == "asc") {
+	    						_audio_asc = [];
+							_audio_asc = hex2bin(split[1]);
+
+							DEBUG("_audio_asc=" + _audio_asc);
+						    }
+						}
+					    }
+					}
+				    } else
+				    if(head.startsWith(X_TIMESTAMP)) {
+					_timestamp = head.substring(X_TIMESTAMP.length+1, head.length).trim();
+					//DEBUG(_timestamp);
+				    }
+
+
+			    	} else {
+				    _code.push(bytearray[i]);
+			    	}
+
+				if( (i>2) && (bytearray[i-3] == 13) && (bytearray[i-2] == 10) && (bytearray[i-1] == 13) && (bytearray[i] == 10) ) {
+				    _isHead = false;
+				    _stream_len = 0;
+				}
+			    } else { // Contents Body..
+				if(_stream_len < _cont_len) {
+				    //DEBUG(bytearray[i]);
+
+				    /*
+				    if(_cont_type == CONTENT_AVC && _stream_len == 0 ) {
+					//DEBUG("START => " + bytearray[0] + ", " + bytearray[1] + ", " + bytearray[2] + ", " + bytearray[3] + ", " + bytearray[4]);
+
+					if(bytearray[i] == 0x00 && bytearray[i+1] == 0x00 && bytearray[i+2] == 0x00 &&
+							bytearray[i+3] == 0x01 && (bytearray[i+4] == 0x65 || bytearray[i+4] == 0x25 || bytearray[i+4] == 0x45)) { // NAL + I Frame.
+					    //_stream = _sps;
+					    for(xx=0; xx<_sps.length; xx++) {
+					        _stream.push(_sps[xx]);
+					    }
+					    //_stream = _stream.concat(_pps);
+					    for(xx=0; xx<_pps.length; xx++) {
+					        _stream.push(_pps[xx]);
+					    }
+					    //DEBUG("IFRAME... SPS, PPS added.. stream LEN: " + _stream.length + ", SPS LEN: " + _sps.length + ", PPS LEN: " + _pps.length);
+					    //DEBUG("_sps=>" + _sps + ", _pps=>" + _pps + ", _stream=>" + _stream);
+
+					    idr_frame = true;
+					    //bytearray[i+4] = 0x65;
+					} else {
+					    //bytearray[i+4] = 0x41;
+					}
+				    } else  
+				     */
+				    if(_cont_type == CONTENT_AAC && _stream_len == 0 ) {
+					var profile = 2;  // AAC LC
+					var freqIdx = 11;
+					var chanCfg = _audio_channel;
+					var id = 0;
+					var temp;
+
+					_stream.push(0xFF);
+					temp = 0xF0;
+					temp |= id << 3;
+					temp |= 0x01;
+					_stream.push(temp);
+					_stream.push(((profile-1)<<6) + (freqIdx<<2) +(chanCfg>>2));
+					_stream.push(( ((chanCfg&3)<<6) & 0xFC) + (_cont_len>>11));
+					_stream.push((_cont_len&0x7FF) >> 3);
+					_stream.push(((_cont_len&7)<<5) + 0x1F);
+					_stream.push(0xFC);
+
+					DEBUG("_channel=" + _audio_channel + ", length=" + _cont_len);
+
+					DEBUG(_stream);
+				    }
+
+				    _stream.push(bytearray[i]);
+				    _stream_len++;
+				}
+				if(_stream_len >= _cont_len) {
+				    //DEBUG("stream len=" + _stream_len + ", content_len=" + _cont_len + ", stream=" + _stream.length);
+				    if(_cont_type == CONTENT_AVC ) {
+					//DEBUG("Video STREAM...");
+
+					if(_video_format != null) {
+					    if(this.callback1) this.callback1(_width, _height, _sps, _pps);
+					    //DEBUG("callback1...");
+					}
+					//DEBUG("_first_frame=>" + _first_frame + ", idr_frame=>" + idr_frame);
+					if(this.callback2) {
+					    /*if(_first_frame && idr_frame) {
+					    	this.callback2(_stream);
+						_first_frame = false;
+					    	//DEBUG("callback2...");
+					    } else if(!_first_frame)*/ {
+					    	this.callback2(_stream);
+					    	//DEBUG("callback2...");
+					    }
+					}
+				    } else
+				    if(_cont_type == CONTENT_AAC) {
+					//DEBUG("Audio STREAM...");
+
+				    	//DEBUG("audio steam => " + _stream);
+					
+					__AudioQue.enqueue(_stream);
+					__AudioQue.noty();
+				
+				        //_audioBufferList.append(new AV.Buffer(_stream));
+					if(_audioPlaying == false) {
+					    _audioPlaying = true;
+
+					    // create a source, asset and player
+
+					    INFO("AUDIO Player started..." + __AudioPlayer.play());
+					} 
+				    }
+
+				    reset();
+				}
+			    }
+			//console.log(bytearray[i]);
+		    }
+		}
+
+
+		//for(int i=0; i++; bytes.
+
+		//writeToScreen('<span style="color: blue;">RESPONSE: ' + evt.data+'</span>');
+		//writeToScreen('=> ' + dataView.getUint8(0));
+		//websocket.close();
+	}
+
+	function onError(evt) {
+		writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
+	}
+
+	function doSend(message) {
+		writeToScreen("SENT: " + message);
+		websocket.send(message);
+	}
+
+	function writeToScreen(message) {
+		var pre = document.createElement("p");
+		pre.style.wordWrap = "break-word";
+		pre.innerHTML = message; output.appendChild(pre);
+	}
+
+	function hex2bin(hex) {
+	    var bytes = [];
+
+	    for(var i=0; i< hex.length-1; i+=2) {
+		bytes.push(parseInt(hex.substr(i, 2), 16));
+	    }
+
+	    //return String.fromCharCode.apply(String, bytes);    
+	    return bytes;
+	}
+
+
+	function DEBUG(d) {
+	    console.debug(d);
+	}
+	
+	function INFO(i) {
+	    console.info(i);
+	}
+
+	function WARNING(w) {
+	    console.warn(w);
+	}
+
+	function ERROR(e) {
+	    console.error(e);
+	}
+
+	//window.addEventListener("load", load, false);
+
+</script>
+
+<script src="sylvester.js" type="text/javascript"></script>
+<script src="glUtils.js" type="text/javascript"></script>
+  
+<script type="text/javascript" src="util.js"></script>
+<script type="text/javascript" src="stream.js"></script>
+<script type="text/javascript" src="worker.js"></script>
+<script type="text/javascript" src="avc-codec.js"></script>
+<script type="text/javascript" src="avc.js"></script>
+<script type="text/javascript" src="mp4.js"></script>
+<script src='canvas.js' type='text/javascript'></script>
+
+
+<script src="aurora.js"></script>
+<script src="aac.js"></script>
+
+  
+<script type="text/javascript">
+    function load() {
+      var nodes = document.querySelectorAll('div.broadway');
+      DEBUG("nodes.length: " + nodes.length);
+      for (var i = 0; i < nodes.length; i++) {
+        var broadway = new Broadway(nodes[i]);
+       // broadway.play();
+      }
+
+      //_audioBufferList = new AV.BufferList;
+      //_audioPlay = AV.Player.fromBuffer(_audioBufferList);
+      //audioPlay.play();
+
+
+	var MySource = AV.EventEmitter.extend({
+      	start: function() {
+	    DEBUG("MySource.start] ....");
+      	    var source = this
+	    
+	    __AudioQue.on(function() {
+	    	var node;
+		while(node = __AudioQue.dequeue()) {
+		    //DEBUG("stream => " + node.data);
+                    source.emit('data', new AV.Buffer(node.data));
+
+		    DEBUG("source.emit..");
+	        }
+
+	    });
+
+            //source.emit('end');
+        },
+
+        pause: function() {
+        },
+
+        reset: function() {}
+     });      
+
+     
+     var source = new MySource();
+     var asset = new AV.Asset(source);
+     __AudioPlayer = new AV.Player(asset);
+
+
+    }
+</script>
+
+
+<body onLoad='javascript:load()'>
+<h2>WebSocket Test</h2>
+
+<div id="output"></div>
+
+<div class="broadway" src="http://10.101.101.49/apps/test/mozilla_story.mp4" width="640" height="360" style="float: left; position: relative;" workers="false" render="true"></div>
+
+
+
+</body>
+</html>

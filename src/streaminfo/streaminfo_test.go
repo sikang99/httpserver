@@ -15,10 +15,13 @@ import (
 // test for stream request info
 //----------------------------------------------------------------------------------
 func TestStreamInfo(t *testing.T) {
-	src := NewSource(4)
+	trk := NewTrack()
+	fmt.Println(trk)
+
+	src := NewSource(4) // (N) : N tracks
 	fmt.Println(src)
 
-	chn := NewChannel(5)
+	chn := NewChannel(5, 4) // (M,N) : M sources, N tracks
 	fmt.Println(chn)
 }
 

@@ -26,6 +26,8 @@ const (
 	NUM_MAX_SLOTS = 1024
 )
 
+//==================================================================================
+// stream slot struc
 //----------------------------------------------------------------------------------
 type StreamSlot struct {
 	sync.Mutex
@@ -34,24 +36,6 @@ type StreamSlot struct {
 	LengthMax int
 	Content   []byte
 	Timestamp int64
-}
-
-//----------------------------------------------------------------------------------
-// string information for the single slot
-//----------------------------------------------------------------------------------
-func (ss *StreamSlot) String() string {
-	str := fmt.Sprintf("\tTimestamp: %v", ss.Timestamp)
-	str += fmt.Sprintf("\tType: %v", ss.Type)
-	str += fmt.Sprintf("\tLength: %v/%v(%v)", ss.Length, ss.LengthMax, len(ss.Content))
-	str += fmt.Sprintf("\tContent: ")
-	if ss.Length > 1 {
-		if strings.Contains(ss.Type, "text/") {
-			str += fmt.Sprintf("%s [%0x:%0x]", string(ss.Content[:ss.Length]), ss.Content[:2], ss.Content[ss.Length-2:ss.Length])
-		} else {
-			str += fmt.Sprintf("[%0x-%0x]", ss.Content[:2], ss.Content[ss.Length-2:ss.Length])
-		}
-	}
-	return str
 }
 
 //----------------------------------------------------------------------------------
@@ -92,6 +76,24 @@ func NewStreamSlotByData(cmax int, ctype string, clen int, cdata []byte) *Stream
 }
 
 //----------------------------------------------------------------------------------
+// string information for the single slot
+//----------------------------------------------------------------------------------
+func (ss *StreamSlot) String() string {
+	str := fmt.Sprintf("\tTimestamp: %v", ss.Timestamp)
+	str += fmt.Sprintf("\tType: %v", ss.Type)
+	str += fmt.Sprintf("\tLength: %v/%v(%v)", ss.Length, ss.LengthMax, len(ss.Content))
+	str += fmt.Sprintf("\tContent: ")
+	if ss.Length > 1 {
+		if strings.Contains(ss.Type, "text/") {
+			str += fmt.Sprintf("%s [%0x:%0x]", string(ss.Content[:ss.Length]), ss.Content[:2], ss.Content[ss.Length-2:ss.Length])
+		} else {
+			str += fmt.Sprintf("[%0x-%0x]", ss.Content[:2], ss.Content[ss.Length-2:ss.Length])
+		}
+	}
+	return str
+}
+
+//----------------------------------------------------------------------------------
 // check media type, its major and sub type of content
 //----------------------------------------------------------------------------------
 func (ss *StreamSlot) IsType(ctype string) bool {
@@ -125,6 +127,8 @@ func (ss *StreamSlot) IsSubType(ctype string) bool {
 	return res
 }
 
+//==================================================================================
+// stream ring struc
 //----------------------------------------------------------------------------------
 type StreamRing struct {
 	sync.Mutex
@@ -137,24 +141,6 @@ type StreamRing struct {
 	Boundary string // description of buffer
 	Desc     string // description of buffer
 	Slots    []StreamSlot
-}
-
-//----------------------------------------------------------------------------------
-// string information for the stream buffer
-//----------------------------------------------------------------------------------
-func (sr *StreamRing) String() string {
-	str := fmt.Sprintf("[StreamRing]")
-	str += fmt.Sprintf("\tStatus: %d", sr.Status)
-	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
-	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/sb.KBYTE)
-	str += fmt.Sprintf("\tBoundary: %s", sr.Boundary)
-	str += fmt.Sprintf("\tDesc: %s\n", sr.Desc)
-
-	for i := 0; i < sr.Num; i++ {
-		str += fmt.Sprintf("\t[%d] %s\n", i, sr.Slots[i].String())
-	}
-
-	return str
 }
 
 //----------------------------------------------------------------------------------
@@ -197,6 +183,28 @@ func NewStreamRingWithParams(num int, size int, desc string) *StreamRing {
 	ring := NewStreamRing(num, size)
 	ring.Desc = desc
 	return ring
+}
+
+//----------------------------------------------------------------------------------
+// string information for the stream buffer
+//----------------------------------------------------------------------------------
+func (sr *StreamRing) BaseString() string {
+	str := fmt.Sprintf("[StreamRing]")
+	str += fmt.Sprintf("\tStatus: %d", sr.Status)
+	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
+	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/sb.KBYTE)
+	str += fmt.Sprintf("\tBoundary: %s", sr.Boundary)
+	str += fmt.Sprintf("\tDesc: %s", sr.Desc)
+	return str
+}
+
+func (sr *StreamRing) String() string {
+	str := fmt.Sprintf("%s\n", sr.BaseString())
+	for i := 0; i < sr.Num; i++ {
+		str += fmt.Sprintf("\t[%d] %s\n", i, sr.Slots[i].String())
+	}
+
+	return str
 }
 
 //----------------------------------------------------------------------------------

@@ -61,7 +61,7 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 		// remember command
 		prestr = cmdstr
 
-		err = sc.ParseCommand(cmdstr)
+		err = sc.ParseMonitorCommand(cmdstr)
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -99,7 +99,7 @@ func PromptReadLine(prompt string, r *bufio.Reader) (string, error) {
 //---------------------------------------------------------------------------
 // parse command
 //---------------------------------------------------------------------------
-func (sc *ServerConfig) ParseCommand(cmdstr string) error {
+func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 	var err error
 
 	//fmt.Println(cmdstr)
@@ -282,7 +282,7 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 	http.HandleFunc("/search", sc.SearchHandler) // server info
 	http.HandleFunc("/status", sc.StatusHandler) // server status
 
-	http.Handle("/websocket/", websocket.Handler(sc.WebsocketHandler))
+	http.Handle("/websocket", websocket.Handler(sc.WebsocketHandler))
 
 	// CAUTION: don't use /static not /static/ as the prefix
 	http.Handle("/static/", http.StripPrefix("/static/", FileServer("./static")))
@@ -378,11 +378,23 @@ func (sc *ServerConfig) MediaHandler(w http.ResponseWriter, r *http.Request) {
 // websocket handler
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
-	log.Printf("Websocket \n")
+	log.Printf("Websocket %s\n", ws.RemoteAddr())
+	defer ws.Close()
+
+	data := make([]byte, sb.MBYTE)
+	for {
+		n, err := ws.Read(data)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		fmt.Println(n)
+	}
 
 	err := websocket.Message.Send(ws, "Not yet implemented")
 	if err != nil {
 		log.Println(err)
+		return
 	}
 }
 
@@ -426,7 +438,7 @@ func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
 		case "ring":
 			str = fmt.Sprint(ring)
 		default:
-			str = ""
+			str = "what? /status?command=[config|network|ring]"
 		}
 		err = ph.WriteResponseMessage(w, http.StatusOK, str)
 

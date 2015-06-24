@@ -625,12 +625,15 @@ func RequestPostJson(url string) error {
 
 //---------------------------------------------------------------------------
 // get json data from request
+// - http://stackoverflow.com/questions/15672556/handling-json-post-request-in-go
 //---------------------------------------------------------------------------
-func GetJsonFromRequest(req *http.Request, jdata interface{}) error {
+func GetJsonFromRequest(r *http.Request, struc interface{}) error {
 	var err error
 
-	decoder := json.NewDecoder(req.Body)
-	err = decoder.Decode(&jdata)
+	//dec := json.NewDecoder(strings.NewReader(jdata))
+	//dec := json.NewDecoder(r.Body)
+	//err = dec.Decode(&struc)
+	err = json.NewDecoder(r.Body).Decode(&struc)
 	if err != nil {
 		log.Println(err)
 		return err

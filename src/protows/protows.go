@@ -161,8 +161,8 @@ func (pw *ProtoWs) EchoClient(smsg string) error {
 	var err error
 	log.Printf("%s to %s:%s,%s\n", STR_ECHO_CLIENT, pw.Host, pw.Port, pw.PortTls)
 
-	ws, err := pw.Connect("echo", "sec")
-	//ws, err := pw.Connect("/echo")
+	//ws, err := pw.Connect("echo", "sec")
+	ws, err := pw.Connect("/echo")
 	if err != nil {
 		log.Println(err)
 		return err

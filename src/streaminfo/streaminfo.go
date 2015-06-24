@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"strconv"
 	"time"
 
 	//"github.com/twinj/uuid"
@@ -24,62 +23,104 @@ const (
 	NUM_DEF_TRACKS  = 4
 	NUM_DEF_SOURCES = 2
 
-	ID_DEF_CHANNEL = 100
-	ID_DEF_SOURCE  = 1
+	ID_DEF_CHANNEL = "100"
+	ID_DEF_SOURCE  = "110"
 )
 
+//==================================================================================
+// track struc
 //----------------------------------------------------------------------------------
-type Uid int // TODO: change uuid?
-
 type Track struct {
-	Id   Uid
+	Id   string
 	Desc string
+}
+
+func NewTrack() *Track {
+	nt := &Track{Id: "1", Desc: "blank track"}
+	return nt
 }
 
 //----------------------------------------------------------------------------------
 // string source information
 //----------------------------------------------------------------------------------
-func (trk *Track) String() string {
-	//str := fmt.Sprintf("[Track]")
-	str := fmt.Sprintf("\tId: %v", trk.Id)
+func (trk *Track) BaseString() string {
+	str := fmt.Sprintf("[Track]")
+	str += fmt.Sprintf("\tId: %s", trk.Id)
 	str += fmt.Sprintf("\tDesc: %s", trk.Desc)
 	return str
 }
 
+func (trk *Track) String() string {
+	str := fmt.Sprintf("%s", trk.BaseString())
+	return str
+}
+
+func (trk *Track) GetId() string {
+	return trk.Id
+}
+
+func (trk *Track) SetId(id int) string {
+	trk.Id = fmt.Sprintf("%d", id+1)
+	return trk.Id
+}
+
+//==================================================================================
+// source struc
 //----------------------------------------------------------------------------------
 type Source struct {
-	Id     Uid
-	Desc   string
-	Time   time.Time
-	Tracks []Track // media track such as audio, video, text, ...
+	Id   string
+	Desc string
+	Time time.Time
+	Trks []Track // media track such as audio, video, text, ...
+}
+
+func NewSource(num int) *Source {
+	trks := make([]Track, num)
+	for j := range trks {
+		trks[j].Id = fmt.Sprintf("%d", 10+(j+1))
+	}
+	ns := &Source{
+		Id:   "10",
+		Time: time.Now(),
+		Desc: "blank source",
+		Trks: trks,
+	}
+	return ns
 }
 
 //----------------------------------------------------------------------------------
 // string source information
 //----------------------------------------------------------------------------------
-func (src *Source) String() string {
-	//str := fmt.Sprintf("[Source]")
-	str := fmt.Sprintf("\tId: %v", src.Id)
+func (src *Source) BaseString() string {
+	str := fmt.Sprintf("[Source]")
+	str += fmt.Sprintf("\tId: %s", src.Id)
 	str += fmt.Sprintf("\tTime: %v", src.Time)
 	str += fmt.Sprintf("\tDesc: %s", src.Desc)
 	return str
 }
 
-func NewSource(num int) *Source {
-	return &Source{
-		Time:   time.Now(),
-		Desc:   "blank source",
-		Tracks: make([]Track, num),
+func (src *Source) String() string {
+	str := fmt.Sprintf("%s\n", src.BaseString())
+	for i := range src.Trks {
+		str += fmt.Sprintf("\t[%d] %s\n", i, src.Trks[i].String())
 	}
+	return str
 }
 
-func (src *Source) GetId() Uid {
+func (src *Source) GetId() string {
 	return src.Id
 }
 
+func (src *Source) SetId(id int) string {
+	src.Id = fmt.Sprintf("%d%d", (id+1)*10)
+	return src.Id
+}
+
+//==================================================================================
+// channel struct
 //----------------------------------------------------------------------------------
 type Channel struct {
-	Id     Uid
+	Id     string
 	Name   string
 	Desc   string
 	Time   time.Time
@@ -88,56 +129,72 @@ type Channel struct {
 	Srcs   []Source
 }
 
-//----------------------------------------------------------------------------------
-// string chanel information
-//----------------------------------------------------------------------------------
-func (chn *Channel) String() string {
-	str := fmt.Sprintf("[Channel]")
-	str += fmt.Sprintf("\tId: %d", chn.Id)
-	str += fmt.Sprintf("\tName: %s", chn.Name)
-	str += fmt.Sprintf("\tTime: %v", chn.Time)
-	str += fmt.Sprintf("\tStatus: %v", chn.Status)
-	str += fmt.Sprintf("\tUse: %v", chn.Use)
-	str += fmt.Sprintf("\tDesc: %s\n", chn.Desc)
-	for i := range chn.Srcs {
-		str += fmt.Sprintf("\t[%d] %s\n", i, &chn.Srcs[i])
-	}
-	return str
-}
-
-//----------------------------------------------------------------------------------
-// make a new channel with the number of sources
-//----------------------------------------------------------------------------------
-func NewChannel(num int) *Channel {
-
-	srcs := make([]Source, num)
+func NewChannel(snum, tnum int) *Channel {
+	srcs := make([]Source, snum)
 	for i := range srcs {
+		srcs[i].Id = fmt.Sprintf("%d%d", 1, i+1)
 		srcs[i].Time = time.Now()
+		trks := make([]Track, tnum)
+		srcs[i].Trks = trks
+		for j := range trks {
+			trks[j].Id = fmt.Sprintf("%d%d%d", 1, i+1, j+1)
+		}
 	}
 
-	return &Channel{
+	nc := &Channel{
+		Id:   "100",
 		Time: time.Now(),
 		Desc: "blank channel",
 		Srcs: srcs,
 	}
+
+	return nc
+}
+
+//----------------------------------------------------------------------------------
+// string chanel information
+//----------------------------------------------------------------------------------
+func (chn *Channel) BaseString() string {
+	str := fmt.Sprintf("[Channel]")
+	str += fmt.Sprintf("\tId: %s", chn.Id)
+	str += fmt.Sprintf("\tName: %s", chn.Name)
+	str += fmt.Sprintf("\tTime: %v", chn.Time)
+	str += fmt.Sprintf("\tStatus: %v", chn.Status)
+	str += fmt.Sprintf("\tUse: %v", chn.Use)
+	str += fmt.Sprintf("\tDesc: %s", chn.Desc)
+	return str
+}
+
+func (chn *Channel) String() string {
+	str := fmt.Sprintf("%s\n", chn.BaseString())
+	for i := range chn.Srcs {
+		str += fmt.Sprintf("\t[%d] %s\n", i, chn.Srcs[i].BaseString())
+		for j := range chn.Srcs[i].Trks {
+			str += fmt.Sprintf("\t\t[%d] %s\n", j, chn.Srcs[i].Trks[j].String())
+		}
+	}
+
+	return str
 }
 
 //----------------------------------------------------------------------------------
 // get/set channel id
 //----------------------------------------------------------------------------------
-func (chn *Channel) GetId() Uid {
+func (chn *Channel) GetId() string {
 	return chn.Id
 }
 
-func (chn *Channel) SetId(id Uid) Uid {
-	chn.Id = id
+func (chn *Channel) SetId(id int) string {
+	chn.Id = fmt.Sprintf("%d", (id+1)*100)
 	return chn.Id
 }
 
+//==================================================================================
+// stream request struc
 //----------------------------------------------------------------------------------
 type StreamRequest struct {
-	Channel Uid
-	Source  Uid
+	Channel string
+	Source  string
 	Time    time.Time // access time
 	Who     string    // string for hostname:port
 	Desc    string
@@ -171,21 +228,14 @@ func GetStreamRequestFromQuery(str string) (*StreamRequest, error) {
 
 	// assign default values
 	sreq := &StreamRequest{
-		Channel: Uid(ID_DEF_CHANNEL),
-		Source:  Uid(ID_DEF_SOURCE),
+		Channel: ID_DEF_CHANNEL,
+		Source:  ID_DEF_SOURCE,
 		Time:    time.Now(),
 	}
 
 	if len(params) > 0 {
-		chn, err := strconv.Atoi(params["channel"][0])
-		if err == nil {
-			sreq.Channel = Uid(chn)
-		}
-
-		src, err := strconv.Atoi(params["source"][0])
-		if err == nil {
-			sreq.Source = Uid(src)
-		}
+		sreq.Channel = params["channel"][0]
+		sreq.Source = params["source"][0]
 	}
 
 	//fmt.Println(sreq)

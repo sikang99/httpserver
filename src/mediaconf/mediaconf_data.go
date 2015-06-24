@@ -61,7 +61,7 @@ var hello_tmpl = `<!DOCTYPE html>
 // server config
 //-----------------------------------------------------------------------------
 type ServerConfig struct {
-	Title        string
+	Title        string `json:"title"`
 	Image        string
 	Url          string
 	Addr         string
