@@ -10,6 +10,7 @@ package protohttp
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -571,7 +572,7 @@ func GetTypeBoundary(ctype string) (string, error) {
 }
 
 //---------------------------------------------------------------------------
-// send response for Player
+// send response for GET
 //---------------------------------------------------------------------------
 func ResponseGet(w http.ResponseWriter, boundary string) error {
 	var err error
@@ -584,7 +585,7 @@ func ResponseGet(w http.ResponseWriter, boundary string) error {
 }
 
 //---------------------------------------------------------------------------
-// send response for Caster
+// send response for POST
 //---------------------------------------------------------------------------
 func ResponsePost(w http.ResponseWriter, boundary string) error {
 	var err error
@@ -604,6 +605,36 @@ func WriteResponseMessage(w http.ResponseWriter, status int, message string) err
 	w.WriteHeader(status)
 	log.Println(message)
 	fmt.Fprintf(w, message)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// send post message with json format
+//---------------------------------------------------------------------------
+func RequestPostJson(url string) error {
+	var err error
+
+	var jsonStr = []byte(`{"title":"Buy cheese and bread for breakfast."}`)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// get json data from request
+//---------------------------------------------------------------------------
+func GetJsonFromRequest(req *http.Request, jdata interface{}) error {
+	var err error
+
+	decoder := json.NewDecoder(req.Body)
+	err = decoder.Decode(&jdata)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
 	return err
 }

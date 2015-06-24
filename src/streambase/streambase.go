@@ -152,22 +152,26 @@ func GetDuration(value int64) time.Duration {
 //---------------------------------------------------------------------------
 // show network interfaces
 //---------------------------------------------------------------------------
-func ShowNetInterfaces() {
+func ShowNetInterfaces() string {
 	list, err := net.Interfaces()
 	if err != nil {
 		log.Println(err)
+		return ""
 	}
 
+	var str string
 	for i, iface := range list {
-		fmt.Printf("%d %s %v\n", i, iface.Name, iface)
+		str += fmt.Sprintf("%d %s %v\n", i, iface.Name, iface)
 		addrs, err := iface.Addrs()
 		if err != nil {
 			log.Println(err)
 		}
 		for j, addr := range addrs {
-			fmt.Printf("\t%d %v\n", j, addr)
+			str += fmt.Sprintf("\t%d %v\n", j, addr)
 		}
 	}
+
+	return str
 }
 
 //---------------------------------------------------------------------------

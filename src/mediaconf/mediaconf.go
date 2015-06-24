@@ -27,6 +27,7 @@ import (
 	pf "stoney/httpserver/src/protofile"
 	ph "stoney/httpserver/src/protohttp"
 	pt "stoney/httpserver/src/prototcp"
+
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
@@ -41,18 +42,12 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 	var prestr string
 
 	r := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("> ")
 
-		line, _, err := r.ReadLine()
+	for {
+		cmdstr, err := PromptReadLine("> ", r)
 		if err != nil {
 			log.Println(err)
 			break
-		}
-
-		cmdstr := strings.Replace(string(line), "\r", "", -1)
-		if cmdstr == "" {
-			continue
 		}
 
 		if strings.EqualFold(cmdstr, "quit") {
@@ -68,12 +63,37 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 
 		err = sc.ParseCommand(cmdstr)
 		if err != nil {
-			log.Println(err)
-			break
+			fmt.Println(err)
+			continue
 		}
 	}
 
 	return err
+}
+
+//---------------------------------------------------------------------------
+// prompt and read a line
+//---------------------------------------------------------------------------
+func PromptReadLine(prompt string, r *bufio.Reader) (string, error) {
+	var err error
+	var str string
+
+	for {
+		fmt.Print(prompt)
+
+		line, _, err := r.ReadLine()
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
+		str = strings.Replace(string(line), "\r", "", -1)
+		if str != "" {
+			break
+		}
+	}
+
+	return str, err
 }
 
 //---------------------------------------------------------------------------
@@ -95,6 +115,8 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 		return err
 	}
 
+	params := url.Values{}
+
 	switch res[0] {
 	case "show":
 		if len(res) < 2 {
@@ -102,19 +124,18 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 			break
 		}
 
-		params := url.Values{}
-
 		switch res[1] {
 		case "network":
-			sb.ShowNetInterfaces()
+			params.Add("command", "network")
 		case "channel":
-			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
+			params.Add("command", "channel")
 		case "ring":
 			params.Add("command", "ring")
 		case "config":
 			params.Add("command", "config")
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+			return err
 		}
 
 		baseUrl.RawQuery = params.Encode()
@@ -132,19 +153,16 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 			break
 		}
 
-		params := url.Values{}
-
 		switch res[1] {
 		case "read":
 			params.Add("command", "read")
 			params.Add("url", "http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
-
 		case "write":
 			params.Add("command", "write")
 			params.Add("file", "record/output.mjpg")
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
-			break
+			return err
 		}
 
 		baseUrl.RawQuery = params.Encode()
@@ -161,17 +179,19 @@ func (sc *ServerConfig) ParseCommand(cmdstr string) error {
 			fmt.Printf("usage: help [show|start]\n")
 			break
 		}
+
 		switch res[1] {
 		case "show":
-			fallthrough
+			fmt.Printf("usage: show [config|network|channel|ring]\n")
 		case "start":
-			fmt.Printf("i will %s for %s shortly\n", res[0], res[1])
+			fmt.Printf("usage: start [read|write]\n")
 		default:
 			fmt.Printf("I can't %s for %s\n", res[0], res[1])
-			break
+			return err
 		}
 
 	case "test":
+		fmt.Printf("TODO\n")
 
 	default:
 		fmt.Printf("usage: [show|start|help|quit]\n")
@@ -389,24 +409,26 @@ func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Status %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
+	var str string
+
 	ring := sc.Ring
 
 	query := r.URL.Query()
-	//fmt.Println(query)
 	command := query.Get("command")
 
 	switch r.Method {
 	case "GET":
 		switch command {
+		case "network":
+			str = sb.ShowNetInterfaces()
 		case "config":
-			str := fmt.Sprint(sc)
-			err = ph.WriteResponseMessage(w, http.StatusOK, str)
+			str = fmt.Sprint(sc)
 		case "ring":
-			fallthrough
+			str = fmt.Sprint(ring)
 		default:
-			str := fmt.Sprint(ring)
-			err = ph.WriteResponseMessage(w, http.StatusOK, str)
+			str = ""
 		}
+		err = ph.WriteResponseMessage(w, http.StatusOK, str)
 
 	case "POST":
 		switch command {
