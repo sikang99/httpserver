@@ -132,6 +132,7 @@ func (ss *StreamSlot) IsSubType(ctype string) bool {
 //----------------------------------------------------------------------------------
 type StreamRing struct {
 	sync.Mutex
+	Id       string // Name or Id?
 	Status   int
 	Num      int    // number of slots used
 	NumMax   int    // number of slots allocated
@@ -147,21 +148,6 @@ type StreamRing struct {
 // make a new circular stream buffer
 //----------------------------------------------------------------------------------
 func NewStreamRing(num int, size int) *StreamRing {
-	/*
-		// buggy method
-		slot := StreamSlot{
-			//Type:    "application/octet-stream",
-			Length:    0,
-			LengthMax: size,
-			Content:   make([]byte, size),
-		}
-
-			var slots []StreamSlot
-			for i := 0; i < num; i++ {
-				slots = append(slots, slot)
-			}
-	*/
-
 	slots := make([]StreamSlot, num)
 	for i := 0; i < num; i++ {
 		slots[i].Content = make([]byte, size)
@@ -189,7 +175,7 @@ func NewStreamRingWithParams(num int, size int, desc string) *StreamRing {
 // string information for the stream buffer
 //----------------------------------------------------------------------------------
 func (sr *StreamRing) BaseString() string {
-	str := fmt.Sprintf("[StreamRing]")
+	str := fmt.Sprintf("[StreamRing] %s", sr.Id)
 	str += fmt.Sprintf("\tStatus: %d", sr.Status)
 	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
 	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/sb.KBYTE)

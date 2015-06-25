@@ -394,7 +394,7 @@ func WriteRingInMultipart(w io.Writer, ring *sr.StreamRing) error {
 	//fmt.Println(ring)
 
 	var pos int
-	for {
+	for ring.IsUsing() {
 		slot, npos, err := ring.GetSlotNextByPos(pos)
 		if err != nil {
 			if err == sb.ErrEmpty {

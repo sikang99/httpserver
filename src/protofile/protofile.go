@@ -26,6 +26,7 @@ import (
 
 //---------------------------------------------------------------------------
 const (
+	STR_DIR_READER  = "Happy Media Dir Reader"
 	STR_FILE_READER = "Happy Media File Reader"
 	STR_FILE_WRITER = "Happy Media File Writer"
 )
@@ -88,13 +89,29 @@ func NewProtoFile(args ...string) *ProtoFile {
 //---------------------------------------------------------------------------
 // act file reader
 //---------------------------------------------------------------------------
-func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
-	log.Printf("%s for %s\n", STR_FILE_READER, pf.Pattern)
+func (pf *ProtoFile) DirReader(ring *sr.StreamRing, loop bool) error {
+	log.Printf("%s for %s\n", STR_DIR_READER, pf.Pattern)
+	defer log.Printf("out %s\n", STR_DIR_READER)
 
 	var err error
 
-	err = ReadDirToRing(ring, pf.Pattern, false)
-	fmt.Println(ring)
+	err = ReadDirToRing(ring, pf.Pattern, loop)
+	//fmt.Println(ring)
+
+	return err
+}
+
+//---------------------------------------------------------------------------
+// act file reader
+//---------------------------------------------------------------------------
+func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
+	log.Printf("%s for %s\n", STR_FILE_READER, pf.Pattern)
+	defer log.Printf("out %s\n", STR_FILE_READER)
+
+	var err error
+
+	err = ReadMultipartFileToRing(ring, pf.Pattern)
+	//fmt.Println(ring)
 
 	return err
 }
@@ -104,10 +121,12 @@ func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) StreamWriter(ring *sr.StreamRing) error {
 	log.Printf("%s for %s\n", STR_FILE_WRITER, pf.Pattern)
+	defer log.Printf("out %s\n", STR_FILE_WRITER)
 
 	var err error
 
 	err = WriteRingToMultipartFile(ring, pf.Pattern)
+	//fmt.Println(ring)
 
 	return err
 }
@@ -136,7 +155,7 @@ func ReadDirToRing(ring *sr.StreamRing, pat string, loop bool) error {
 	defer ring.SetStatusIdle()
 
 	// ToRing : to ring buffer
-	for {
+	for ring.IsUsing() {
 		for i := range files {
 			slot, pos := ring.GetSlotIn()
 
@@ -227,7 +246,7 @@ func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
 	mr := multipart.NewReader(f, ring.Boundary)
 
 	var preTimestamp int64 = 0
-	for {
+	for ring.IsUsing() {
 		slot, pos := ring.GetSlotIn()
 
 		err = ReadPartToSlot(mr, slot)

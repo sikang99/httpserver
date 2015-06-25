@@ -156,7 +156,7 @@ gp:
 	@make clobber
 	git init
 	git add * .gitignore
-	git commit -m "refactoring streaminfo package"
+	git commit -m "refactoring mediaconf package"
 	git push -u https://sikang99@github.com/sikang99/$(PROGRAM) master
 
 gs:

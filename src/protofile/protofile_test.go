@@ -48,7 +48,7 @@ func TestReadDirWriteMultipart(t *testing.T) {
 	fmt.Println(ring)
 
 	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
-	go fr.StreamReader(ring)
+	go fr.DirReader(ring, false)
 
 	time.Sleep(time.Millisecond)
 
@@ -63,8 +63,8 @@ func TestReadMultipartFile(t *testing.T) {
 	ring := sr.NewStreamRing(5, sb.MBYTE)
 	fmt.Println(ring)
 
-	ReadMultipartFileToRing(ring, "output.mjpg")
-	fmt.Println(ring)
+	fd := NewProtoFile("output.mjpg", "Testing")
+	fd.StreamReader(ring)
 }
 
 //----------------------------------E-----N-----D----------------------------------

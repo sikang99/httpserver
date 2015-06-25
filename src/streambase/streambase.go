@@ -48,6 +48,7 @@ const (
 const (
 	STATUS_IDLE = iota
 	STATUS_USING
+	STATUS_PAUSE
 
 	LEN_MAX_LINE = 128
 	LEN_MAX_MSG  = 1024

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	sb "stoney/httpserver/src/streambase"
+	si "stoney/httpserver/src/streaminfo"
 	sr "stoney/httpserver/src/streamring"
 )
 
@@ -61,17 +62,18 @@ var hello_tmpl = `<!DOCTYPE html>
 // server config
 //-----------------------------------------------------------------------------
 type ServerConfig struct {
-	Title        string `json:"title"`
-	Image        string
-	Url          string
-	Addr         string
-	Host         string
-	Port         string
-	PortS        string
-	Port2        string
-	Mode         string
-	Ring         *sr.StreamRing
-	ImageChannel chan []byte
+	Title    string `json:"title"`
+	Image    string
+	Url      string
+	Addr     string
+	Host     string
+	Port     string
+	PortS    string
+	Port2    string
+	Mode     string
+	Ring     *sr.StreamRing
+	Channels []*si.Channel
+	NotiChan chan []byte
 	// http://giantmachines.tumblr.com/post/52184842286/golang-http-client-with-timeouts
 	ConnectTimeout   time.Duration
 	ReadWriteTimeout time.Duration
@@ -91,7 +93,7 @@ func (sc *ServerConfig) String() string {
 //-----------------------------------------------------------------------------
 func NewServerConfig() *ServerConfig {
 	sc := &ServerConfig{
-		ImageChannel: make(chan []byte, 2)}
+		NotiChan: make(chan []byte, 2)}
 
 	sc.Title = "Happy Media System: MJPEG"
 	sc.Image = "static/image/gophergun.png"

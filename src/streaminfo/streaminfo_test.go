@@ -1,6 +1,6 @@
 //==================================================================================
 // Author: Stoney Kang, sikang99@gmail.com, 2015
-// Test for Stream Info
+// Test for Stream Info : channel, source, track
 //==================================================================================
 
 package streaminfo
@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"testing"
+
+	sb "stoney/httpserver/src/streambase"
 )
 
 //----------------------------------------------------------------------------------
@@ -18,11 +20,15 @@ func TestStreamInfo(t *testing.T) {
 	trk := NewTrack()
 	fmt.Println(trk)
 
-	src := NewSource(4) // (N) : N tracks
+	src := NewSource(3) // (N) : N tracks
 	fmt.Println(src)
 
-	chn := NewChannel(5, 4) // (M,N) : M sources, N tracks
+	chn := NewChannel(4, 3) // (M,N) : M sources, N tracks
 	fmt.Println(chn)
+
+	fmt.Printf("\tCH(0): %s\n", chn.GetId())
+	fmt.Printf("\tCH(0)/SC(3): %s\n", chn.Srcs[3].GetId())
+	fmt.Printf("\tCH(0)/SC(3)/TK(2): %s\n", chn.Srcs[3].Trks[2].GetId())
 }
 
 //----------------------------------------------------------------------------------
@@ -38,7 +44,14 @@ func TestStreamRequest(t *testing.T) {
 	}
 	fmt.Println(sreq)
 
-	uri = "ws://localhost:8080/stream"
+	uri = "ws://localhost:8080/stream?track=888&what=xxxx"
+	sreq, err = GetStreamRequestFromURI(uri)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println(sreq)
+
+	uri = "ws://localhost:8080/command?track=333&channel=300&source=3"
 	sreq, err = GetStreamRequestFromURI(uri)
 	if err != nil {
 		log.Fatalln(err)
@@ -50,13 +63,16 @@ func TestStreamRequest(t *testing.T) {
 // test for uuid
 //----------------------------------------------------------------------------------
 func TestUUID(t *testing.T) {
-	uid := StdGetUUID()
+	uid := GetStdUUID()
 	fmt.Println(uid)
 
-	uib := StdParseUUID(uid)
-	fmt.Println(uib)
+	uid = GetStdUUID()
+	fmt.Println(uid)
 
-	uid = PseudoGetUUID()
+	uib := ParseStdUUID(uid)
+	sb.HexDump(uib)
+
+	uid = GetPseudoUUID()
 	fmt.Println(uid)
 }
 

@@ -44,7 +44,7 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 	r := bufio.NewReader(os.Stdin)
 
 	for {
-		cmdstr, err := PromptReadLine("> ", r)
+		cmdstr, err := PromptReadLine("command> ", r)
 		if err != nil {
 			log.Println(err)
 			break
@@ -103,99 +103,132 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 	var err error
 
 	//fmt.Println(cmdstr)
-	res := strings.Fields(cmdstr)
-	if len(res) < 1 {
+	tok := strings.Fields(cmdstr)
+	if len(tok) < 1 {
 		return err
 	}
-	//fmt.Println(res)
+	//fmt.Println(tok)
 
-	baseUrl, err := url.Parse("http://localhost:8080/status")
+	baseUrl, err := url.Parse("http://localhost:8080/command")
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
 	params := url.Values{}
+	params.Add("op", tok[0])
 
-	switch res[0] {
+	var method string
+	switch tok[0] {
+	// GET ops
 	case "show":
-		if len(res) < 2 {
+		if len(tok) < 2 {
 			fmt.Printf("usage: show [config|network|channel|ring]\n")
-			break
+			return err
 		}
 
-		switch res[1] {
+		method = "GET"
+
+		switch tok[1] {
 		case "network":
-			params.Add("command", "network")
+			params.Add("obj", tok[1])
 		case "channel":
-			params.Add("command", "channel")
+			params.Add("obj", tok[1])
 		case "ring":
-			params.Add("command", "ring")
+			params.Add("obj", tok[1])
 		case "config":
-			params.Add("command", "config")
+			params.Add("obj", tok[1])
 		default:
-			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
 			return err
 		}
 
-		baseUrl.RawQuery = params.Encode()
-		res, err := http.Get(fmt.Sprint(baseUrl))
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-		body, err := ioutil.ReadAll(res.Body)
-		fmt.Println(string(body))
-
+	// POST ops
 	case "start":
-		if len(res) < 2 {
-			fmt.Printf("usage: start [read|write]\n")
-			break
+		if len(tok) < 2 {
+			fmt.Printf("usage: start [http_reader|tcp_server|dir_reader|file_reader|file_writer]\n")
+			return err
 		}
 
-		switch res[1] {
-		case "read":
-			params.Add("command", "read")
+		method = "POST"
+
+		switch tok[1] {
+		case "http_reader":
+			params.Add("obj", tok[1])
 			params.Add("url", "http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
-		case "write":
-			params.Add("command", "write")
+		case "dir_reader":
+			params.Add("obj", tok[1])
+			params.Add("file", "static/image/*.jpg")
+		case "file_reader":
+			params.Add("obj", tok[1])
 			params.Add("file", "record/output.mjpg")
+		case "file_writer":
+			params.Add("obj", tok[1])
+			params.Add("file", "record/output.mjpg")
+		case "file_caster":
+		case "tcp_server":
+			params.Add("obj", tok[1])
 		default:
-			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
 			return err
 		}
 
-		baseUrl.RawQuery = params.Encode()
-		res, err := http.Post(fmt.Sprint(baseUrl), "text/plain", nil)
-		if err != nil {
-			log.Println(err)
+	case "stop":
+		if len(tok) < 2 {
+			fmt.Printf("usage: stop [ring]\n")
 			return err
 		}
-		body, err := ioutil.ReadAll(res.Body)
-		fmt.Println(string(body))
+
+		method = "POST"
+
+		switch tok[1] {
+		case "ring":
+			params.Add("obj", tok[1])
+		default:
+			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
+			return err
+		}
 
 	case "help":
-		if len(res) < 2 {
-			fmt.Printf("usage: help [show|start]\n")
-			break
-		}
-
-		switch res[1] {
-		case "show":
-			fmt.Printf("usage: show [config|network|channel|ring]\n")
-		case "start":
-			fmt.Printf("usage: start [read|write]\n")
-		default:
-			fmt.Printf("I can't %s for %s\n", res[0], res[1])
+		if len(tok) < 2 {
+			fmt.Printf("usage: help [show|start|stop]\n")
 			return err
 		}
 
+		switch tok[1] {
+		case "show":
+			fmt.Printf("usage: show [config|network|ring|channel]\n")
+		case "start":
+			fmt.Printf("usage: start [http_reader|dir_reader|file_reader|file_writer|tcp_server]\n")
+		case "stop":
+			fmt.Printf("usage: stop [ring]\n")
+		default:
+			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
+		}
+		return err
+
 	case "test":
-		fmt.Printf("TODO\n")
+		fmt.Printf("for TEST\n")
+		return err
 
 	default:
-		fmt.Printf("usage: [show|start|help|quit]\n")
+		fmt.Printf("usage: [show|start|stop|help|quit]\n")
+		return err
 	}
+
+	baseUrl.RawQuery = params.Encode()
+	var res *http.Response
+	if method == "POST" {
+		res, err = http.Post(fmt.Sprint(baseUrl), "text/plain", nil)
+	} else {
+		res, err = http.Get(fmt.Sprint(baseUrl))
+	}
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	fmt.Printf("%s\n", string(body))
 
 	return err
 }
@@ -276,11 +309,11 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 	log.Printf("%s\n", ph.STR_HTTP_SERVER)
 
 	http.HandleFunc("/", sc.IndexHandler)
-	http.HandleFunc("/hello", sc.HelloHandler)   // view
-	http.HandleFunc("/media", sc.MediaHandler)   // on-demand
-	http.HandleFunc("/stream", sc.StreamHandler) // live
-	http.HandleFunc("/search", sc.SearchHandler) // server info
-	http.HandleFunc("/status", sc.StatusHandler) // server status
+	http.HandleFunc("/hello", sc.HelloHandler)     // view
+	http.HandleFunc("/media", sc.MediaHandler)     // on-demand
+	http.HandleFunc("/stream", sc.StreamHandler)   // live
+	http.HandleFunc("/search", sc.SearchHandler)   // server info
+	http.HandleFunc("/command", sc.CommandHandler) // server control & monitor
 
 	http.Handle("/websocket", websocket.Handler(sc.WebsocketHandler))
 
@@ -313,7 +346,7 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 	*/
 
 	//go sc.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", ring)
-	go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(ring)
+	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(ring)
 	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").StreamCaster(ring)
 
 	wg.Wait()
@@ -415,9 +448,9 @@ func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //---------------------------------------------------------------------------
-// handle /status access
+// handle /command access
 //---------------------------------------------------------------------------
-func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
+func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Status %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
@@ -426,42 +459,81 @@ func (sc *ServerConfig) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	ring := sc.Ring
 
 	query := r.URL.Query()
-	command := query.Get("command")
+	op := query.Get("op")
+	obj := query.Get("obj")
 
 	switch r.Method {
+	// monitor part
 	case "GET":
-		switch command {
-		case "network":
-			str = sb.ShowNetInterfaces()
-		case "config":
-			str = fmt.Sprint(sc)
-		case "ring":
-			str = fmt.Sprint(ring)
+		switch op {
+		case "show":
+			switch obj {
+			case "network":
+				str = sb.ShowNetInterfaces()
+			case "config":
+				str = fmt.Sprint(sc)
+			case "ring":
+				str = fmt.Sprint(ring)
+			default:
+				str = "what obj? [config|network|ring]"
+			}
 		default:
-			str = "what? /status?command=[config|network|ring]"
+			str = "what op? [show]"
 		}
-		err = ph.WriteResponseMessage(w, http.StatusOK, str)
 
+	// control part
 	case "POST":
-		switch command {
-		case "read":
-			url := query.Get("url")
-			go sc.StreamReader(url, sc.Ring)
-			err = ph.WriteResponseMessage(w, http.StatusOK, "started http_reader")
-		case "write":
-			file := query.Get("file")
-			fp := pf.NewProtoFile()
-			fp.Pattern = file
-			go fp.StreamWriter(sc.Ring)
-			err = ph.WriteResponseMessage(w, http.StatusOK, "started file_writer")
+		switch op {
+		case "start":
+			switch obj {
+			case "http_reader":
+				url := query.Get("url")
+				go sc.StreamReader(url, sc.Ring)
+				str = "started http_reader " + url
+			case "dir_reader":
+				file := query.Get("file")
+				fp := pf.NewProtoFile()
+				fp.Pattern = file
+				go fp.DirReader(sc.Ring, true)
+				str = "started dir_reader " + file
+			case "file_reader":
+				file := query.Get("file")
+				fp := pf.NewProtoFile()
+				fp.Pattern = file
+				go fp.StreamReader(sc.Ring)
+				str = "started file_reader " + file
+			case "file_writer":
+				file := query.Get("file")
+				fp := pf.NewProtoFile()
+				fp.Pattern = file
+				go fp.StreamWriter(sc.Ring)
+				str = "started file_writer " + file
+			case "tcp_server":
+				tp := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+				go tp.StreamServer(sc.Ring)
+				str = "started tcp_server " + tp.Port
+			default:
+				str = "what obj? [http_reader|file_writer|file_caster|tcp_server]"
+			}
+		case "stop":
+			switch obj {
+			case "ring":
+				err = sc.Ring.SetStatusIdle()
+				if err != nil {
+					str = fmt.Sprint(err)
+				} else {
+					str = "processed"
+				}
+			}
 		default:
-			err = ph.WriteResponseMessage(w, http.StatusNotAcceptable, "noop")
+			str = "what op? [start|stop]"
 		}
 
 	default:
-		err = ph.WriteResponseMessage(w, http.StatusMethodNotAllowed, "/status: Not yet implemented")
+		str = "Not yet implemented"
 	}
 
+	err = ph.WriteResponseMessage(w, http.StatusOK, str)
 	if err != nil {
 		log.Println(err)
 	}

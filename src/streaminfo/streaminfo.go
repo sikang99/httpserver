@@ -20,11 +20,12 @@ import (
 )
 
 const (
-	NUM_DEF_TRACKS  = 4
-	NUM_DEF_SOURCES = 2
+	NUM_DEF_TRACKS  = 2
+	NUM_DEF_SOURCES = 4
 
 	ID_DEF_CHANNEL = "100"
 	ID_DEF_SOURCE  = "110"
+	ID_DEF_TRACK   = "111"
 )
 
 //==================================================================================
@@ -71,11 +72,12 @@ type Source struct {
 	Id   string
 	Desc string
 	Time time.Time
+	Ntrk int
 	Trks []Track // media track such as audio, video, text, ...
 }
 
-func NewSource(num int) *Source {
-	trks := make([]Track, num)
+func NewSource(tnum int) *Source {
+	trks := make([]Track, tnum)
 	for j := range trks {
 		trks[j].Id = fmt.Sprintf("%d", 10+(j+1))
 	}
@@ -83,6 +85,7 @@ func NewSource(num int) *Source {
 		Id:   "10",
 		Time: time.Now(),
 		Desc: "blank source",
+		Ntrk: tnum,
 		Trks: trks,
 	}
 	return ns
@@ -95,6 +98,7 @@ func (src *Source) BaseString() string {
 	str := fmt.Sprintf("[Source]")
 	str += fmt.Sprintf("\tId: %s", src.Id)
 	str += fmt.Sprintf("\tTime: %v", src.Time)
+	str += fmt.Sprintf("\tNtrk: %v", src.Ntrk)
 	str += fmt.Sprintf("\tDesc: %s", src.Desc)
 	return str
 }
@@ -102,7 +106,7 @@ func (src *Source) BaseString() string {
 func (src *Source) String() string {
 	str := fmt.Sprintf("%s\n", src.BaseString())
 	for i := range src.Trks {
-		str += fmt.Sprintf("\t[%d] %s\n", i, src.Trks[i].String())
+		str += fmt.Sprintf("\t[%d] %s\n", i, src.Trks[i].BaseString())
 	}
 	return str
 }
@@ -126,25 +130,28 @@ type Channel struct {
 	Time   time.Time
 	Status int
 	Use    int
+	Nsrc   int
 	Srcs   []Source
 }
 
 func NewChannel(snum, tnum int) *Channel {
 	srcs := make([]Source, snum)
 	for i := range srcs {
-		srcs[i].Id = fmt.Sprintf("%d%d", 1, i+1)
+		srcs[i].Id = fmt.Sprintf("%d%d%d", 1, i+1, 0)
 		srcs[i].Time = time.Now()
 		trks := make([]Track, tnum)
 		srcs[i].Trks = trks
 		for j := range trks {
 			trks[j].Id = fmt.Sprintf("%d%d%d", 1, i+1, j+1)
 		}
+		srcs[i].Ntrk = tnum
 	}
 
 	nc := &Channel{
 		Id:   "100",
 		Time: time.Now(),
 		Desc: "blank channel",
+		Nsrc: snum,
 		Srcs: srcs,
 	}
 
@@ -161,6 +168,7 @@ func (chn *Channel) BaseString() string {
 	str += fmt.Sprintf("\tTime: %v", chn.Time)
 	str += fmt.Sprintf("\tStatus: %v", chn.Status)
 	str += fmt.Sprintf("\tUse: %v", chn.Use)
+	str += fmt.Sprintf("\tNsrc: %v", chn.Nsrc)
 	str += fmt.Sprintf("\tDesc: %s", chn.Desc)
 	return str
 }
@@ -170,7 +178,7 @@ func (chn *Channel) String() string {
 	for i := range chn.Srcs {
 		str += fmt.Sprintf("\t[%d] %s\n", i, chn.Srcs[i].BaseString())
 		for j := range chn.Srcs[i].Trks {
-			str += fmt.Sprintf("\t\t[%d] %s\n", j, chn.Srcs[i].Trks[j].String())
+			str += fmt.Sprintf("\t\t[%d] %s\n", j, chn.Srcs[i].Trks[j].BaseString())
 		}
 	}
 
@@ -195,9 +203,22 @@ func (chn *Channel) SetId(id int) string {
 type StreamRequest struct {
 	Channel string
 	Source  string
-	Time    time.Time // access time
+	Track   string
 	Who     string    // string for hostname:port
+	Time    time.Time // access time
 	Desc    string
+}
+
+func NewStreamRequest() *StreamRequest {
+	sq := &StreamRequest{
+		Channel: ID_DEF_CHANNEL,
+		Source:  ID_DEF_SOURCE,
+		Track:   ID_DEF_TRACK,
+		Time:    time.Now(),
+		Desc:    "newbie",
+	}
+
+	return sq
 }
 
 //----------------------------------------------------------------------------------
@@ -207,8 +228,9 @@ func (sq *StreamRequest) String() string {
 	str := fmt.Sprintf("[Request]")
 	str += fmt.Sprintf("\tChannel: %v", sq.Channel)
 	str += fmt.Sprintf("\tSource: %v", sq.Source)
+	str += fmt.Sprintf("\tTrack: %v", sq.Track)
 	str += fmt.Sprintf("\tWho: %s\n", sq.Who)
-	str += fmt.Sprintf("\tStartAt: %s", sq.Time)
+	str += fmt.Sprintf("\tStartedAt: %s", sq.Time)
 	str += fmt.Sprintf("\tDesciption: %s\n", sq.Desc)
 	return str
 }
@@ -226,20 +248,22 @@ func GetStreamRequestFromQuery(str string) (*StreamRequest, error) {
 	}
 	//fmt.Println(params)
 
-	// assign default values
-	sreq := &StreamRequest{
-		Channel: ID_DEF_CHANNEL,
-		Source:  ID_DEF_SOURCE,
-		Time:    time.Now(),
-	}
+	sq := NewStreamRequest()
 
 	if len(params) > 0 {
-		sreq.Channel = params["channel"][0]
-		sreq.Source = params["source"][0]
+		if params["channel"] != nil {
+			sq.Channel = params["channel"][0]
+		}
+		if params["source"] != nil {
+			sq.Source = params["source"][0]
+		}
+		if params["track"] != nil {
+			sq.Track = params["track"][0]
+		}
 	}
 
 	//fmt.Println(sreq)
-	return sreq, err
+	return sq, err
 }
 
 //----------------------------------------------------------------------------------
@@ -255,6 +279,7 @@ func GetStreamRequestFromURI(uri string) (*StreamRequest, error) {
 		log.Println(err)
 		return nil, err
 	}
+	//fmt.Println(ureq)
 
 	sreq, err := GetStreamRequestFromQuery(ureq.RawQuery)
 	if err != nil {
@@ -271,7 +296,7 @@ func GetStreamRequestFromURI(uri string) (*StreamRequest, error) {
 // get a new  uuid
 // - http://stackoverflow.com/questions/15130321/is-there-a-method-to-generate-a-uuid-with-go-language
 //----------------------------------------------------------------------------------
-func StdGetUUID() (uid string) {
+func GetStdUUID() (uid string) {
 	u4, err := uuid.NewV4()
 	if err != nil {
 		log.Println(err)
@@ -281,17 +306,16 @@ func StdGetUUID() (uid string) {
 	return
 }
 
-func StdParseUUID(uid string) (b []byte) {
+func ParseStdUUID(uid string) []byte {
 	u, err := uuid.ParseHex(uid)
 	if err != nil {
 		log.Println(err)
-		return
+		return nil
 	}
-	copy(b, u[:])
-	return
+	return u[:16]
 }
 
-func PseudoGetUUID() (uid string) {
+func GetPseudoUUID() (uid string) {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
 	if err != nil {
