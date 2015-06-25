@@ -103,11 +103,12 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 	var err error
 
 	//fmt.Println(cmdstr)
-	tok := strings.Fields(cmdstr)
-	if len(tok) < 1 {
+	toks := strings.Fields(cmdstr)
+	if len(toks) < 1 {
 		return err
 	}
-	//fmt.Println(tok)
+	ntok := len(toks)
+	//fmt.Println(toks)
 
 	baseUrl, err := url.Parse("http://localhost:8080/command")
 	if err != nil {
@@ -116,94 +117,116 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 	}
 
 	params := url.Values{}
-	params.Add("op", tok[0])
+	params.Add("op", toks[0])
 
 	var method string
-	switch tok[0] {
+	switch toks[0] {
 	// GET ops
 	case "show":
-		if len(tok) < 2 {
+		if ntok < 2 {
 			fmt.Printf("usage: show [config|network|channel|ring]\n")
 			return err
 		}
 
 		method = "GET"
 
-		switch tok[1] {
+		switch toks[1] {
 		case "network":
-			params.Add("obj", tok[1])
+			params.Add("obj", toks[1])
 		case "channel":
-			params.Add("obj", tok[1])
+			params.Add("obj", toks[1])
 		case "ring":
-			params.Add("obj", tok[1])
+			params.Add("obj", toks[1])
 		case "config":
-			params.Add("obj", tok[1])
+			params.Add("obj", toks[1])
 		default:
-			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
+			fmt.Printf("I can't %s for %s\n", toks[0], toks[1])
 			return err
 		}
 
 	// POST ops
 	case "start":
-		if len(tok) < 2 {
-			fmt.Printf("usage: start [http_reader|tcp_server|dir_reader|file_reader|file_writer]\n")
+		if ntok < 2 {
+			fmt.Printf("usage: start [http_reader|tcp_caster/server|dir_reader|file_reader/writer] [params ...]\n")
 			return err
 		}
 
 		method = "POST"
 
-		switch tok[1] {
+		switch toks[1] {
 		case "http_reader":
-			params.Add("obj", tok[1])
-			params.Add("url", "http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
+			params.Add("obj", toks[1])
+			if ntok > 2 {
+				params.Add("url", toks[2])
+			} else {
+				params.Add("url", "http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi")
+			}
 		case "dir_reader":
-			params.Add("obj", tok[1])
-			params.Add("file", "static/image/*.jpg")
+			params.Add("obj", toks[1])
+			if ntok > 2 {
+				params.Add("file", toks[2])
+			} else {
+				params.Add("file", "static/image/*.jpg")
+			}
 		case "file_reader":
-			params.Add("obj", tok[1])
-			params.Add("file", "record/output.mjpg")
+			params.Add("obj", toks[1])
+			if ntok > 2 {
+				params.Add("file", toks[2])
+			} else {
+				params.Add("file", "record/output.mjpg")
+			}
 		case "file_writer":
-			params.Add("obj", tok[1])
-			params.Add("file", "record/output.mjpg")
-		case "file_caster":
+			params.Add("obj", toks[1])
+			if ntok > 2 {
+				params.Add("file", toks[2])
+			} else {
+				params.Add("file", "record/output.mjpg")
+			}
+		case "tcp_caster":
+			fallthrough
 		case "tcp_server":
-			params.Add("obj", tok[1])
+			params.Add("obj", toks[1])
+			if ntok > 2 {
+				params.Add("port", toks[2])
+			} else {
+				params.Add("port", "8087")
+			}
 		default:
-			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
+			fmt.Printf("I can't %s for %s\n", toks[0], toks[1])
 			return err
 		}
 
 	case "stop":
-		if len(tok) < 2 {
+		if ntok < 2 {
 			fmt.Printf("usage: stop [ring]\n")
 			return err
 		}
 
 		method = "POST"
 
-		switch tok[1] {
+		switch toks[1] {
 		case "ring":
-			params.Add("obj", tok[1])
+			params.Add("obj", toks[1])
 		default:
-			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
+			fmt.Printf("I can't %s for %s\n", toks[0], toks[1])
 			return err
 		}
 
 	case "help":
-		if len(tok) < 2 {
+		if ntok < 2 {
 			fmt.Printf("usage: help [show|start|stop]\n")
 			return err
 		}
 
-		switch tok[1] {
+		switch toks[1] {
 		case "show":
 			fmt.Printf("usage: show [config|network|ring|channel]\n")
 		case "start":
-			fmt.Printf("usage: start [http_reader|dir_reader|file_reader|file_writer|tcp_server]\n")
+			fmt.Printf("usage: start [http_reader|dir_reader|file_reader/writer|tcp_caster/server]\n")
 		case "stop":
 			fmt.Printf("usage: stop [ring]\n")
 		default:
-			fmt.Printf("I can't %s for %s\n", tok[0], tok[1])
+			fmt.Printf("I can't %s for %s\n", toks[0], toks[1])
 		}
 		return err
 
@@ -492,28 +515,31 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 				str = "started http_reader " + url
 			case "dir_reader":
 				file := query.Get("file")
-				fp := pf.NewProtoFile()
-				fp.Pattern = file
+				fp := pf.NewProtoFile(file)
 				go fp.DirReader(sc.Ring, true)
 				str = "started dir_reader " + file
 			case "file_reader":
 				file := query.Get("file")
-				fp := pf.NewProtoFile()
-				fp.Pattern = file
+				fp := pf.NewProtoFile(file)
 				go fp.StreamReader(sc.Ring)
 				str = "started file_reader " + file
 			case "file_writer":
 				file := query.Get("file")
-				fp := pf.NewProtoFile()
-				fp.Pattern = file
+				fp := pf.NewProtoFile(file)
 				go fp.StreamWriter(sc.Ring)
 				str = "started file_writer " + file
 			case "tcp_server":
-				tp := pt.NewProtoTcp("localhost", "8087", "T-Rx")
+				port := query.Get("port")
+				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
 				go tp.StreamServer(sc.Ring)
-				str = "started tcp_server " + tp.Port
+				str = "started tcp_server " + port
+			case "tcp_caster":
+				port := query.Get("port")
+				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
+				go tp.StreamCaster()
+				str = "started tcp_caster " + port
 			default:
-				str = "what obj? [http_reader|file_writer|file_caster|tcp_server]"
+				str = "what obj? [http_reader|dir_reader|file_reader/writer|tcp_caster/server]"
 			}
 		case "stop":
 			switch obj {
@@ -530,7 +556,7 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		str = "Not yet implemented"
+		str = "what's this?"
 	}
 
 	err = ph.WriteResponseMessage(w, http.StatusOK, str)

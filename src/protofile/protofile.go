@@ -38,6 +38,7 @@ type ProtoFile struct {
 	Desc       string
 	CreatedAt  int64
 	ModifiedAt int64
+	Status     int
 }
 
 //---------------------------------------------------------------------------
