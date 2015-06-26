@@ -36,7 +36,8 @@ import (
 // http monitor client
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StreamMonitor(url string) error {
-	log.Printf("%s for %s\n", ph.STR_HTTP_MONITOR, url)
+	log.Printf("start %s for %s\n", ph.STR_HTTP_MONITOR, url)
+	defer log.Printf("end %s for %s\n", ph.STR_HTTP_MONITOR, url)
 
 	var err error
 	var prestr string
@@ -239,7 +240,9 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 		return err
 	}
 
+	// make and send request
 	baseUrl.RawQuery = params.Encode()
+
 	var res *http.Response
 	if method == "POST" {
 		res, err = http.Post(fmt.Sprint(baseUrl), "text/plain", nil)
@@ -250,6 +253,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 		log.Println(err)
 		return err
 	}
+
 	body, err := ioutil.ReadAll(res.Body)
 	fmt.Printf("%s\n", string(body))
 
@@ -260,7 +264,8 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 //	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) error {
-	log.Printf("%s for %s\n", ph.STR_HTTP_READER, url)
+	log.Printf("start %s for %s\n", ph.STR_HTTP_READER, url)
+	defer log.Printf("end %s for %s\n", ph.STR_HTTP_READER, url)
 
 	var err error
 	var res *http.Response
@@ -289,7 +294,8 @@ func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) error {
 // http caster client
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StreamCaster(url string) error {
-	log.Printf("%s for %s\n", ph.STR_HTTP_CASTER, url)
+	log.Printf("start %s for %s\n", ph.STR_HTTP_CASTER, url)
+	defer log.Printf("end %s for %s\n", ph.STR_HTTP_CASTER, url)
 
 	hp := ph.NewProtoHttp()
 	client := ph.NewClient()
@@ -300,7 +306,8 @@ func (sc *ServerConfig) StreamCaster(url string) error {
 // http player client
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StreamPlayer(url string, ring *sr.StreamRing) error {
-	log.Printf("%s for %s\n", ph.STR_HTTP_PLAYER, url)
+	log.Printf("start %s for %s\n", ph.STR_HTTP_PLAYER, url)
+	defer log.Printf("end %s for %s\n", ph.STR_HTTP_PLAYER, url)
 
 	var err error
 	var res *http.Response
@@ -329,7 +336,8 @@ func (sc *ServerConfig) StreamPlayer(url string, ring *sr.StreamRing) error {
 // http server entry
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
-	log.Printf("%s\n", ph.STR_HTTP_SERVER)
+	log.Printf("start %s\n", ph.STR_HTTP_SERVER)
+	defer log.Printf("end %s\n", ph.STR_HTTP_SERVER)
 
 	http.HandleFunc("/", sc.IndexHandler)
 	http.HandleFunc("/hello", sc.HelloHandler)     // view
@@ -381,7 +389,7 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 // index file handler
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) IndexHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Index %s to %s\n", r.URL.Path, r.Host)
+	log.Printf("index %s to %s\n", r.URL.Path, r.Host)
 
 	if strings.Contains(r.URL.Path, "favicon.ico") {
 		http.ServeFile(w, r, "static/favicon.ico")
@@ -395,7 +403,7 @@ func (sc *ServerConfig) IndexHandler(w http.ResponseWriter, r *http.Request) {
 // hello file handler (default: hello.html)
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) HelloHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Hello %s to %s\n", r.URL.Path, r.Host)
+	log.Printf("hello %s to %s\n", r.URL.Path, r.Host)
 
 	hello_page := "static/hello.html"
 
@@ -420,7 +428,7 @@ func (sc *ServerConfig) HelloHandler(w http.ResponseWriter, r *http.Request) {
 // handle /media to provide on-demand media file request
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) MediaHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Media %s to %s\n", r.URL.Path, r.Host)
+	log.Printf("media %s to %s\n", r.URL.Path, r.Host)
 
 	_, err := os.Stat(r.URL.Path[1:])
 	if err != nil {
@@ -434,7 +442,7 @@ func (sc *ServerConfig) MediaHandler(w http.ResponseWriter, r *http.Request) {
 // websocket handler
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
-	log.Printf("Websocket %s\n", ws.RemoteAddr())
+	log.Printf("websocket %s\n", ws.RemoteAddr())
 	defer ws.Close()
 
 	data := make([]byte, sb.MBYTE)
@@ -458,7 +466,7 @@ func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
 // handle /search access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Search %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+	log.Printf("search %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
 
@@ -474,7 +482,7 @@ func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
 // handle /command access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Status %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
+	log.Printf("command %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
 	var str string
@@ -512,34 +520,34 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 			case "http_reader":
 				url := query.Get("url")
 				go sc.StreamReader(url, sc.Ring)
-				str = "started http_reader " + url
+				str = "command to start http_reader " + url
 			case "dir_reader":
 				file := query.Get("file")
 				fp := pf.NewProtoFile(file)
 				go fp.DirReader(sc.Ring, true)
-				str = "started dir_reader " + file
+				str = "command to start dir_reader " + file
 			case "file_reader":
 				file := query.Get("file")
 				fp := pf.NewProtoFile(file)
 				go fp.StreamReader(sc.Ring)
-				str = "started file_reader " + file
+				str = "command to start file_reader " + file
 			case "file_writer":
 				file := query.Get("file")
 				fp := pf.NewProtoFile(file)
 				go fp.StreamWriter(sc.Ring)
-				str = "started file_writer " + file
+				str = "command to start file_writer " + file
 			case "tcp_server":
 				port := query.Get("port")
 				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
 				go tp.StreamServer(sc.Ring)
-				str = "started tcp_server " + port
+				str = "command to start tcp_server " + port
 			case "tcp_caster":
 				port := query.Get("port")
 				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
 				go tp.StreamCaster()
-				str = "started tcp_caster " + port
+				str = "command to start tcp_caster " + port
 			default:
-				str = "what obj? [http_reader|dir_reader|file_reader/writer|tcp_caster/server]"
+				str = "what obj to start? [http_reader|dir_reader|file_reader/writer|tcp_caster/server]"
 			}
 		case "stop":
 			switch obj {
@@ -550,6 +558,8 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 				} else {
 					str = "processed"
 				}
+			default:
+				str = "what obj to stop? [ring]"
 			}
 		default:
 			str = "what op? [start|stop]"
@@ -569,7 +579,7 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 // handle /stream access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StreamHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+	log.Printf("stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
 
 	var err error
 	ring := sc.Ring
@@ -616,7 +626,9 @@ func (sc *ServerConfig) StreamHandler(w http.ResponseWriter, r *http.Request) {
 // serve http access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeHttp(wg *sync.WaitGroup) {
-	log.Println("Starting HTTP server at http://" + sc.Host + ":" + sc.Port)
+	log.Println("start HTTP server at http://" + sc.Host + ":" + sc.Port)
+	defer log.Println("end HTTP server at http://" + sc.Host + ":" + sc.Port)
+
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -632,7 +644,9 @@ func (sc *ServerConfig) ServeHttp(wg *sync.WaitGroup) {
 // serve https tls access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeHttps(wg *sync.WaitGroup) {
-	log.Println("Starting HTTPS server at https://" + sc.Host + ":" + sc.PortS)
+	log.Println("start HTTPS server at https://" + sc.Host + ":" + sc.PortS)
+	defer log.Println("end HTTPS server at https://" + sc.Host + ":" + sc.PortS)
+
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -648,7 +662,9 @@ func (sc *ServerConfig) ServeHttps(wg *sync.WaitGroup) {
 // serve http2 tls access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeHttp2(wg *sync.WaitGroup) {
-	log.Println("Starting HTTP2 server at https://" + sc.Host + ":" + sc.Port2)
+	log.Println("start HTTP2 server at https://" + sc.Host + ":" + sc.Port2)
+	defer log.Println("end HTTP2 server at https://" + sc.Host + ":" + sc.Port2)
+
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -666,7 +682,9 @@ func (sc *ServerConfig) ServeHttp2(wg *sync.WaitGroup) {
 // http://www.ajanicij.info/content/websocket-tutorial-go
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeWs(wg *sync.WaitGroup) {
-	log.Println("Starting WS server at https://" + sc.Host + ":" + sc.Port)
+	log.Println("start WS server at https://" + sc.Host + ":" + sc.Port)
+	defer log.Println("end WS server at https://" + sc.Host + ":" + sc.Port)
+
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -682,7 +700,9 @@ func (sc *ServerConfig) ServeWs(wg *sync.WaitGroup) {
 // serve wss access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) ServeWss(wg *sync.WaitGroup) {
-	log.Println("Starting WSS server at https://" + sc.Host + ":" + sc.PortS)
+	log.Println("start WSS server at https://" + sc.Host + ":" + sc.PortS)
+	defer log.Println("end WSS server at https://" + sc.Host + ":" + sc.PortS)
+
 	defer wg.Done()
 
 	srv := &http.Server{
@@ -698,7 +718,9 @@ func (sc *ServerConfig) ServeWss(wg *sync.WaitGroup) {
 // file server for path
 //---------------------------------------------------------------------------
 func FileServer(path string) http.Handler {
-	log.Println("File server for " + path)
+	log.Println("start File server for " + path)
+	defer log.Println("end File server for " + path)
+
 	return http.FileServer(http.Dir(path))
 }
 

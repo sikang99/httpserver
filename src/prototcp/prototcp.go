@@ -140,8 +140,10 @@ func NewProtoTcpWithPorts(args ...string) *ProtoTcp {
 // act TCP sender for test and debugging
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) StreamCaster() error {
+	log.Printf("start %s to %s:%s\n", STR_TCP_CASTER, pt.Host, pt.Port)
+	defer log.Printf("end %s to %s:%s\n", STR_TCP_CASTER, pt.Host, pt.Port)
+
 	var err error
-	log.Printf("%s to %s:%s\n", STR_TCP_CASTER, pt.Host, pt.Port)
 
 	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
 	conn, err := net.DialTCP("tcp", nil, addr)
@@ -178,8 +180,10 @@ func (pt *ProtoTcp) StreamCaster() error {
 // TCP receiver for debugging
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) StreamServer(ring *sr.StreamRing) error {
+	log.Printf("start %s on :%s\n", STR_TCP_SERVER, pt.Port)
+	defer log.Printf("end %s on :%s\n", STR_TCP_SERVER, pt.Port)
+
 	var err error
-	log.Printf("%s on :%s\n", STR_TCP_SERVER, pt.Port)
 
 	l, err := net.Listen("tcp", ":"+pt.Port)
 	if err != nil {
@@ -212,8 +216,10 @@ func (pt *ProtoTcp) StreamServer(ring *sr.StreamRing) error {
 // TCP Player to receive data in multipart
 //---------------------------------------------------------------------------
 func (pt *ProtoTcp) StreamPlayer(ring *sr.StreamRing) error {
+	log.Printf("start %s\n", STR_TCP_PLAYER)
+	defer log.Printf("end %s\n", STR_TCP_PLAYER)
+
 	var err error
-	log.Printf("%s\n", STR_TCP_PLAYER)
 
 	addr, _ := net.ResolveTCPAddr("tcp", pt.Host+":"+pt.Port)
 	conn, err := net.DialTCP("tcp", nil, addr)

@@ -91,8 +91,8 @@ func NewProtoFile(args ...string) *ProtoFile {
 // act file reader
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) DirReader(ring *sr.StreamRing, loop bool) error {
-	log.Printf("%s for %s\n", STR_DIR_READER, pf.Pattern)
-	defer log.Printf("out %s\n", STR_DIR_READER)
+	log.Printf("start %s for %s\n", STR_DIR_READER, pf.Pattern)
+	defer log.Printf("end %s\n", STR_DIR_READER)
 
 	var err error
 
@@ -106,8 +106,8 @@ func (pf *ProtoFile) DirReader(ring *sr.StreamRing, loop bool) error {
 // act file reader
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
-	log.Printf("%s for %s\n", STR_FILE_READER, pf.Pattern)
-	defer log.Printf("out %s\n", STR_FILE_READER)
+	log.Printf("start %s for %s\n", STR_FILE_READER, pf.Pattern)
+	defer log.Printf("end %s\n", STR_FILE_READER)
 
 	var err error
 
@@ -121,8 +121,8 @@ func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
 // act file writer
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) StreamWriter(ring *sr.StreamRing) error {
-	log.Printf("%s for %s\n", STR_FILE_WRITER, pf.Pattern)
-	defer log.Printf("out %s\n", STR_FILE_WRITER)
+	log.Printf("start %s for %s\n", STR_FILE_WRITER, pf.Pattern)
+	defer log.Printf("end %s\n", STR_FILE_WRITER)
 
 	var err error
 
@@ -263,7 +263,7 @@ func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
 		}
 		preTimestamp = slot.Timestamp
 
-		fmt.Println("MR", slot)
+		//fmt.Println("MR", slot)
 		ring.SetPosInByPos(pos + 1)
 	}
 
@@ -302,7 +302,7 @@ func WriteRingToMultipartFile(ring *sr.StreamRing, file string) error {
 		w := bufio.NewWriter(f)
 		err = WriteSlotToHandle(w, slot, ring.Boundary)
 
-		fmt.Println("MW", slot)
+		//fmt.Println("MW", slot)
 		pos = npos
 	}
 
