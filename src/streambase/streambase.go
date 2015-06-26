@@ -49,6 +49,7 @@ const (
 	STATUS_IDLE = iota
 	STATUS_USING
 	STATUS_PAUSE
+	STATUS_CLOSE
 
 	LEN_MAX_LINE = 128
 	LEN_MAX_MSG  = 1024
@@ -56,6 +57,13 @@ const (
 	TIME_DEF_WAIT      = 100 * time.Microsecond
 	STR_TIME_PRECISION = "Millisecond"
 )
+
+var StatusText = map[int]string{
+	STATUS_USING: "Using",
+	STATUS_IDLE:  "Idle",
+	STATUS_PAUSE: "Pause",
+	STATUS_CLOSE: "Close",
+}
 
 // multipart headers
 const (

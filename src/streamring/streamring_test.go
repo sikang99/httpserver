@@ -1,6 +1,6 @@
 //==================================================================================
 // Author : Stoney Kang, sikang99@gmail.com, 2015
-// Test for stream buffer for multipart media
+// Test for stream ring(slots) buffer for multipart media
 //==================================================================================
 
 package streamring
@@ -106,7 +106,7 @@ func TestStreamRing(t *testing.T) {
 	var err error
 
 	nb := 3
-	sr := NewStreamRing(nb, sb.KBYTE)
+	sr := NewStreamRingWithSize(nb, sb.KBYTE)
 	fmt.Println(sr)
 
 	sr.Resize(2)
@@ -164,7 +164,7 @@ func TestStreamRing(t *testing.T) {
 func TestStreamRead(t *testing.T) {
 	// prepare a buffer
 	nb := 5
-	sr := NewStreamRing(nb, sb.MBYTE)
+	sr := NewStreamRingWithSize(nb, sb.MBYTE)
 
 	data := make([]byte, 128)
 	in := NewStreamSlotByData(sb.KBYTE, "image/jpeg", len(data), data)
@@ -199,7 +199,7 @@ func TestStreamWrite(t *testing.T) {
 	var err error
 
 	ns := 5
-	sr := NewStreamRing(ns, sb.MBYTE)
+	sr := NewStreamRingWithSize(ns, sb.MBYTE)
 	fmt.Println(sr)
 
 	err = sr.SetStatusUsing()
@@ -233,7 +233,7 @@ func TestStreamWrite(t *testing.T) {
 func TestStreamReadWrite(t *testing.T) {
 	// prepare a buffer
 	nb := 5
-	sr := NewStreamRing(nb, sb.MBYTE)
+	sr := NewStreamRingWithSize(nb, sb.MBYTE)
 	sr.Desc = "Test buffer"
 
 	var fend bool = false
@@ -282,6 +282,16 @@ func TestStreamReadWrite(t *testing.T) {
 	}
 
 	writer(10)
+}
+
+//----------------------------------------------------------------------------------
+// test for stream array (set of rings)
+//----------------------------------------------------------------------------------
+func TestStreamArray(t *testing.T) {
+	array := NewStreamArrayWithSize(4, 3, sb.GBYTE)
+	for i := range array {
+		fmt.Println(array[i])
+	}
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

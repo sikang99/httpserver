@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -125,7 +126,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 	// GET ops
 	case "show":
 		if ntok < 2 {
-			fmt.Printf("usage: show [config|network|channel|ring]\n")
+			fmt.Printf("usage: show [config|network|channel|ring|array]\n")
 			return err
 		}
 
@@ -136,8 +137,13 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string) error {
 			params.Add("obj", toks[1])
 		case "channel":
 			params.Add("obj", toks[1])
+		case "array":
+			params.Add("obj", toks[1])
 		case "ring":
 			params.Add("obj", toks[1])
+			if ntok > 2 {
+				params.Add("id", toks[2])
+			}
 		case "config":
 			params.Add("obj", toks[1])
 		default:
@@ -281,6 +287,7 @@ func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) error {
 		log.Println(sb.RedString(err))
 		return err
 	}
+	defer res.Body.Close()
 
 	ring.Boundary, err = ph.GetTypeBoundary(res.Header.Get("Content-Type"))
 	mr := multipart.NewReader(res.Body, ring.Boundary)
@@ -300,6 +307,8 @@ func (sc *ServerConfig) StreamCaster(url string) error {
 	hp := ph.NewProtoHttp()
 	client := ph.NewClient()
 	return hp.RequestPost(client)
+
+	// TODO: sending data
 }
 
 //---------------------------------------------------------------------------
@@ -376,10 +385,6 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 		go sc.ServeWss(&wg)
 	*/
 
-	//go sc.StreamReader("http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi", ring)
-	//go pt.NewProtoTcp("localhost", "8087", "T-Rx").StreamServer(ring)
-	//go pf.NewProtoFile("./static/image/*.jpg", "F-Rx").StreamCaster(ring)
-
 	wg.Wait()
 
 	return nil
@@ -389,7 +394,7 @@ func (sc *ServerConfig) StreamServer(ring *sr.StreamRing) error {
 // index file handler
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) IndexHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("index %s to %s\n", r.URL.Path, r.Host)
+	log.Printf("handle /index %s to %s\n", r.URL.Path, r.Host)
 
 	if strings.Contains(r.URL.Path, "favicon.ico") {
 		http.ServeFile(w, r, "static/favicon.ico")
@@ -403,7 +408,7 @@ func (sc *ServerConfig) IndexHandler(w http.ResponseWriter, r *http.Request) {
 // hello file handler (default: hello.html)
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) HelloHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("hello %s to %s\n", r.URL.Path, r.Host)
+	log.Printf("handle /hello %s to %s\n", r.URL.Path, r.Host)
 
 	hello_page := "static/hello.html"
 
@@ -417,10 +422,10 @@ func (sc *ServerConfig) HelloHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := os.Stat(hello_page)
 	if err != nil {
 		ph.WriteTemplatePage(w, hello_tmpl, sc)
-		log.Printf("Hello serve %s\n", "hello_tmpl")
+		log.Printf("hello serve %s\n", "hello_tmpl")
 	} else {
 		http.ServeFile(w, r, hello_page)
-		log.Printf("Hello serve %s\n", hello_page)
+		log.Printf("hello serve %s\n", hello_page)
 	}
 }
 
@@ -428,7 +433,7 @@ func (sc *ServerConfig) HelloHandler(w http.ResponseWriter, r *http.Request) {
 // handle /media to provide on-demand media file request
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) MediaHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("media %s to %s\n", r.URL.Path, r.Host)
+	log.Printf("handle /media %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	_, err := os.Stat(r.URL.Path[1:])
 	if err != nil {
@@ -442,7 +447,7 @@ func (sc *ServerConfig) MediaHandler(w http.ResponseWriter, r *http.Request) {
 // websocket handler
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
-	log.Printf("websocket %s\n", ws.RemoteAddr())
+	log.Printf("handle /websocket %s\n", ws.RemoteAddr())
 	defer ws.Close()
 
 	data := make([]byte, sb.MBYTE)
@@ -466,7 +471,7 @@ func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
 // handle /search access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("search %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
+	log.Printf("handle /search %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
 
@@ -482,16 +487,16 @@ func (sc *ServerConfig) SearchHandler(w http.ResponseWriter, r *http.Request) {
 // handle /command access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("command %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
+	log.Printf("handle /command %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
 	var str string
 
-	ring := sc.Ring
-
 	query := r.URL.Query()
 	op := query.Get("op")
 	obj := query.Get("obj")
+
+	ring := sc.Array[0]
 
 	switch r.Method {
 	// monitor part
@@ -504,9 +509,18 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 			case "config":
 				str = fmt.Sprint(sc)
 			case "ring":
+				id := query.Get("id")
+				i, err := strconv.Atoi(id)
+				if err == nil && i < len(sc.Array) {
+					ring = sc.Array[i]
+				}
 				str = fmt.Sprint(ring)
+			case "array":
+				for i := range sc.Array {
+					str += fmt.Sprintf("[%d] %s\n", i, sc.Array[i].BaseString())
+				}
 			default:
-				str = "what obj? [config|network|ring]"
+				str = "what obj? [config|network|ring|array]"
 			}
 		default:
 			str = "what op? [show]"
@@ -519,44 +533,44 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 			switch obj {
 			case "http_reader":
 				url := query.Get("url")
-				go sc.StreamReader(url, sc.Ring)
-				str = "command to start http_reader " + url
+				go sc.StreamReader(url, ring)
+				str = "order to start http_reader " + url
 			case "dir_reader":
 				file := query.Get("file")
 				fp := pf.NewProtoFile(file)
-				go fp.DirReader(sc.Ring, true)
-				str = "command to start dir_reader " + file
+				go fp.DirReader(ring, true)
+				str = "order to start dir_reader " + file
 			case "file_reader":
 				file := query.Get("file")
 				fp := pf.NewProtoFile(file)
-				go fp.StreamReader(sc.Ring)
-				str = "command to start file_reader " + file
+				go fp.StreamReader(ring)
+				str = "order to start file_reader " + file
 			case "file_writer":
 				file := query.Get("file")
 				fp := pf.NewProtoFile(file)
-				go fp.StreamWriter(sc.Ring)
-				str = "command to start file_writer " + file
+				go fp.StreamWriter(ring)
+				str = "order to start file_writer " + file
 			case "tcp_server":
 				port := query.Get("port")
 				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
-				go tp.StreamServer(sc.Ring)
-				str = "command to start tcp_server " + port
+				go tp.StreamServer(ring)
+				str = "order to start tcp_server " + port
 			case "tcp_caster":
 				port := query.Get("port")
 				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
 				go tp.StreamCaster()
-				str = "command to start tcp_caster " + port
+				str = "order to start tcp_caster " + port
 			default:
 				str = "what obj to start? [http_reader|dir_reader|file_reader/writer|tcp_caster/server]"
 			}
 		case "stop":
 			switch obj {
 			case "ring":
-				err = sc.Ring.SetStatusIdle()
+				err = ring.SetStatusIdle()
 				if err != nil {
 					str = fmt.Sprint(err)
 				} else {
-					str = "processed"
+					str = "order is processed"
 				}
 			default:
 				str = "what obj to stop? [ring]"
@@ -579,10 +593,14 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 // handle /stream access
 //---------------------------------------------------------------------------
 func (sc *ServerConfig) StreamHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("stream %s for %s to %s\n", r.Method, r.URL.Path, r.Host)
+	log.Printf("handle /stream %s for %s to %s\n", r.Method, r.RequestURI, r.Host)
 
 	var err error
-	ring := sc.Ring
+	/*
+		query := r.URL.Query()
+		trk := query.Get("track")
+	*/
+	ring := sc.Array[0]
 
 	switch r.Method {
 	case "POST": // for Caster

@@ -20,8 +20,10 @@ import (
 // test for status
 //----------------------------------------------------------------------------------
 func TestStatusValue(t *testing.T) {
-	fmt.Println(STATUS_USING)
-	fmt.Println(STATUS_IDLE)
+	fmt.Println(STATUS_IDLE, StatusText[STATUS_IDLE])
+	fmt.Println(STATUS_USING, StatusText[STATUS_USING])
+	fmt.Println(STATUS_PAUSE, StatusText[STATUS_PAUSE])
+	fmt.Println(STATUS_CLOSE, StatusText[STATUS_CLOSE])
 }
 
 //----------------------------------------------------------------------------------

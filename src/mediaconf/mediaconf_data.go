@@ -62,17 +62,18 @@ var hello_tmpl = `<!DOCTYPE html>
 // server config
 //-----------------------------------------------------------------------------
 type ServerConfig struct {
-	Title    string `json:"title"`
-	Image    string
-	Url      string
-	Addr     string
-	Host     string
-	Port     string
-	PortS    string
-	Port2    string
-	Mode     string
-	Ring     *sr.StreamRing
-	Channels []*si.Channel
+	Title string `json:"title"`
+	Image string
+	Url   string
+	Addr  string
+	Host  string
+	Port  string
+	PortS string
+	Port2 string
+	Mode  string
+	//Ring     *sr.StreamRing
+	Array    []*sr.StreamRing
+	Station  []*si.Channel
 	NotiChan chan []byte
 	// http://giantmachines.tumblr.com/post/52184842286/golang-http-client-with-timeouts
 	ConnectTimeout   time.Duration
@@ -103,7 +104,8 @@ func NewServerConfig() *ServerConfig {
 	sc.PortS = sb.STR_DEF_PTLS
 	sc.Port2 = sb.STR_DEF_PORT2
 
-	sc.Ring = sr.NewStreamRingWithParams(3, sb.MBYTE, "Server stream buffer")
+	//sc.Ring = sr.NewStreamRingWithParams(3, sb.MBYTE, "Server stream buffer")
+	sc.Array = sr.NewStreamArrayWithSize(2, 3, sb.MBYTE)
 
 	return sc
 }

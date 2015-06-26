@@ -339,7 +339,7 @@ func (pw *ProtoWs) StreamCaster(sec ...string) (err error) {
 func (pw *ProtoWs) StreamServer() (err error) {
 	log.Printf("%s on ws:%s and wss:%s\n", STR_WS_SERVER, pw.Port, pw.PortTls)
 
-	pw.Ring = sr.NewStreamRing(2, sb.MBYTE)
+	pw.Ring = sr.NewStreamRingWithSize(2, sb.MBYTE)
 
 	http.Handle("/stream", websocket.Handler(pw.StreamHandler))
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))

@@ -11,6 +11,7 @@ package streamring
 import (
 	"fmt"
 	"mime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -147,7 +148,7 @@ type StreamRing struct {
 //----------------------------------------------------------------------------------
 // make a new circular stream buffer
 //----------------------------------------------------------------------------------
-func NewStreamRing(num int, size int) *StreamRing {
+func NewStreamRingWithParams(num int, size int, desc string) *StreamRing {
 	slots := make([]StreamSlot, num)
 	for i := 0; i < num; i++ {
 		slots[i].Content = make([]byte, size)
@@ -161,14 +162,27 @@ func NewStreamRing(num int, size int) *StreamRing {
 		Size: size,
 		In:   0, Out: 0,
 		Boundary: sb.STR_DEF_BDRY,
-		Desc:     "New empty buffer",
+		Desc:     desc,
 	}
 }
 
-func NewStreamRingWithParams(num int, size int, desc string) *StreamRing {
-	ring := NewStreamRing(num, size)
-	ring.Desc = desc
-	return ring
+func NewStreamRingWithSize(num int, size int) *StreamRing {
+	return NewStreamRingWithParams(num, size, "New sized ring buffer")
+}
+
+func NewStreamRing() *StreamRing {
+	return NewStreamRingWithParams(3, sb.MBYTE, "New default ring buffer")
+}
+
+//----------------------------------------------------------------------------------
+// make a new ring arrary(slice)
+//----------------------------------------------------------------------------------
+func NewStreamArrayWithSize(rnum, snum, size int) []*StreamRing {
+	var array []*StreamRing
+	for i := 0; i < rnum; i++ {
+		array = append(array, NewStreamRingWithParams(snum, size, strconv.Itoa(i)+"-th ring"))
+	}
+	return array
 }
 
 //----------------------------------------------------------------------------------
@@ -176,7 +190,7 @@ func NewStreamRingWithParams(num int, size int, desc string) *StreamRing {
 //----------------------------------------------------------------------------------
 func (sr *StreamRing) BaseString() string {
 	str := fmt.Sprintf("[StreamRing] %s", sr.Id)
-	str += fmt.Sprintf("\tStatus: %d", sr.Status)
+	str += fmt.Sprintf("\tStatus: %s(%d)", sb.StatusText[sr.Status], sr.Status)
 	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
 	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/sb.KBYTE)
 	str += fmt.Sprintf("\tBoundary: %s", sr.Boundary)

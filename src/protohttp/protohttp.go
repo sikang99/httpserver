@@ -603,8 +603,8 @@ func WriteResponseMessage(w http.ResponseWriter, status int, message string) err
 	var err error
 
 	w.WriteHeader(status)
-	log.Println(message)
 	fmt.Fprintf(w, message)
+	//log.Println(message)
 
 	return err
 }

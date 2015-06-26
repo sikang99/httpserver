@@ -237,7 +237,7 @@ func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
 
 	err = ring.SetStatusUsing()
 	if err != nil {
-		log.Println(err)
+		log.Println(sb.RedString(err))
 		return err
 	}
 	defer ring.SetStatusIdle()

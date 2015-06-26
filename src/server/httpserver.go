@@ -34,7 +34,7 @@ var (
 	fport  = flag.String("port", sb.STR_DEF_PORT, "TCP port to be used for http")
 	fports = flag.String("ports", sb.STR_DEF_PTLS, "TCP port to be used for https")
 	fport2 = flag.String("port2", sb.STR_DEF_PORT2, "TCP port to be used for http2")
-	furl   = flag.String("url", "http://localhost:8080/[index|hello|/stream]", "url to be accessed")
+	furl   = flag.String("url", "http://"+sb.STR_DEF_HOST+":"+sb.STR_DEF_PORT, "base url to be accessed")
 	froot  = flag.String("root", ".", "Define the root filesystem path")
 	vflag  = flag.Bool("verbose", false, "Verbose display")
 )
@@ -87,18 +87,20 @@ func main() {
 	tp := pt.NewProtoTcpWithPorts("8087")
 	wp := pw.NewProtoWsWithPorts("8087", "8443")
 
+	ring := sc.Array[0]
+
 	// let's do work by the working mode
 	switch sc.Mode {
 
 	// package protohttp
 	case "http_reader":
-		sc.StreamReader(sc.Url, sc.Ring)
+		sc.StreamReader(sc.Url, ring)
 	case "http_player":
-		sc.StreamPlayer(sc.Url, sc.Ring)
+		sc.StreamPlayer(sc.Url, ring)
 	case "http_caster":
 		sc.StreamCaster(sc.Url)
 	case "http_server":
-		sc.StreamServer(sc.Ring)
+		sc.StreamServer(ring)
 	case "http_monitor":
 		sc.StreamMonitor(sc.Url)
 
@@ -106,9 +108,9 @@ func main() {
 	case "tcp_caster":
 		tp.StreamCaster()
 	case "tcp_server":
-		tp.StreamServer(sc.Ring)
+		tp.StreamServer(ring)
 	case "tcp_player":
-		tp.StreamPlayer(sc.Ring)
+		tp.StreamPlayer(ring)
 
 	// package protows
 	case "ws_caster":
@@ -121,10 +123,10 @@ func main() {
 	// package protofile
 	case "file_reader":
 		fr := pf.NewProtoFile("./static/image/*.jpg", "F-Rr")
-		fr.StreamReader(sc.Ring)
+		fr.StreamReader(ring)
 	case "file_writer":
 		fw := pf.NewProtoFile("output.mjpg", "F-Wr")
-		fw.StreamWriter(sc.Ring)
+		fw.StreamWriter(ring)
 
 	default:
 		fmt.Println("Unknown working mode")
