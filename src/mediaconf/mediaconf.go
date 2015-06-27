@@ -56,13 +56,20 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 		if strings.EqualFold(cmdstr, "quit") {
 			fmt.Println("Bye bye.")
 			break
-		} else if cmdstr == "." {
-			// previous command
-			cmdstr = prestr
 		}
 
-		// remember command
-		prestr = cmdstr
+		if cmdstr == "" {
+			continue
+		}
+
+		// for just enter(return)
+		if cmdstr == "." {
+			// exec previous command
+			cmdstr = prestr
+		} else {
+			// remember current command
+			prestr = cmdstr
+		}
 
 		err = sc.ParseMonitorCommand(cmdstr, r)
 		if err != nil {
@@ -213,11 +220,34 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 				url = toks[2]
 			}
 			params.Add("url", url)
-		case "dir_reader":
-			if ntok > 2 {
-				params.Add("file", toks[2])
+			id := "0"
+			if ntok < 4 {
+				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				if err != nil {
+					return err
+				}
 			} else {
-				params.Add("file", "static/image/*.jpg")
+				id = toks[3]
+			}
+		case "dir_reader":
+			file := "static/image/*.jpg"
+			if ntok < 3 {
+				file, err = PromptReadLineWithDefault("patten to read? [static/image/*.jpg]: ", file, r)
+				if err != nil {
+					return err
+				}
+			} else {
+				file = toks[2]
+			}
+			params.Add("file", file)
+			id := "0"
+			if ntok < 4 {
+				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				if err != nil {
+					return err
+				}
+			} else {
+				id = toks[3]
 			}
 		case "file_reader":
 			fallthrough
@@ -232,6 +262,15 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 				file = toks[2]
 			}
 			params.Add("file", file)
+			id := "0"
+			if ntok < 4 {
+				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				if err != nil {
+					return err
+				}
+			} else {
+				id = toks[3]
+			}
 		case "tcp_caster":
 			fallthrough
 		case "tcp_server":
@@ -617,38 +656,52 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 		case "start":
 			switch obj {
 			case "http_reader":
-				url := query.Get("url")
-				go sc.StreamReader(url, ring)
-				str = "order to start http_reader " + url
-			case "dir_reader":
-				file := query.Get("file")
-				fp := pf.NewProtoFile(file)
-				//go fp.DirReader(ring, true)
-				go fp.DirReader(sc.Array[1], true)
-				str = "order to start dir_reader " + file
-			case "file_reader":
-				file := query.Get("file")
-				fp := pf.NewProtoFile(file)
-				go fp.StreamReader(ring)
-				str = "order to start file_reader " + file
-			case "file_writer":
-				file := query.Get("file")
-				fp := pf.NewProtoFile(file)
-				go fp.StreamWriter(ring)
-				str = "order to start file_writer " + file
-			case "tcp_server":
-				port := query.Get("port")
 				id := query.Get("id")
 				i, _ := strconv.Atoi(id)
 				i = i % len(sc.Array)
+				url := query.Get("url")
+				go sc.StreamReader(url, sc.Array[i])
+				str = fmt.Sprintf("order to start %s (%s, %s)", obj, url, id)
+			case "dir_reader":
+				id := query.Get("id")
+				i, _ := strconv.Atoi(id)
+				i = i % len(sc.Array)
+				file := query.Get("file")
+				fp := pf.NewProtoFile(file)
+				go fp.DirReader(sc.Array[i], true)
+				str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+			case "file_reader":
+				id := query.Get("id")
+				i, _ := strconv.Atoi(id)
+				i = i % len(sc.Array)
+				file := query.Get("file")
+				fp := pf.NewProtoFile(file)
+				go fp.StreamReader(sc.Array[i])
+				str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+			case "file_writer":
+				id := query.Get("id")
+				i, _ := strconv.Atoi(id)
+				i = i % len(sc.Array)
+				file := query.Get("file")
+				fp := pf.NewProtoFile(file)
+				go fp.StreamWriter(sc.Array[i])
+				str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+			case "tcp_server":
+				id := query.Get("id")
+				i, _ := strconv.Atoi(id)
+				i = i % len(sc.Array)
+				port := query.Get("port")
 				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
 				go tp.StreamServer(sc.Array[i])
-				str = fmt.Sprintf("order to start tcp_server (%s, %s)", port, id)
+				str = fmt.Sprintf("order to start %s (%s, %s)", obj, port, id)
 			case "tcp_caster":
+				id := query.Get("id")
+				i, _ := strconv.Atoi(id)
+				i = i % len(sc.Array)
 				port := query.Get("port")
 				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
 				go tp.StreamCaster()
-				str = "order to start tcp_caster " + port
+				str = fmt.Sprintf("order to start %s (%s, %s)", obj, port, id)
 			default:
 				str = "what obj to start? [http_reader|dir_reader|file_reader/writer|tcp_caster/server]"
 			}
