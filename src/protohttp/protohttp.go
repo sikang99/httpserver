@@ -564,6 +564,11 @@ func GetTypeBoundary(ctype string) (string, error) {
 	}
 
 	boundary := params["boundary"]
+	if boundary == "" {
+		log.Println(sb.RedString("Not found boundary string"))
+		return boundary, sb.ErrFound
+	}
+
 	if !strings.HasPrefix(boundary, "--") {
 		log.Printf("expected to start with --, got %q", boundary)
 	}

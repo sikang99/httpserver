@@ -85,6 +85,7 @@ var (
 	ErrNull    = errors.New("error null")
 	ErrSize    = errors.New("error size")
 	ErrStatus  = errors.New("error invalid status")
+	ErrValue   = errors.New("error invalid value")
 	ErrSupport = errors.New("error not supported")
 )
 

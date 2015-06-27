@@ -405,7 +405,7 @@ func (pt *ProtoTcp) WriteRingToStream(w *bufio.Writer, ring *sr.StreamRing) erro
 	}
 
 	var pos int
-	for {
+	for ring.IsUsing() {
 		slot, npos, err := ring.GetSlotNextByPos(pos)
 		if err != nil {
 			if err == sb.ErrEmpty {
@@ -442,24 +442,24 @@ func (pt *ProtoTcp) ReadStreamToRing(r *bufio.Reader, ring *sr.StreamRing) error
 	defer ring.Reset()
 
 	//  recv multipart stream to ring
-	for {
+	for ring.IsUsing() {
 		slot, pos := ring.GetSlotIn()
 		err = pt.ReadFrameToSlot(r, slot)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
-		fmt.Println(">2", slot)
+		//fmt.Println(">2", slot)
 
 		// ignore control frame from cam
 		if slot.IsMajorType("multipart") {
 			log.Println(slot)
 			continue
 		}
+
 		ring.SetPosInByPos(pos + 1)
 	}
 
-	//fmt.Println(ring)
 	return err
 }
 
@@ -575,6 +575,11 @@ func (pt *ProtoTcp) GetTypeBoundary(str string) error {
 	boundary := params["boundary"]
 	if !strings.HasPrefix(boundary, "--") {
 		log.Printf("expected with --, got %q", boundary)
+	}
+
+	if boundary == "" {
+		log.Println(sb.ErrFound)
+		return sb.ErrFound
 	}
 
 	pt.Boundary = boundary

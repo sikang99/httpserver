@@ -52,7 +52,7 @@ func TestHandleInfo(t *testing.T) {
 // test for send and receive
 //---------------------------------------------------------------------------
 func TestCastServe(t *testing.T) {
-	sbuf := sr.NewStreamRing(5, sb.MBYTE)
+	sbuf := sr.NewStreamRingWithSize(5, sb.MBYTE)
 
 	sx := NewProtoTcp("localhost", "8087", "Cx")
 	go sx.StreamServer(sbuf)
@@ -67,7 +67,7 @@ func TestCastServe(t *testing.T) {
 // test for send and receive
 //---------------------------------------------------------------------------
 func TestServePlay(t *testing.T) {
-	sbuf := sr.NewStreamRing(3, 2*sb.MBYTE)
+	sbuf := sr.NewStreamRingWithSize(3, 2*sb.MBYTE)
 	sbuf.SetStatusUsing()
 
 	// generate slot data
@@ -94,7 +94,7 @@ func TestServePlay(t *testing.T) {
 
 	time.Sleep(time.Millisecond)
 
-	rbuf := sr.NewStreamRing(5, sb.MBYTE)
+	rbuf := sr.NewStreamRingWithSize(5, sb.MBYTE)
 
 	px := NewProtoTcp("localhost", "8087", "Px")
 	px.StreamPlayer(rbuf)
@@ -104,7 +104,7 @@ func TestServePlay(t *testing.T) {
 // test for cast, serve, play
 //---------------------------------------------------------------------------
 func TestCastServePlay(t *testing.T) {
-	sbuf := sr.NewStreamRing(4, sb.MBYTE)
+	sbuf := sr.NewStreamRingWithSize(4, sb.MBYTE)
 
 	sx := NewProtoTcp("localhost", "8087", "Cx")
 	go sx.StreamServer(sbuf)
@@ -116,7 +116,7 @@ func TestCastServePlay(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	rbuf := sr.NewStreamRing(3, sb.MBYTE)
+	rbuf := sr.NewStreamRingWithSize(3, sb.MBYTE)
 
 	px := NewProtoTcp("localhost", "8087", "Px")
 	px.StreamPlayer(rbuf)

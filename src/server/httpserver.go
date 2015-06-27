@@ -23,7 +23,7 @@ import (
 
 //---------------------------------------------------------------------------
 const (
-	STR_MEDIA_VERSION = "0.9.7, 2015/06/25"
+	STR_MEDIA_VERSION = "0.9.8, 2015/06/25"
 	STR_MEDIA_SYSTEM  = "Happy Media System"
 )
 
