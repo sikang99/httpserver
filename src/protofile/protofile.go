@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"time"
 
+	pb "stoney/httpserver/src/protobase"
+
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
@@ -38,18 +40,42 @@ type ProtoFile struct {
 	Desc       string
 	CreatedAt  int64
 	ModifiedAt int64
-	Status     int
+	Base       *pb.ProtoBase
 }
 
 //---------------------------------------------------------------------------
 // string ProtoTcp information
 //---------------------------------------------------------------------------
 func (pf *ProtoFile) String() string {
-	str := fmt.Sprintf("\tPattern: %v", pf.Pattern)
+	str := fmt.Sprint(pf.Base)
+	str += fmt.Sprintf("\tPattern: %v", pf.Pattern)
 	str += fmt.Sprintf("\tBoundary: %v", pf.Boundary)
 	str += fmt.Sprintf("\tDesc: %v", pf.Desc)
 	str += fmt.Sprintf("\tCreatedAt: %v,%v", pf.CreatedAt, pf.ModifiedAt)
 	return str
+}
+
+//---------------------------------------------------------------------------
+// new ProtoTcp struct
+//---------------------------------------------------------------------------
+func NewProtoFile(args ...string) *ProtoFile {
+	base := pb.NewProtoBase()
+
+	pf := &ProtoFile{
+		Boundary:  sb.STR_DEF_BDRY,
+		CreatedAt: time.Now().Unix(),
+		Base:      base,
+	}
+
+	for i, arg := range args {
+		if i == 0 {
+			pf.Pattern = arg
+		} else if i == 1 {
+			pf.Desc = arg
+		}
+	}
+
+	return pf
 }
 
 //---------------------------------------------------------------------------
@@ -68,23 +94,10 @@ func (pf *ProtoFile) Clear() {
 }
 
 //---------------------------------------------------------------------------
-// new ProtoTcp struct
+// check status
 //---------------------------------------------------------------------------
-func NewProtoFile(args ...string) *ProtoFile {
-	pf := &ProtoFile{
-		Boundary:  sb.STR_DEF_BDRY,
-		CreatedAt: time.Now().Unix(),
-	}
-
-	for i, arg := range args {
-		if i == 0 {
-			pf.Pattern = arg
-		} else if i == 1 {
-			pf.Desc = arg
-		}
-	}
-
-	return pf
+func (pf *ProtoFile) IsRun() bool {
+	return pf.Base.IsRun()
 }
 
 //---------------------------------------------------------------------------
@@ -96,7 +109,14 @@ func (pf *ProtoFile) DirReader(ring *sr.StreamRing, loop bool) error {
 
 	var err error
 
-	err = ReadDirToRing(ring, pf.Pattern, loop)
+	pf.Base.SetStatusRun()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer pf.Base.Reset()
+
+	err = ReadDirToRing(pf.Base, ring, pf.Pattern, loop)
 	//fmt.Println(ring)
 
 	return err
@@ -111,7 +131,14 @@ func (pf *ProtoFile) StreamReader(ring *sr.StreamRing) error {
 
 	var err error
 
-	err = ReadMultipartFileToRing(ring, pf.Pattern)
+	pf.Base.SetStatusRun()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer pf.Base.Reset()
+
+	err = ReadMultipartFileToRing(pf.Base, ring, pf.Pattern)
 	//fmt.Println(ring)
 
 	return err
@@ -126,7 +153,14 @@ func (pf *ProtoFile) StreamWriter(ring *sr.StreamRing) error {
 
 	var err error
 
-	err = WriteRingToMultipartFile(ring, pf.Pattern)
+	pf.Base.SetStatusRun()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer pf.Base.Reset()
+
+	err = WriteRingToMultipartFile(pf.Base, ring, pf.Pattern)
 	//fmt.Println(ring)
 
 	return err
@@ -135,7 +169,7 @@ func (pf *ProtoFile) StreamWriter(ring *sr.StreamRing) error {
 //---------------------------------------------------------------------------
 // read files with the given pattern in the directory and put them to the ring buffer
 //---------------------------------------------------------------------------
-func ReadDirToRing(ring *sr.StreamRing, pat string, loop bool) error {
+func ReadDirToRing(pb *pb.ProtoBase, ring *sr.StreamRing, pat string, loop bool) error {
 	var err error
 
 	// ReadDir : read directory
@@ -156,7 +190,7 @@ func ReadDirToRing(ring *sr.StreamRing, pat string, loop bool) error {
 	defer ring.SetStatusIdle()
 
 	// ToRing : to ring buffer
-	for ring.IsUsing() {
+	for ring.IsUsing() && pb.IsRun() {
 		for i := range files {
 			slot, pos := ring.GetSlotIn()
 
@@ -166,7 +200,7 @@ func ReadDirToRing(ring *sr.StreamRing, pat string, loop bool) error {
 			}
 
 			ring.SetPosInByPos(pos + 1)
-			fmt.Println("FR", slot)
+			//fmt.Println("FR", slot)
 
 			time.Sleep(time.Second)
 		}
@@ -225,7 +259,7 @@ func ReadPartToSlot(mr *multipart.Reader, ss *sr.StreamSlot) error {
 // read multipart file to the ring buffer
 // TODO: change relative time gap into absolute one to prevent drift
 //---------------------------------------------------------------------------
-func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
+func ReadMultipartFileToRing(pb *pb.ProtoBase, ring *sr.StreamRing, file string) error {
 	var err error
 
 	f, err := os.Open(file)
@@ -235,6 +269,7 @@ func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
 	}
 	defer f.Close()
 
+	// set ring to using
 	err = ring.SetStatusUsing()
 	if err != nil {
 		log.Println(sb.RedString(err))
@@ -242,12 +277,10 @@ func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
 	}
 	defer ring.SetStatusIdle()
 
-	// TODO: set boundary from the multipart file
-
 	mr := multipart.NewReader(f, ring.Boundary)
 
 	var preTimestamp int64 = 0
-	for ring.IsUsing() {
+	for ring.IsUsing() && pb.IsRun() {
 		slot, pos := ring.GetSlotIn()
 
 		err = ReadPartToSlot(mr, slot)
@@ -273,7 +306,7 @@ func ReadMultipartFileToRing(ring *sr.StreamRing, file string) error {
 //---------------------------------------------------------------------------
 // write the ring buffer to file
 //---------------------------------------------------------------------------
-func WriteRingToMultipartFile(ring *sr.StreamRing, file string) error {
+func WriteRingToMultipartFile(pb *pb.ProtoBase, ring *sr.StreamRing, file string) error {
 	var err error
 
 	f, err := os.Create(file)
@@ -285,7 +318,7 @@ func WriteRingToMultipartFile(ring *sr.StreamRing, file string) error {
 
 	// write ring buffer to file
 	var pos int
-	for ring.IsUsing() {
+	for ring.IsUsing() && pb.IsRun() {
 		slot, npos, err := ring.GetSlotNextByPos(pos)
 		if err != nil {
 			if err == sb.ErrEmpty {

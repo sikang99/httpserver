@@ -27,6 +27,7 @@ import (
 
 	"github.com/fatih/color"
 
+	pb "stoney/httpserver/src/protobase"
 	sb "stoney/httpserver/src/streambase"
 	si "stoney/httpserver/src/streamimage"
 	sr "stoney/httpserver/src/streamring"
@@ -51,6 +52,7 @@ type ProtoHttp struct {
 	Method   string
 	Boundary string
 	Desc     string
+	Base     *pb.ProtoBase
 }
 
 //---------------------------------------------------------------------------
@@ -69,12 +71,15 @@ func (ph *ProtoHttp) String() string {
 // make a new struct
 //---------------------------------------------------------------------------
 func NewProtoHttp(args ...string) *ProtoHttp {
+	base := pb.NewProtoBase()
+
 	ph := &ProtoHttp{
 		Host:     sb.STR_DEF_HOST,
 		Port:     sb.STR_DEF_PORT,
 		PortTls:  sb.STR_DEF_PTLS,
 		Port2:    sb.STR_DEF_PORT2,
 		Boundary: sb.STR_DEF_BDRY,
+		Base:     base,
 	}
 
 	ph.Desc = "NewProtoHttp"
@@ -93,7 +98,6 @@ func NewProtoHttp(args ...string) *ProtoHttp {
 
 func NewProtoHttpWithPorts(args ...string) *ProtoHttp {
 	ph := NewProtoHttp()
-
 	ph.Desc = "NewProtoHttpWithPorts"
 
 	for i, arg := range args {
@@ -107,6 +111,12 @@ func NewProtoHttpWithPorts(args ...string) *ProtoHttp {
 		}
 	}
 	return ph
+}
+
+func NewProtoHttpWithUrl(url string) *ProtoHttp {
+	ph := NewProtoHttp()
+	ph.Desc = "NewProtoHttpWithUrl"
+	ph.Url = url
 }
 
 //---------------------------------------------------------------------------

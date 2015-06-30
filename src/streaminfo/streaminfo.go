@@ -293,7 +293,7 @@ func GetStreamRequestFromURI(uri string) (*StreamRequest, error) {
 }
 
 //----------------------------------------------------------------------------------
-// get a new  uuid
+// get a new uuid
 // - http://stackoverflow.com/questions/15130321/is-there-a-method-to-generate-a-uuid-with-go-language
 //----------------------------------------------------------------------------------
 func GetStdUUID() (uid string) {
@@ -324,6 +324,14 @@ func GetPseudoUUID() (uid string) {
 	}
 	uid = fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 	return
+}
+
+//----------------------------------------------------------------------------------
+// get a new unique id
+//----------------------------------------------------------------------------------
+func GetNewId() string {
+	now := time.Now().UnixNano()
+	return fmt.Sprint(now)
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

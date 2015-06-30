@@ -25,6 +25,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"github.com/bradfitz/http2"
+	"github.com/fatih/color"
 
 	pf "stoney/httpserver/src/protofile"
 	ph "stoney/httpserver/src/protohttp"
@@ -105,6 +106,7 @@ func PromptReadLineWithDefault(prompt string, def string, r *bufio.Reader) (stri
 	var err error
 	var str string
 
+	prompt = fmt.Sprintf("%s [%s]: ", prompt, def)
 	str, err = PromptReadLine(prompt, r)
 	if err != nil {
 		return str, err
@@ -159,7 +161,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 	// GET ops
 	case "show":
 		if ntok < 2 {
-			fmt.Printf("usage: show [config|dir|network|channel|ring|array]\n")
+			fmt.Printf("usage: show [config|dir|network|channel|ring|array|actor]\n")
 			return err
 		}
 
@@ -174,7 +176,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 		case "ring":
 			id := "0"
 			if ntok < 3 {
-				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				id, err = PromptReadLineWithDefault("\tring id", id, r)
 				if err != nil {
 					return err
 				}
@@ -185,7 +187,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 		case "dir":
 			path := "record"
 			if ntok < 3 {
-				path, err = PromptReadLineWithDefault("dir path? [record]: ", path, r)
+				path, err = PromptReadLineWithDefault("\tdir path", path, r)
 				if err != nil {
 					return err
 				}
@@ -193,6 +195,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 				path = toks[2]
 			}
 			params.Add("path", path)
+		case "actor":
 		default:
 			fmt.Printf("I can't %s for %s\n", toks[0], toks[1])
 			return err
@@ -212,81 +215,96 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 		case "http_reader":
 			url := "http://imoment:imoment@192.168.0.91/axis-cgi/mjpg/video.cgi"
 			if ntok < 3 {
-				url, err = PromptReadLineWithDefault("url to read? [axis]: ", url, r)
+				url, err = PromptReadLineWithDefault("\turl to read", url, r)
 				if err != nil {
 					return err
 				}
 			} else {
 				url = toks[2]
 			}
+			if url == "q" { // command cancel
+				return err
+			}
 			params.Add("url", url)
 			id := "0"
 			if ntok < 4 {
-				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				id, err = PromptReadLineWithDefault("\tring id", id, r)
 				if err != nil {
 					return err
 				}
 			} else {
 				id = toks[3]
 			}
+			params.Add("id", id)
 		case "dir_reader":
 			file := "static/image/*.jpg"
 			if ntok < 3 {
-				file, err = PromptReadLineWithDefault("patten to read? [static/image/*.jpg]: ", file, r)
+				file, err = PromptReadLineWithDefault("\tpatten to read", file, r)
 				if err != nil {
 					return err
 				}
 			} else {
 				file = toks[2]
 			}
+			if file == "q" { // command cancel
+				return err
+			}
 			params.Add("file", file)
 			id := "0"
 			if ntok < 4 {
-				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				id, err = PromptReadLineWithDefault("\tring id", id, r)
 				if err != nil {
 					return err
 				}
 			} else {
 				id = toks[3]
 			}
+			params.Add("id", id)
 		case "file_reader":
 			fallthrough
 		case "file_writer":
 			file := "record/output.mjpg"
 			if ntok < 3 {
-				file, err = PromptReadLineWithDefault("file to handle? [record/output.mjpg]: ", file, r)
+				file, err = PromptReadLineWithDefault("\tfile to handle", file, r)
 				if err != nil {
 					return err
 				}
 			} else {
 				file = toks[2]
 			}
+			if file == "q" { // command cancel
+				return err
+			}
 			params.Add("file", file)
 			id := "0"
 			if ntok < 4 {
-				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				id, err = PromptReadLineWithDefault("\tring id", id, r)
 				if err != nil {
 					return err
 				}
 			} else {
 				id = toks[3]
 			}
+			params.Add("id", id)
 		case "tcp_caster":
 			fallthrough
 		case "tcp_server":
 			port := "8087"
 			if ntok < 3 {
-				port, err = PromptReadLineWithDefault("port to handle? [8087]: ", port, r)
+				port, err = PromptReadLineWithDefault("\tport to handle", port, r)
 				if err != nil {
 					return err
 				}
 			} else {
 				port = toks[2]
 			}
+			if port == "q" { // command cancel
+				return err
+			}
 			params.Add("port", port)
 			id := "0"
 			if ntok < 4 {
-				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				id, err = PromptReadLineWithDefault("\tring id", id, r)
 				if err != nil {
 					return err
 				}
@@ -301,7 +319,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 
 	case "stop":
 		if ntok < 2 {
-			fmt.Printf("usage: stop [ring|array]\n")
+			fmt.Printf("usage: stop [ring|array|actor]\n")
 			return err
 		}
 
@@ -309,17 +327,37 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 		params.Add("obj", toks[1])
 
 		switch toks[1] {
-		case "ring":
+		case "actor":
 			id := "0"
 			if ntok < 3 {
-				id, err = PromptReadLineWithDefault("Ring id? [0]: ", id, r)
+				id, err = PromptReadLineWithDefault("\tactor id", id, r)
 				if err != nil {
 					return err
 				}
+			} else {
+				id = toks[2]
+			}
+			params.Add("id", id)
+		default:
+			fmt.Printf("I can't %s for %s\n", toks[0], toks[1])
+			return err
+		}
+
+	case "close":
+		switch toks[1] {
+		case "ring":
+			id := "0"
+			if ntok < 3 {
+				id, err = PromptReadLineWithDefault("\tring id", id, r)
+				if err != nil {
+					return err
+				}
+			} else {
+				id = toks[2]
 			}
 			params.Add("id", id)
 		case "array":
-			yn, err := PromptReadLineWithDefault("Are you sure? [N/y]: ", "N", r)
+			yn, err := PromptReadLineWithDefault("\tAre you sure?", "N", r)
 			if yn != "y" {
 				return err
 			}
@@ -330,17 +368,19 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 
 	case "help":
 		if ntok < 2 {
-			fmt.Printf("usage: help [show|start|stop]\n")
+			fmt.Printf("usage: help [show|start|stop|close]\n")
 			return err
 		}
 
 		switch toks[1] {
 		case "show":
 			fmt.Printf("usage: show [config|dir|network|ring|array]\n")
+		case "close":
+			fmt.Printf("usage: close [ring|array]\n")
 		case "start":
 			fmt.Printf("usage: start [http_reader|dir_reader|file_reader/writer|tcp_caster/server]\n")
 		case "stop":
-			fmt.Printf("usage: stop [ring|array]\n")
+			fmt.Printf("usage: stop [actor] [id]\n")
 		default:
 			fmt.Printf("I can't %s for %s\n", toks[0], toks[1])
 		}
@@ -370,7 +410,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
-	fmt.Printf("%s\n", string(body))
+	fmt.Printf("%s\n", color.BlueString(string(body)))
 
 	return err
 }
@@ -403,8 +443,8 @@ func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) error {
 		log.Println(err)
 		return err
 	}
-	ring.Boundary = boundary
 
+	ring.Boundary = boundary
 	mr := multipart.NewReader(res.Body, ring.Boundary)
 
 	err = ph.ReadMultipartToRing(mr, ring)
@@ -637,14 +677,23 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 				i, err := strconv.Atoi(id)
 				if err == nil && i < len(sc.Array) {
 					ring = sc.Array[i]
+					str = fmt.Sprintf("[%d] %s", i, ring)
+				} else {
+					str = fmt.Sprintf("error> id(%s)", id)
 				}
-				str = fmt.Sprint(ring)
 			case "array":
 				for i := range sc.Array {
 					str += fmt.Sprintf("[%d] %s\n", i, sc.Array[i].BaseString())
 				}
+			case "actor":
+				for key, actor := range sc.Actors {
+					if actor.Status == sb.STATUS_IDLE {
+						delete(sc.Actors, key)
+					}
+					str += fmt.Sprintf("%s\n", actor)
+				}
 			default:
-				str = "what obj? [config|network|ring|array]"
+				str = "what obj? [config|network|ring|array|actor]"
 			}
 		default:
 			str = "what op? [show]"
@@ -656,56 +705,97 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 		case "start":
 			switch obj {
 			case "http_reader":
-				id := query.Get("id")
-				i, _ := strconv.Atoi(id)
-				i = i % len(sc.Array)
 				url := query.Get("url")
-				go sc.StreamReader(url, sc.Array[i])
-				str = fmt.Sprintf("order to start %s (%s, %s)", obj, url, id)
+				id := query.Get("id")
+				i, err := strconv.Atoi(id)
+				if err == nil && i < len(sc.Array) {
+					np := ph.NewProtoHttpWithUrl(url)
+					sc.Actors[np.Base.Id] = np.Base
+					go sc.StreamReader(url, sc.Array[i])
+					str = fmt.Sprintf("order to start %s (%s -> %s)", obj, url, id)
+				} else {
+					str = fmt.Sprintf("error: %s (%s -> %s)", obj, url, id)
+				}
 			case "dir_reader":
-				id := query.Get("id")
-				i, _ := strconv.Atoi(id)
-				i = i % len(sc.Array)
 				file := query.Get("file")
-				fp := pf.NewProtoFile(file)
-				go fp.DirReader(sc.Array[i], true)
-				str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+				id := query.Get("id")
+				i, err := strconv.Atoi(id)
+				if err == nil && i < len(sc.Array) {
+					np := pf.NewProtoFile(file)
+					sc.Actors[np.Base.Id] = np.Base
+					go np.DirReader(sc.Array[i], true)
+					str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+				} else {
+					str = fmt.Sprintf("error: %s (%s -> %s)", obj, file, id)
+				}
 			case "file_reader":
-				id := query.Get("id")
-				i, _ := strconv.Atoi(id)
-				i = i % len(sc.Array)
 				file := query.Get("file")
-				fp := pf.NewProtoFile(file)
-				go fp.StreamReader(sc.Array[i])
-				str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+				id := query.Get("id")
+				i, err := strconv.Atoi(id)
+				if err == nil && i < len(sc.Array) {
+					np := pf.NewProtoFile(file)
+					sc.Actors[np.Base.Id] = np.Base
+					go np.StreamReader(sc.Array[i])
+					str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+				} else {
+					str = fmt.Sprintf("error: %s (%s -> %s)", obj, file, id)
+				}
 			case "file_writer":
 				id := query.Get("id")
-				i, _ := strconv.Atoi(id)
-				i = i % len(sc.Array)
 				file := query.Get("file")
-				fp := pf.NewProtoFile(file)
-				go fp.StreamWriter(sc.Array[i])
-				str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+				i, err := strconv.Atoi(id)
+				if err == nil && i < len(sc.Array) {
+					np := pf.NewProtoFile(file)
+					sc.Actors[np.Base.Id] = np.Base
+					go np.StreamWriter(sc.Array[i])
+					str = fmt.Sprintf("order to start %s (%s, %s)", obj, file, id)
+				} else {
+					str = fmt.Sprintf("error: %s (%s -> %s)", obj, file, id)
+				}
 			case "tcp_server":
-				id := query.Get("id")
-				i, _ := strconv.Atoi(id)
-				i = i % len(sc.Array)
 				port := query.Get("port")
-				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
-				go tp.StreamServer(sc.Array[i])
-				str = fmt.Sprintf("order to start %s (%s, %s)", obj, port, id)
+				id := query.Get("id")
+				i, err := strconv.Atoi(id)
+				if err == nil && i < len(sc.Array) {
+					np := pt.NewProtoTcp("localhost", port, "T-Rx")
+					sc.Actors[np.Base.Id] = np.Base
+					go np.StreamServer(sc.Array[i])
+					str = fmt.Sprintf("order to start %s (%s, %s)", obj, port, id)
+				} else {
+					str = fmt.Sprintf("error: %s (%s -> %s)", obj, port, id)
+				}
 			case "tcp_caster":
-				id := query.Get("id")
-				i, _ := strconv.Atoi(id)
-				i = i % len(sc.Array)
 				port := query.Get("port")
-				tp := pt.NewProtoTcp("localhost", port, "T-Rx")
-				go tp.StreamCaster()
-				str = fmt.Sprintf("order to start %s (%s, %s)", obj, port, id)
+				id := query.Get("id")
+				i, err := strconv.Atoi(id)
+				if err == nil && i < len(sc.Array) {
+					np := pt.NewProtoTcp("localhost", port, "T-Rx")
+					sc.Actors[np.Base.Id] = np.Base
+					go np.StreamCaster()
+					str = fmt.Sprintf("order to start %s (%s, %s)", obj, port, id)
+				} else {
+					str = fmt.Sprintf("error: %s (%s -> %s)", obj, port, id)
+				}
 			default:
 				str = "what obj to start? [http_reader|dir_reader|file_reader/writer|tcp_caster/server]"
 			}
+
 		case "stop":
+			switch obj {
+			case "actor":
+				id := query.Get("id")
+				actor := sc.Actors[id]
+				if actor != nil {
+					actor.SetStatusClose()
+					str = id + " is closed"
+				} else {
+					str = id + " not exist"
+				}
+			default:
+				str = "what obj to stop? [ring|array]"
+			}
+
+		case "close":
 			switch obj {
 			case "ring":
 				id := query.Get("id")
@@ -713,7 +803,7 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 				if err == nil && i < len(sc.Array) {
 					ring = sc.Array[i]
 				} else {
-					str = "invalid ring number: " + id
+					str = "error: invalid ring number: " + id
 					break
 				}
 				err = ring.SetStatusIdle()
@@ -726,10 +816,11 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 				for i := range sc.Array {
 					sc.Array[i].SetStatusIdle()
 				}
-				str = "stopped all rings"
+				str = "closed all rings (array)"
 			default:
-				str = "what obj to stop? [ring]"
+				str = "what obj to close? [ring|array]"
 			}
+
 		default:
 			str = "what op? [start|stop]"
 		}

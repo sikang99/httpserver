@@ -26,6 +26,7 @@ import (
 
 	//"github.com/kisom/go-schannel"	// Bidirectional secure channels over TCP/IP
 
+	pb "stoney/httpserver/src/protobase"
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
@@ -47,7 +48,7 @@ type ProtoTcp struct {
 	Method   string // POST or GET
 	Boundary string
 	Conn     net.Conn
-	Quit     chan bool
+	Base     *pb.ProtoBase
 }
 
 //---------------------------------------------------------------------------
@@ -97,11 +98,13 @@ func (pt *ProtoTcp) Clear() {
 // new ProtoTcp struct in variadic style
 //---------------------------------------------------------------------------
 func NewProtoTcp(args ...string) *ProtoTcp {
+	base := pb.NewProtoBase()
+
 	pt := &ProtoTcp{
 		Host:     sb.STR_DEF_HOST,
 		Port:     sb.STR_DEF_PORT,
 		Boundary: sb.STR_DEF_BDRY,
-		Quit:     make(chan bool),
+		Base:     base,
 	}
 
 	for i, arg := range args {
@@ -197,14 +200,6 @@ func (pt *ProtoTcp) StreamServer(ring *sr.StreamRing) error {
 		conn, err := l.Accept()
 		if err != nil {
 			log.Println(err)
-
-			select {
-			case <-pt.Quit:
-				log.Printf("shutdown %s\n", STR_TCP_SERVER)
-				return nil
-			default:
-			}
-
 			continue
 		}
 

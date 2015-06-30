@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	pb "stoney/httpserver/src/protobase"
+
 	sb "stoney/httpserver/src/streambase"
 	si "stoney/httpserver/src/streaminfo"
 	sr "stoney/httpserver/src/streamring"
@@ -60,20 +62,21 @@ var hello_tmpl = `<!DOCTYPE html>
 
 //-----------------------------------------------------------------------------
 // server config
+// - http://stackoverflow.com/questions/31014838/parsing-json-into-a-struct
 //-----------------------------------------------------------------------------
 type ServerConfig struct {
-	Title string `json:"title"`
-	Image string
-	Url   string
-	Addr  string
-	Host  string
-	Port  string
-	PortS string
-	Port2 string
-	Mode  string
-	//Ring     *sr.StreamRing
+	Title    string `json:"title"`
+	Image    string
+	Url      string
+	Addr     string
+	Host     string
+	Port     string
+	PortS    string
+	Port2    string
+	Mode     string
 	Array    []*sr.StreamRing
 	Station  []*si.Channel
+	Actors   map[string]*pb.ProtoBase
 	NotiChan chan []byte
 	// http://giantmachines.tumblr.com/post/52184842286/golang-http-client-with-timeouts
 	ConnectTimeout   time.Duration
@@ -86,6 +89,8 @@ type ServerConfig struct {
 func (sc *ServerConfig) String() string {
 	str := fmt.Sprintf("\tTitle: %s", sc.Title)
 	str += fmt.Sprintf("\tMode: %s", sc.Mode)
+	str += fmt.Sprintf("\tAddr: %s", sc.Addr)
+	str += fmt.Sprintf("\tUrl: %s", sc.Url)
 	return str
 }
 
@@ -94,7 +99,9 @@ func (sc *ServerConfig) String() string {
 //-----------------------------------------------------------------------------
 func NewServerConfig() *ServerConfig {
 	sc := &ServerConfig{
-		NotiChan: make(chan []byte, 2)}
+		NotiChan: make(chan []byte, 2),
+		Actors:   make(map[string]*pb.ProtoBase),
+	}
 
 	sc.Title = "Happy Media System: MJPEG"
 	sc.Image = "static/image/gophergun.png"
@@ -104,8 +111,7 @@ func NewServerConfig() *ServerConfig {
 	sc.PortS = sb.STR_DEF_PTLS
 	sc.Port2 = sb.STR_DEF_PORT2
 
-	//sc.Ring = sr.NewStreamRingWithParams(3, sb.MBYTE, "Server stream buffer")
-	sc.Array = sr.NewStreamArrayWithSize(2, 3, sb.MBYTE)
+	sc.Array = sr.NewStreamArrayWithSize(3, 3, sb.MBYTE)
 
 	return sc
 }

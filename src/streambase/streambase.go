@@ -13,6 +13,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"reflect"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -46,11 +48,6 @@ const (
 )
 
 const (
-	STATUS_IDLE = iota
-	STATUS_USING
-	STATUS_PAUSE
-	STATUS_CLOSE
-
 	LEN_MAX_LINE = 128
 	LEN_MAX_MSG  = 1024
 
@@ -58,11 +55,26 @@ const (
 	STR_TIME_PRECISION = "Millisecond"
 )
 
+const (
+	STATUS_IDLE = iota
+	STATUS_USING
+	STATUS_CLOSE
+	STATUS_RUN
+	STATUS_PAUSE
+	STATUS_STOP
+	STATUS_RESUME
+)
+
 var StatusText = map[int]string{
-	STATUS_USING: "Using",
+	// for ring or other objects
 	STATUS_IDLE:  "Idle",
-	STATUS_PAUSE: "Pause",
+	STATUS_USING: "Using",
 	STATUS_CLOSE: "Close",
+	// for actor or worker
+	STATUS_RUN:    "Run",
+	STATUS_PAUSE:  "Pause",
+	STATUS_STOP:   "Stop",
+	STATUS_RESUME: "Resume",
 }
 
 // multipart headers
@@ -205,6 +217,64 @@ func IsTerminal() bool {
 //---------------------------------------------------------------------------
 func RedString(obj interface{}) string {
 	return color.RedString(fmt.Sprint(obj))
+}
+
+//---------------------------------------------------------------------------
+// get function name of given
+//---------------------------------------------------------------------------
+func GetFuncName(fn interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
+}
+
+//---------------------------------------------------------------------------
+// get function name of current position
+//---------------------------------------------------------------------------
+func FName() string {
+	pc, _, _, _ := runtime.Caller(0)
+	return runtime.FuncForPC(pc).Name()
+}
+
+//---------------------------------------------------------------------------
+// get function name of caller
+//---------------------------------------------------------------------------
+func FuncName() string {
+	pc, _, _, _ := runtime.Caller(1)
+	return runtime.FuncForPC(pc).Name()
+}
+
+//---------------------------------------------------------------------------
+// trace
+//---------------------------------------------------------------------------
+func Trace() {
+	pc := make([]uintptr, 10) // at least 1 entry needed
+	runtime.Callers(2, pc)
+	f := runtime.FuncForPC(pc[0])
+	file, line := f.FileLine(pc[0])
+	fmt.Printf("%s:%d %s\n", file, line, f.Name())
+}
+
+//---------------------------------------------------------------------------
+// sanity check
+//---------------------------------------------------------------------------
+func AskOrder(ch chan string, order string) string {
+	ch <- order
+
+	select {
+	case str := <-ch:
+		return str
+	default:
+		return ""
+	}
+}
+
+func AnswerStatus(ch chan string) string {
+	select {
+	case str := <-ch:
+		log.Println(str)
+		return str
+	default:
+		return ""
+	}
 }
 
 // ---------------------------------E-----N-----D-----------------------------------

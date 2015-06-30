@@ -13,6 +13,7 @@ import (
 
 	//"github.com/kisom/go-schannel"	// Bidirectional secure channels over TCP/IP
 
+	pb "stoney/httpserver/src/protobase"
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 )
@@ -32,7 +33,7 @@ type ProtoUdp struct {
 	Method   string // POST or GET
 	Boundary string
 	Conn     net.Conn
-	Quit     chan bool
+	Base     *pb.ProtoBase
 }
 
 //---------------------------------------------------------------------------
@@ -82,11 +83,13 @@ func (pt *ProtoUdp) Clear() {
 // new ProtoUdp struct in variadic style
 //---------------------------------------------------------------------------
 func NewProtoUdp(args ...string) *ProtoUdp {
+	base := pb.NewProtoBase()
+
 	pt := &ProtoUdp{
 		Host:     "localhost",
 		Port:     "8080",
 		Boundary: sb.STR_DEF_BDRY,
-		Quit:     make(chan bool),
+		Base:     base,
 	}
 
 	for i, arg := range args {

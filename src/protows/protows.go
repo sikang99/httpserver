@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	pb "stoney/httpserver/src/protobase"
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
 
@@ -56,6 +57,7 @@ type ProtoWs struct {
 	Boundary string
 	Conn     *websocket.Conn
 	Ring     *sr.StreamRing
+	Base     *pb.ProtoBase
 }
 
 //---------------------------------------------------------------------------
@@ -76,6 +78,8 @@ func (pw *ProtoWs) String() string {
 // new ProtoWs struct, variadic argument
 //---------------------------------------------------------------------------
 func NewProtoWs(args ...string) *ProtoWs {
+	base := pb.NewProtoBase()
+
 	pw := &ProtoWs{
 		Mode:     sb.STR_DEF_MODE,
 		Host:     sb.STR_DEF_HOST,
@@ -83,6 +87,7 @@ func NewProtoWs(args ...string) *ProtoWs {
 		PortTls:  sb.STR_DEF_PTLS,
 		Port2:    sb.STR_DEF_PORT2,
 		Boundary: sb.STR_DEF_BDRY,
+		Base:     base,
 	}
 
 	pw.Desc = "NewProtoWs"

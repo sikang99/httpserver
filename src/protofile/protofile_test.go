@@ -44,7 +44,7 @@ func TestHandleInfo(t *testing.T) {
 // test for read files and write to a file in multipart
 //---------------------------------------------------------------------------------
 func TestReadDirWriteMultipart(t *testing.T) {
-	ring := sr.NewStreamRing(5, sb.MBYTE)
+	ring := sr.NewStreamRingWithSize(5, sb.MBYTE)
 	fmt.Println(ring)
 
 	fr := NewProtoFile("../../static/image/*.jpg", "Testing")
@@ -60,7 +60,7 @@ func TestReadDirWriteMultipart(t *testing.T) {
 // test for reading multipart file
 //---------------------------------------------------------------------------------
 func TestReadMultipartFile(t *testing.T) {
-	ring := sr.NewStreamRing(5, sb.MBYTE)
+	ring := sr.NewStreamRingWithSize(5, sb.MBYTE)
 	fmt.Println(ring)
 
 	fd := NewProtoFile("output.mjpg", "Testing")

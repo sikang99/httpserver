@@ -133,16 +133,17 @@ func (ss *StreamSlot) IsSubType(ctype string) bool {
 //----------------------------------------------------------------------------------
 type StreamRing struct {
 	sync.Mutex
-	Id       string // Name or Id?
-	Status   int
-	Num      int    // number of slots used
-	NumMax   int    // number of slots allocated
-	Size     int    // size of the slot content
-	In       int    // input position of buffer to be written
-	Out      int    // output position of buffer to be read
-	Boundary string // description of buffer
-	Desc     string // description of buffer
-	Slots    []StreamSlot
+	Id         string // Name or Id?
+	Status     int
+	Num        int    // number of slots used
+	NumMax     int    // number of slots allocated
+	Size       int    // size of the slot content
+	In         int    // input position of buffer to be written
+	Out        int    // output position of buffer to be read
+	TotalBytes int64  // total bytes to recevie
+	Boundary   string // description of buffer
+	Desc       string // description of buffer
+	Slots      []StreamSlot
 }
 
 //----------------------------------------------------------------------------------
@@ -193,6 +194,7 @@ func (sr *StreamRing) BaseString() string {
 	str += fmt.Sprintf("\tStatus: %s(%d)", sb.StatusText[sr.Status], sr.Status)
 	str += fmt.Sprintf("\tPos: %d,%d", sr.In, sr.Out)
 	str += fmt.Sprintf("\tSize: %d/%d, %d KB", sr.Num, sr.NumMax, sr.Size/sb.KBYTE)
+	str += fmt.Sprintf("\tTotalBytes: %v", sr.TotalBytes)
 	str += fmt.Sprintf("\tBoundary: %s", sr.Boundary)
 	str += fmt.Sprintf("\tDesc: %s", sr.Desc)
 	return str

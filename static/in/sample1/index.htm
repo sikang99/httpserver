@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
@@ -8,12 +7,11 @@
 		<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
     </head>
     <body>
-		Websocket Server URL: <input type="text" id="wsUrl" value="ws://localhost:9001"><br>
+		Websocket Server URL: <input type="text" id="wsUrl" value="ws://localhost:8080/websocket"><br>
 		<input type=button id="btnStart" value="startSend" />
 		<input type=button id="btnStop" value="stopSend" />
         <p id="output"></p>
     <script src="stream.js"></script>
-    <!-- script src="script.js"></script -->
 	<script>
 	$( document ).ready(function() {
 		$("#btnStart").on("click", function() {
