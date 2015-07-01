@@ -127,8 +127,17 @@ rebuild:
 install i:
 	go install
 
-kill k:
+kill k: 
+	@echo ""
+	@echo "make (kill) [ks|kd]"
+	@echo "   ks - kill $(PROGRAM)"
+	@echo "   kd - kill godoc"
+	@echo ""
+
+ks:
 	killall httpserver
+
+kd:
 	killall godoc
 
 clean:
