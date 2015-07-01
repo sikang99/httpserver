@@ -112,6 +112,10 @@ rt:
 	curl -I http://localhost:8080/stream
 
 #------------------------------------------------------------------------------------
+doc:
+	godoc -http=:6060 &
+	@chromium-browser http://localhost:6060/pkg/stoney/httpserver/
+
 ping:
 	ping -c 3 192.168.0.91
 
@@ -125,6 +129,7 @@ install i:
 
 kill k:
 	killall httpserver
+	killall godoc
 
 clean:
 	rm -f ./$(PROGRAM)

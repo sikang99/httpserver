@@ -469,11 +469,11 @@ func (pw *ProtoWs) serveHttps(wg *sync.WaitGroup) {
 // stream handler in the server
 //---------------------------------------------------------------------------
 func (pw *ProtoWs) StreamHandler(ws *websocket.Conn) {
-	var err error
-
 	log.Printf("in for %s\n", ws.LocalAddr())
 	defer log.Printf("out for %s\n", ws.RemoteAddr())
 	defer ws.Close()
+
+	var err error
 
 	r := bufio.NewReader(ws)
 	w := bufio.NewWriter(ws)

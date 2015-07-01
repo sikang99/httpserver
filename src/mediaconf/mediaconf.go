@@ -30,6 +30,7 @@ import (
 	pf "stoney/httpserver/src/protofile"
 	ph "stoney/httpserver/src/protohttp"
 	pt "stoney/httpserver/src/prototcp"
+	pw "stoney/httpserver/src/protows"
 
 	sb "stoney/httpserver/src/streambase"
 	sr "stoney/httpserver/src/streamring"
@@ -72,7 +73,7 @@ func (sc *ServerConfig) StreamMonitor(url string) error {
 			prestr = cmdstr
 		}
 
-		err = sc.ParseMonitorCommand(cmdstr, r)
+		err = ParseMonitorCommand(cmdstr, r)
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -136,7 +137,7 @@ func PromptReadLineUntilInput(prompt string, r *bufio.Reader) (string, error) {
 //---------------------------------------------------------------------------
 // parse command
 //---------------------------------------------------------------------------
-func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) error {
+func ParseMonitorCommand(cmdstr string, r *bufio.Reader) error {
 	var err error
 
 	//fmt.Println(cmdstr)
@@ -418,7 +419,7 @@ func (sc *ServerConfig) ParseMonitorCommand(cmdstr string, r *bufio.Reader) erro
 //---------------------------------------------------------------------------
 //	multipart reader entry, mainly from camera
 //---------------------------------------------------------------------------
-func (sc *ServerConfig) StreamReader(url string, ring *sr.StreamRing) error {
+func (sc *ServerConfig) StreamReader(ring *sr.StreamRing, url string) error {
 	log.Printf("start %s for %s\n", ph.STR_HTTP_READER, url)
 	defer log.Printf("end %s for %s\n", ph.STR_HTTP_READER, url)
 
@@ -469,7 +470,7 @@ func (sc *ServerConfig) StreamCaster(url string) error {
 //---------------------------------------------------------------------------
 // http player client
 //---------------------------------------------------------------------------
-func (sc *ServerConfig) StreamPlayer(url string, ring *sr.StreamRing) error {
+func (sc *ServerConfig) StreamPlayer(ring *sr.StreamRing, url string) error {
 	log.Printf("start %s for %s\n", ph.STR_HTTP_PLAYER, url)
 	defer log.Printf("end %s for %s\n", ph.STR_HTTP_PLAYER, url)
 
@@ -608,21 +609,36 @@ func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
 	log.Printf("handle /websocket %s\n", ws.RemoteAddr())
 	defer ws.Close()
 
-	data := make([]byte, sb.MBYTE)
-	for {
-		n, err := ws.Read(data)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		fmt.Println(n)
-	}
+	var err error
 
-	err := websocket.Message.Send(ws, "Not yet implemented")
+	wp := pw.NewProtoWs()
+
+	r := bufio.NewReader(ws)
+	w := bufio.NewWriter(ws)
+
+	err = wp.HandleRequest(r, w, sc.Array[0])
 	if err != nil {
 		log.Println(err)
 		return
 	}
+
+	/*
+		data := make([]byte, sb.MBYTE)
+		for {
+			n, err := ws.Read(data)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			fmt.Println(n)
+		}
+
+		err := websocket.Message.Send(ws, "Not yet implemented")
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	*/
 }
 
 //---------------------------------------------------------------------------
@@ -711,7 +727,7 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 				if err == nil && i < len(sc.Array) {
 					np := ph.NewProtoHttpWithUrl(url)
 					sc.Actors[np.Base.Id] = np.Base
-					go sc.StreamReader(url, sc.Array[i])
+					go sc.StreamReader(sc.Array[i], url)
 					str = fmt.Sprintf("order to start %s (%s -> %s)", obj, url, id)
 				} else {
 					str = fmt.Sprintf("error: %s (%s -> %s)", obj, url, id)
@@ -787,9 +803,9 @@ func (sc *ServerConfig) CommandHandler(w http.ResponseWriter, r *http.Request) {
 				actor := sc.Actors[id]
 				if actor != nil {
 					actor.SetStatusClose()
-					str = id + " is closed"
+					str = fmt.Sprintf("%s %s is closed", obj, id)
 				} else {
-					str = id + " not exist"
+					str = fmt.Sprintf("%s %s not exist", obj, id)
 				}
 			default:
 				str = "what obj to stop? [ring|array]"

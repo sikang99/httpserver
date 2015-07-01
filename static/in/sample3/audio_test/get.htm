@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Simple Web Audio Recorder</title>
+		<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+    </head>
+    <body>
+		Websocket Server URL(GET): <input type="text" id="wsUrlGet" value="ws://10.101.101.193:9001/get" size="50"><br>
+		Get String: <input type="text" id="wsGetStr" value="GET /?channel=200 HTTP/1.1" size="50"><br>
+		<input type=button id="btnStartGet" value="startGet" />
+		<input type=button id="btnStopGet" value="stopGet" />
+        <p id="outputGet"></p>
+    <script src="get.js"></script>
+    <!-- script src="script.js"></script -->
+	<script>
+	$( document ).ready(function() {
+		$("#btnStartGet").on("click", function() {
+			console.log("btnStartGet clicked");
+			startGet();
+		});
+		$("#btnStopGet").on("click", function() {
+			console.log("btnStopGet clicked");
+			stopGet();
+		});
+	});
+	</script>
+    </body>
+</html>

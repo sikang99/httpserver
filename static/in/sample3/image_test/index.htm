@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="Author" content="">
+  <meta name="Keywords" content="">
+  <meta name="Description" content="">
+  <title>sender test</title>
+  <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+ <script src="jpeg_encoder_basic.js"></script>
+ <script>
+	var imgSrcs = ["./sky1.jpg", "./sky2.jpg", "./sky3.jpg"];
+	var curIndex = 0;
+	var canvas = null;
+	var encoder = null;
+	var quality = 90;
+	
+	function init() {		
+		encoder = new JPEGEncoder();
+		canvas = document.getElementById("imgCanvas");
+
+		initWebsocket();
+		nextImage();
+	}
+	
+	function nextImage() {
+		var base_image = new Image();
+		var ctx = canvas.getContext("2d");
+		base_image.onload = function(){
+			console.log("Loaded "+ src);
+			ctx.drawImage(base_image, 0, 0);
+			imgChanged();
+		}
+		
+		var src = imgSrcs[(curIndex++)%imgSrcs.length];
+		console.log("Loading... "+ src);
+		base_image.src = src;
+	}
+
+	function imgChanged() {
+
+		var ctx = canvas.getContext("2d");
+		var imgData = ctx.getImageData(0,0,canvas.width, canvas.height);
+		var rawData = encoder.encode(imgData, quality, true);
+		
+		var blob = new Blob([rawData.buffer], {type:'image/jpeg'});
+		
+		socket.send(blob);
+        console.log('sendToServer...');
+
+		
+	}
+
+	function initWebsocket() {
+		//socket = new WebSocket(host, "audio_stream");
+		var host = $("#wsUrl").val();
+		socket = new WebSocket(host);
+		socket.binaryType = "blob";
+		socket.onopen = function() {
+			console.log("socket.onopen");
+		}
+
+		socket.onmessage = function(msg) {
+			console.log("socket.onmessage "+ msg.data.size);
+		}
+
+		socket.onclose = function() {
+			console.log("socket.onclose");
+		}
+	}
+
+ </script>
+ </head>
+ <body onload="init()">
+	Websocket Server URL: <input type="text" id="wsUrl" value="ws://localhost:9001"><br>
+	<canvas id="imgCanvas" width="600" height="400"></canvas><br>
+	<button onclick="nextImage()">next</button>
+ </body>
+</html>

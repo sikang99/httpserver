@@ -117,6 +117,7 @@ func NewProtoHttpWithUrl(url string) *ProtoHttp {
 	ph := NewProtoHttp()
 	ph.Desc = "NewProtoHttpWithUrl"
 	ph.Url = url
+	return ph
 }
 
 //---------------------------------------------------------------------------

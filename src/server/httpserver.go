@@ -84,6 +84,7 @@ func main() {
 	fmt.Printf("Default ports: %s,%s,%s\n", sc.Port, sc.PortS, sc.Port2)
 	fmt.Printf("Working mode: %s\n", sc.Mode)
 
+	//hp := ph.NewProtoHttpWithPorts(sc.Port, sc.PortS, sc.Port2)
 	tp := pt.NewProtoTcpWithPorts("8087")
 	wp := pw.NewProtoWsWithPorts("8087", "8443")
 
@@ -94,9 +95,9 @@ func main() {
 
 	// package protohttp
 	case "http_reader":
-		sc.StreamReader(sc.Url, ring)
+		sc.StreamReader(ring, sc.Url)
 	case "http_player":
-		sc.StreamPlayer(sc.Url, ring)
+		sc.StreamPlayer(ring, sc.Url)
 	case "http_caster":
 		sc.StreamCaster(sc.Url)
 	case "http_server":
