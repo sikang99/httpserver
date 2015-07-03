@@ -345,6 +345,14 @@ func ParseMonitorCommand(cmdstr string, r *bufio.Reader) error {
 		}
 
 	case "close":
+		if ntok < 2 {
+			fmt.Printf("usage: close [ring|array]\n")
+			return err
+		}
+
+		method = "POST"
+		params.Add("obj", toks[1])
+
 		switch toks[1] {
 		case "ring":
 			id := "0"
@@ -613,32 +621,11 @@ func (sc *ServerConfig) WebsocketHandler(ws *websocket.Conn) {
 
 	wp := pw.NewProtoWs()
 
-	r := bufio.NewReader(ws)
-	w := bufio.NewWriter(ws)
-
-	err = wp.HandleRequest(r, w, sc.Array[0])
+	err = wp.HandleRequest(ws, sc.Array[0])
 	if err != nil {
 		log.Println(err)
 		return
 	}
-
-	/*
-		data := make([]byte, sb.MBYTE)
-		for {
-			n, err := ws.Read(data)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			fmt.Println(n)
-		}
-
-		err := websocket.Message.Send(ws, "Not yet implemented")
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	*/
 }
 
 //---------------------------------------------------------------------------

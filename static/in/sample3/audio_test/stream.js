@@ -75,7 +75,7 @@ function success(e){
 
 var sendFlag = false;
 var socket = null;
-var host = "ws://localhost:9001/"
+var host = "ws://localhost:8080/"
 var size = 0;
 function startSend() {
 	// connect ws
@@ -84,8 +84,13 @@ function startSend() {
 	socket = new WebSocket(host);
 	socket.binaryType = "arraybuffer";
 	socket.onopen = function() {
-		sendFlag = true;
-		headerSent = false;
+		
+		var data = "POST /live?channel=100&source=1 HTTP/1.1\r\n"+
+					"User-Agent: HeritTestApp\r\n"+
+					"Content-Type: multipart/x-mixed-replace;boundary=agilemedia\r\n\r\n";
+		socket.send(data);
+		headerSent = true;
+
 		console.log("socket.onopen");
 	}
 
@@ -93,7 +98,7 @@ function startSend() {
 		if (typeof msg.data == "object") {
 			size += msg.data.byteLength;
 			console.log("socket.onmessage "+ typeof msg.data +" " + size +" "+ msg.data.byteLength);
-
+			
 			///////////////////////////////////////////////////////////////////////////////
 			// playback using echo message
 			/*
@@ -104,6 +109,14 @@ function startSend() {
 			source.connect(context.destination);
 			source.start(0);		
 			*/
+		} else {
+			console.log("socket.onmessage "+ typeof msg.data +" " + msg.data);
+			
+			if (msg.data.indexOf("200 Ok") >= 0) {
+				sendFlag = true;
+			} else {
+				alert(msg.data);
+			}
 		}
 	}
 
@@ -130,31 +143,25 @@ function stopSend() {
 }
 
 var sentTotal = 0;
-var headerSent = false;
+
 function sendToServer(left, right) {
 
 	if (sendFlag == true)
 	{
 		var data = null;
-		if (headerSent == false)
-		{
-			data = "POST /live?channel=100&source=1 HTTP/1.1\r\n"+
-					"User-Agent: HeritTestApp\r\n"+
-					"Content-Type: multipart/x-mixed-replace;boundary=--agilemedia\r\n";
-			socket.send(data);
-			headerSent = true;
-		}
-
 		data = "\r\n--agilemedia\r\n"+
-				"Content-Type: audio/pcm\r\n"+
-				"Content-Length: "+left.byteLength+"\r\n"+
-				"X-Audio-Format: format=pcm_16; channel=1; frequency="+sampleRate+"\r\n\r\n";
+				"Content-Type: audio/pcm; format=pcm_16; channel=1; frequency="+sampleRate+"\r\n"+
+				"Content-Length: "+left.byteLength+"\r\n\r\n";
+				//"Content-Type: audio/pcm\r\n"+
+				//"Content-Length: "+left.byteLength+"\r\n"+
+				//"X-Audio-Format: format=pcm_16; channel=1; frequency="+sampleRate+"\r\n\r\n";
 		socket.send(data);
 				
 		data = left;
 		socket.send(data);
+
 		sentTotal += data.byteLength;
-		outputElementPost.innerHTML = 'Sending now... ('+sentTotal+')';
+		outputElementPost.innerHTML = 'Sending now... ('+data.byteLength+':'+sentTotal+')';
         //console.log('sendToServer:' + data.byteLength +":"+sentTotal);
 	}
 }

@@ -103,7 +103,7 @@ func NewServerConfig() *ServerConfig {
 		Actors:   make(map[string]*pb.ProtoBase),
 	}
 
-	sc.Title = "Happy Media System: MJPEG"
+	sc.Title = "Happy Media System"
 	sc.Image = "static/image/gophergun.png"
 	sc.Addr = "http://localhost"
 	sc.Host = sb.STR_DEF_HOST

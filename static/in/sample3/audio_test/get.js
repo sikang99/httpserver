@@ -27,7 +27,7 @@ var source, buffer;
 
 var sendFlag = false;
 var socket = null;
-var host = "ws://localhost:9001/"
+var host = "ws://localhost:8080/websocket"
 var size = 0;
 function startSend() {
 
@@ -93,7 +93,7 @@ function sendToServer(left, right) {
 		{
 			data = "POST /live?channel=100&source=1 HTTP/1.1\r\n"+
 					"User-Agent: HeritTestApp\r\n"+
-					"Content-Type: multipart/x-mixed-replace;boundary=--agilemedia\r\n";
+					"Content-Type: multipart/x-mixed-replace;boundary=agilemedia\r\n";
 			socket.send(data);
 			headerSent = true;
 		}
@@ -170,6 +170,9 @@ function startGet() {
 			source.start(0);
 		
 			outputElementGet.innerHTML = 'Receiving now... ('+getSize+')';
+		} else {
+			//console.log(decodeUtf8(msg.data));
+			console.log("socketGet.onmessage "+ typeof msg.data +" " + msg.data.byteLength);
 		}
 	}
 
